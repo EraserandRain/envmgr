@@ -9,8 +9,8 @@ crontab -l
 ```bash
 crontab -e
 
-*/10 * * * *    sudo ntpdate ntp.aliyun.com
-10,40 * * * *   cat ~/.zshrc > ~/install/zsh/zshrc.bak
+* */1 * * *   sudo ntpdate ntp.aliyun.com
+* */2 * * *   cat ~/.zshrc > ~/install/zsh/zshrc.bak
     ## backup ~/.zshrc
-10,40 * * * *   ~/install/autopushtoGithub.sh > /dev/null
+* */2 * * *   ~/install/autopushtoGithub.sh > /dev/null
 ```
