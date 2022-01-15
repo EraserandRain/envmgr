@@ -7,7 +7,8 @@ crontab -l
 编辑 `crontab`
 ```zsh
 crontab -e
-
+```
+```zsh
 * */1 * * *   sudo ntpdate ntp.aliyun.com
 * */2 * * *   cat ~/.zshrc > ~/install/zsh/zshrc.bak
     ## backup ~/.zshrc
