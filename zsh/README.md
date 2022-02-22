@@ -10,7 +10,10 @@ crontab -e
 ```
 ```zsh
 * */1 * * *   sudo ntpdate ntp.aliyun.com
-* */2 * * *   cat ~/.zshrc > ~/install/zsh/zshrc.bak
+* */2 * * *   cat ~/.zshrc > ~/install/zsh/.zshrc
     ## backup ~/.zshrc
 * */2 * * *   ~/install/zsh/zshrc-push.sh > /dev/null
 ```
+
+## 更新本地 `~/.zshrc` 文件
+执行 `zsh/zshrc-update.sh` 即可
