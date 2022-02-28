@@ -12,7 +12,7 @@ crontab -e
 * */1 * * *   sudo ntpdate ntp.aliyun.com
 * */2 * * *   cat ~/.zshrc > ~/install/zsh/.zshrc
     ## backup ~/.zshrc
-* */2 * * *   ~/install/zsh/zshrc-push.sh > /dev/null
+* */6 * * *   ~/install/zsh/zshrc-push.sh > /dev/null
 ```
 
 ## 更新本地 `~/.zshrc` 文件
