@@ -16,5 +16,6 @@ plugins=(
 
 ## alias
 alias clr="clear"
+alias gac="git add . && git commit"
 ## reload
 source $ZSH/oh-my-zsh.sh
