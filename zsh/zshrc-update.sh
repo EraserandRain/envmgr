@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/zsh
 
 ## descrition
     ## This script is used for
