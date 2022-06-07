@@ -14,4 +14,5 @@ do
     sudo sed -i "/github/d" /etc/hosts
     sudo bash -c "cat hosts_tmp >> /etc/hosts"
 done
+sudo echo "# GitHub hosts update at `date -d '0 day' '+%Y-%m-%d %X' `" >> /etc/hosts
 exit 0
