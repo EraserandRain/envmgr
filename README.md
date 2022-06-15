@@ -6,5 +6,6 @@ install
 ├── drive
 ├── hosts
 ├── nvm
+├── yum
 └── zsh
 ```

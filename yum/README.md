@@ -1,9 +1,9 @@
 ## 配置 yum 源
 ```bash
 ## Centos 6 
-curl  | sh
+curl https://raw.githubusercontent.com/EraserandRain/install/master/yum/centos6_yum.sh | sh
 
 
 ## Centos 7
-curl  | sh
+curl https://raw.githubusercontent.com/EraserandRain/install/master/yum/centos7_yum.sh | sh
 ```
