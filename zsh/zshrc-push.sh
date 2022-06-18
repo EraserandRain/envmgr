@@ -1,8 +1,6 @@
 #!/bin/bash
 
-## descrition
-    ## This script is used for
-        ## 1.auto push zshrc.bak to github
+## descrition: auto push zshrc.bak to github
 cd ~/install
 git add .
 git commit -m 'autoPush'

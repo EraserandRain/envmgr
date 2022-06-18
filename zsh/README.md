@@ -10,7 +10,7 @@ crontab -e
 ```
 ```zsh
 * */1 * * *   sudo ntpdate ntp.aliyun.com
-* */2 * * *   cat ~/.zshrc > ~/install/zsh/.zshrc
+* */2 * * *   cat ~/.zshrc > ~/install/zsh/zshrc.bak
     ## backup ~/.zshrc
 * */6 * * *   ~/install/zsh/zshrc-push.sh > /dev/null
 ```
