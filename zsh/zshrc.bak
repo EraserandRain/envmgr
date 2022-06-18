@@ -1,12 +1,12 @@
 ## export
 	## zsh
-export ZSH="~/.oh-my-zsh"
+export ZSH="$HOME/.oh-my-zsh"
 	## nvm
 export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
 [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
     ## docker-compose
-export PATH=$PATH:~/.local/bin
+export PATH=$PATH:$HOME/.local/bin
 
 ## theme and plugins
 ZSH_THEME="lambda"
