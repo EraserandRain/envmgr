@@ -11,8 +11,7 @@ ZSH_THEME="lambda"
 plugins=(
     git
     zsh-autosuggestions)
-
-PS1='hahaλ %~/ $(git_prompt_info)%{$reset_color%}'
 ## alias
 alias clr="clear"
 alias gac="git add . && git commit"
+alias gst="git status"
