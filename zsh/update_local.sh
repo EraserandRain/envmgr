@@ -15,15 +15,15 @@ EOF
 }
 
 update_wsl() {
-    $ZSHFILE=wsl
-    cat ~/install/zsh/bak_for_zshrc/$ZSHFILE >~/.zshrc
+    ZSHFILE=wsl
+    cat ~/install/zsh/bak_for_zshrc/$ZSHFILE > ~/.zshrc
     source ~/.zshrc
     exit 0
 }
 
 update_ubuntu() {
-    $ZSHFILE=ubuntu_docker
-    cat ~/install/zsh/bak_for_zshrc/$ZSHFILE >~/.zshrc
+    ZSHFILE=ubuntu_docker
+    cat ~/install/zsh/bak_for_zshrc/$ZSHFILE > ~/.zshrc
     source ~/.zshrc
     exit 0
 }
