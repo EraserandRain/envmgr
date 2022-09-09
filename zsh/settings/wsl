@@ -1,0 +1,13 @@
+#!/usr/bin/env zsh
+
+# Set Device
+Device='wsl'
+
+# Loading
+source ~/install/zsh/settings/include/common.sh
+loadPath
+loadZsh
+loadNvm
+loadAlias
+fix_wsl2_interop
+reload $Device

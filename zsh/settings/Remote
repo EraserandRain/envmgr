@@ -1,0 +1,12 @@
+#!/usr/bin/env zsh
+
+# Set Device
+Device='Remote'
+
+# Loading
+source ~/install/zsh/settings/include/common.sh
+loadPath
+loadZsh
+loadNvm
+loadAlias
+reload $Device

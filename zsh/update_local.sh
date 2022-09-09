@@ -17,7 +17,7 @@ EOF
 }
 
 update_local_zsh() {
-    cat ~/install/zsh/bak_for_zshrc/$ZSHFILE > ~/.zshrc
+    cat ~/install/zsh/settings/$ZSHFILE > ~/.zshrc
     source ~/.zshrc
     exit 0
 }
