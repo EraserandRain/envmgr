@@ -25,8 +25,8 @@ function loadAlias(){
     alias clr="clear"
     alias gac="git add . && git commit"
     alias gst="git status"
-    alias dps="docker ps"
-    alias dpsa="docker ps -as"
+    alias dps="docker ps -as"
+    alias dc="docker-compose"
 }
 
 function reload(){
