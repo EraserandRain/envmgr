@@ -19,7 +19,6 @@ EOF
 update_local_zsh() {
     cat ~/install/zsh/settings/$ZSHFILE > ~/.zshrc
     source ~/.zshrc
-    exit 0
 }
 
 # Main
@@ -46,4 +45,3 @@ do
             ;;
     esac
 done
-exit 0
