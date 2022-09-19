@@ -4,7 +4,7 @@
 Device='Docker'
 
 # Loading
-source ~/install/zsh/settings/include/common.sh
+source ~/install/include/common.sh
 loadPath
 loadZsh
 loadNvm
