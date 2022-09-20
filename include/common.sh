@@ -41,3 +41,38 @@ function fix_wsl2_interop() {
         fi
     done
 }
+
+function install_python3_env() {
+    sudo apt-get -y install python3 python3-pip
+}
+
+function install_cpp_env() {
+    sudo apt-get -y install gcc automake autoconf libtool make build-essential gdb
+}
+
+function install_node_env() {
+    sudo ~/install/nvm/install-nvm.sh
+    load_nvm
+    nvm install --lts 
+    npm i -g npm nrm pnpm
+    nrm use tencent 
+}
+
+function install_ubuntu_docker() {
+    ~/install/docker/install_ubuntu_docker.sh
+}
+
+
+function install_docker_compose() {
+    install_python3_env
+    pip3 install docker-compose -i https://mirrors.aliyun.com/pypi/simple/
+    load_path
+}
+
+function install_zsh() {
+    sudo apt-get -y install zsh 
+    ~/install/zsh/install_omz.sh --skip-chsh
+    sudo chsh -s /usr/bin/zsh
+    git clone https://github.com/zsh-users/zsh-autosuggestions ~/.oh-my-zsh/custom/plugins/zsh-autosuggestions
+    git clone https://github.com/zsh-users/zsh-syntax-highlighting.git ~/.oh-my-zsh/custom/plugins/zsh-syntax-highlighting 
+}
