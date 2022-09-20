@@ -11,5 +11,5 @@ fi
 
 sudo gpasswd -a $USER docker
 sudo service docker restart
-
+sudo chmod 666 /var/run/docker.sock
 rm -rf get-docker.sh
