@@ -1,13 +1,13 @@
 #!/usr/bin/env zsh
-function setDevice() {
+function set_device() {
     return $1
 }
 
-function loadPath() {
+function load_path() {
     export PATH=$PATH:$HOME/.local/bin
 }
 
-function loadZsh() {
+function load_zsh() {
     export ZSH="$HOME/.oh-my-zsh"
     ZSH_THEME="lambda"
     plugins=(
@@ -15,13 +15,13 @@ function loadZsh() {
         zsh-autosuggestions)
 }
 
-function loadNvm() {
+function load_nvm() {
     export NVM_DIR="$HOME/.nvm"
     [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
     [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
 }
 
-function loadAlias(){
+function load_alias(){
     alias clr="clear"
     alias gac="git add . && git commit"
     alias gst="git status"
@@ -29,7 +29,7 @@ function loadAlias(){
     alias dc="docker-compose"
 }
 
-function reload(){
+function reload_zsh(){
     source ~/.oh-my-zsh/oh-my-zsh.sh
     export PROMPT="%F{cyan}[$1]%f $PROMPT"
 }

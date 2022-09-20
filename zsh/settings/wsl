@@ -5,9 +5,8 @@ Device='wsl'
 
 # Loading
 source ~/install/include/common.sh
-loadPath
-loadZsh
-loadNvm
-loadAlias
-fix_wsl2_interop
-reload $Device
+load_path
+load_zsh
+load_nvm
+load_alias
+reload_zsh $Device
