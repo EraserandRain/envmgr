@@ -42,7 +42,7 @@ function load_alias() {
 }
 
 function reload_zsh() {
-    # source $workdir/.oh-my-zsh/oh-my-zsh.sh
+    source ~/.oh-my-zsh/oh-my-zsh.sh
     export PROMPT="%F{cyan}[$1]%f $PROMPT"
 }
 
