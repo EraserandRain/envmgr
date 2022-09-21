@@ -58,7 +58,7 @@ function install_cpp_env() {
 }
 
 function install_node_env() {
-    sudo ~/install/nvm/install-nvm.sh
+    ~/install/nvm/install_nvm.sh
     load_nvm
     nvm install --lts
     npm i -g npm nrm pnpm
