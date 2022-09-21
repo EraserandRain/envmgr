@@ -81,5 +81,4 @@ function set_apt_mirror(){
     sudo mv /etc/apt/sources.list /etc/apt/sources.list.bak
     sudo cp ~/install/include/sources.list /etc/apt/sources.list
     sudo apt-get -y update
-    sudo apt-get -y upgrade
 }
