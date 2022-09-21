@@ -9,7 +9,7 @@ print_usage() {
     OPTIONS:
         -w : update local ~/.zshrc in WSL
         -d : update local ~/.zshrc in Docker
-        -r : update local ~/.zshrc in Remote Server
+        -c : update local ~/.zshrc in Common
         -h : show this help and exit    
 
 EOF
@@ -22,7 +22,7 @@ update_local_zsh() {
 }
 
 # Main
-while getopts "h w d r" OPT
+while getopts "h w d c" OPT
 do
     case $OPT in
         h)
@@ -36,8 +36,8 @@ do
             ZSHFILE=Docker
             update_local_zsh
             ;;
-        r)
-            ZSHFILE=Remote
+        c)
+            ZSHFILE=Common
             update_local_zsh
             ;;
         *)

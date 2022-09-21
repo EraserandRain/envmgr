@@ -1,7 +1,7 @@
 #!/usr/bin/env zsh
 
 # Set Device
-Device='Remote'
+Device=`hostname -s`
 
 # Loading
 source ~/install/include/common.sh
