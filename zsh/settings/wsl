@@ -8,5 +8,8 @@ source ~/install/include/common.sh
 load_path
 load_zsh
 load_nvm
+load_vagrant
 load_alias
+fix_wsl2_interop
+disable_needrestart
 reload_zsh $Device

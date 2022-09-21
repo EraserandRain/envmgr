@@ -17,19 +17,26 @@ function load_zsh() {
 
 function load_nvm() {
     export NVM_DIR="$HOME/.nvm"
-    [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
-    [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
+    [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"                   # This loads nvm
+    [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion" # This loads nvm bash_completion
 }
 
-function load_alias(){
+function load_vagrant() {
+    export VAGRANT_WSL_ENABLE_WINDOWS_ACCESS=1
+    export PATH="$PATH:/mnt/d/APP/virtualbox"
+}
+
+function load_alias() {
     alias clr="clear"
     alias gac="git add . && git commit"
     alias gst="git status"
+    alias gstb="git status -sb"
     alias dps="docker ps -as"
     alias dc="docker-compose"
+    alias vbm="vboxmanage"
 }
 
-function reload_zsh(){
+function reload_zsh() {
     source ~/.oh-my-zsh/oh-my-zsh.sh
     export PROMPT="%F{cyan}[$1]%f $PROMPT"
 }
@@ -53,15 +60,14 @@ function install_cpp_env() {
 function install_node_env() {
     sudo ~/install/nvm/install-nvm.sh
     load_nvm
-    nvm install --lts 
+    nvm install --lts
     npm i -g npm nrm pnpm
-    nrm use tencent 
+    nrm use tencent
 }
 
 function install_ubuntu_docker() {
     ~/install/docker/install_ubuntu_docker.sh
 }
-
 
 function install_docker_compose() {
     install_python3_env
@@ -70,23 +76,20 @@ function install_docker_compose() {
 }
 
 function install_zsh() {
-    sudo apt-get -y install zsh 
+    sudo apt-get -y install zsh
     ~/install/zsh/install_omz.sh --skip-chsh
     sudo chsh -s /usr/bin/zsh
     git clone https://github.com/zsh-users/zsh-autosuggestions ~/.oh-my-zsh/custom/plugins/zsh-autosuggestions
-    git clone https://github.com/zsh-users/zsh-syntax-highlighting.git ~/.oh-my-zsh/custom/plugins/zsh-syntax-highlighting 
+    git clone https://github.com/zsh-users/zsh-syntax-highlighting.git ~/.oh-my-zsh/custom/plugins/zsh-syntax-highlighting
 }
 
-function set_apt_mirror(){
+function set_apt_mirror() {
     sudo mv /etc/apt/sources.list /etc/apt/sources.list.bak
     sudo cp ~/install/include/sources.list /etc/apt/sources.list
     sudo apt-get -y update
 }
 
-function disable_needrestart(){
-    sudo sed -i "/$nrconf{restart}/ s|'i'|'a'|" /etc/needrestart/needrestart.conf 
+function disable_needrestart() {
+    sudo sed -i "/$nrconf{restart}/ s|'i'|'a'|" /etc/needrestart/needrestart.conf
     sudo sed -i "/^#.*$nrconf{restart}/s/^#//" /etc/needrestart/needrestart.conf
 }
-
-
-
