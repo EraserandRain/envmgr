@@ -1,8 +1,8 @@
 ## Project Description
-| **File**|**Description**|
+| **Directory**|**Description**|
 |-|-| 
-|docker/|Install wsl docker|
-|hosts/|sync github host to `/etc/hosts`|
+|docker/|Install Ubuntu Docker|
+|hosts/|Sync github host to `/etc/hosts`|
 |nvm/|Install nvm|
-|yum/| yum mirror|
+|yum/|Set yum mirror|
 |zsh/|Install and Config zsh|
