@@ -82,3 +82,11 @@ function set_apt_mirror(){
     sudo cp ~/install/include/sources.list /etc/apt/sources.list
     sudo apt-get -y update
 }
+
+function disable_needrestart(){
+    sudo sed -i "/$nrconf{restart}/ s|'i'|'a'|" /etc/needrestart/needrestart.conf 
+    sudo sed -i "/^#.*$nrconf{restart}/s/^#//" /etc/needrestart/needrestart.conf
+}
+
+
+
