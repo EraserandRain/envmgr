@@ -1,9 +1,4 @@
 #!/usr/bin/env zsh
-current_user=$(whoami)
-workdir=""
-function set_workdir() {
-    [ $current_user = "root" ] && workdir="/root" || workdir="/home/$current_user"
-}
 function set_device() {
     return $1
 }
@@ -42,7 +37,7 @@ function load_alias() {
 }
 
 function reload_zsh() {
-    source ~/.oh-my-zsh/oh-my-zsh.sh
+    source $HOME/.oh-my-zsh/oh-my-zsh.sh
     export PROMPT="%F{cyan}[$1]%f $PROMPT"
 }
 
@@ -63,7 +58,7 @@ function install_cpp_env() {
 }
 
 function install_node_env() {
-    $workdir/install/nvm/install_nvm.sh
+    $HOME/install/nvm/install_nvm.sh
     load_nvm
     nvm install --lts
     npm i -g npm nrm pnpm
@@ -71,7 +66,7 @@ function install_node_env() {
 }
 
 function install_ubuntu_docker() {
-    $workdir/install/docker/install_ubuntu_docker.sh
+    $HOME/install/docker/install_ubuntu_docker.sh
 }
 
 function install_docker_compose() {
@@ -82,15 +77,15 @@ function install_docker_compose() {
 
 function install_zsh() {
     sudo apt-get -y install zsh
-    $workdir/install/zsh/install_omz.sh --skip-chsh
+    $HOME/install/zsh/install_omz.sh --skip-chsh
     sudo chsh -s /usr/bin/zsh
-    git clone https://github.com/zsh-users/zsh-autosuggestions $workdir/.oh-my-zsh/custom/plugins/zsh-autosuggestions
-    git clone https://github.com/zsh-users/zsh-syntax-highlighting.git $workdir/.oh-my-zsh/custom/plugins/zsh-syntax-highlighting
+    git clone https://github.com/zsh-users/zsh-autosuggestions $HOME/.oh-my-zsh/custom/plugins/zsh-autosuggestions
+    git clone https://github.com/zsh-users/zsh-syntax-highlighting.git $HOME/.oh-my-zsh/custom/plugins/zsh-syntax-highlighting
 }
 
 function set_apt_mirror() {
     sudo mv /etc/apt/sources.list /etc/apt/sources.list.bak
-    sudo cp $workdir/install/include/sources.list /etc/apt/sources.list
+    sudo cp $HOME/install/include/sources.list /etc/apt/sources.list
     sudo apt-get -y update
 }
 
