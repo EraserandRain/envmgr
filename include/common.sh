@@ -78,14 +78,14 @@ function install_docker_compose() {
 function install_zsh() {
     sudo apt-get -y install zsh
     $HOME/install/zsh/install_omz.sh --skip-chsh
-    sudo chsh -s /usr/bin/zsh
     git clone https://github.com/zsh-users/zsh-autosuggestions $HOME/.oh-my-zsh/custom/plugins/zsh-autosuggestions
     git clone https://github.com/zsh-users/zsh-syntax-highlighting.git $HOME/.oh-my-zsh/custom/plugins/zsh-syntax-highlighting
+    chsh -s /usr/bin/zsh
 }
 
 function set_apt_mirror() {
     sudo mv /etc/apt/sources.list /etc/apt/sources.list.bak
-    sudo cp $HOME/install/include/sources.list /etc/apt/sources.list
+    sudo cp -r $HOME/install/include/sources.list /etc/apt/sources.list
     sudo apt-get -y update
 }
 
