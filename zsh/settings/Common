@@ -9,5 +9,5 @@ load_path
 load_zsh
 load_nvm
 load_alias
-disable_needrestart
+if_jammy_run disable_needrestart
 reload_zsh $Device

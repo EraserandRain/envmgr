@@ -11,5 +11,5 @@ load_nvm
 load_vagrant
 load_alias
 fix_wsl2_interop
-disable_needrestart
+if_jammy_run disable_needrestart
 reload_zsh $Device

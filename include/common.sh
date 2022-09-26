@@ -93,3 +93,8 @@ function disable_needrestart() {
     sudo sed -i "/$nrconf{restart}/ s|'i'|'a'|" /etc/needrestart/needrestart.conf
     sudo sed -i "/^#.*$nrconf{restart}/s/^#//" /etc/needrestart/needrestart.conf
 }
+
+function if_jammy_run(){
+    source /etc/os-release
+    [[ $VERSION_ID == '22.04' ]] && $1
+}
