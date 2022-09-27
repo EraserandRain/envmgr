@@ -9,6 +9,6 @@ load_path
 load_zsh
 load_nvm
 load_alias
-if_jammy_run disable_needrestart
+if_jammy_os disable_needrestart
 set_git_config
 reload_zsh $Device

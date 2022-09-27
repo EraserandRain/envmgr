@@ -11,6 +11,6 @@ load_nvm
 load_vagrant
 load_alias
 fix_wsl2_interop
-if_jammy_run disable_needrestart
+if_jammy_os disable_needrestart
 set_git_config
 reload_zsh $Device
