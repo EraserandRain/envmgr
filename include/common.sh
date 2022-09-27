@@ -94,17 +94,12 @@ function disable_needrestart() {
     sudo sed -i "/^#.*$nrconf{restart}/s/^#//" /etc/needrestart/needrestart.conf
 }
 
-function if_jammy_run(){
-    source /etc/os-release
-    [[ $VERSION_ID == '22.04' ]] && $1
+function if_jammy_os() {
+    [[ "$(lsb_release -rs)" == '22.04' ]] && $1
 }
 
-function set_git_config(){
+function set_git_config() {
     cd $HOME
-    cat << EOF > .gitconfig
-[core]
-        editor = vim
-[init]
-        defaultBranch = main
-EOF
+    git config --global core.editor vim
+    git config --global init.defaultBranch main
 }
