@@ -41,14 +41,6 @@ function reload_zsh() {
     export PROMPT="%F{cyan}[$1]%f $PROMPT"
 }
 
-function fix_wsl2_interop() {
-    for i in $(pstree -np -s $$ | grep -o -E '[0-9]+'); do
-        if [[ -e "/run/WSL/${i}_interop" ]]; then
-            export WSL_INTEROP=/run/WSL/${i}_interop
-        fi
-    done
-}
-
 function install_python3_env() {
     sudo apt-get -y install python3 python3-pip
 }
@@ -102,4 +94,19 @@ function set_git_config() {
     cd $HOME
     git config --global core.editor vim
     git config --global init.defaultBranch main
+}
+
+# WSL2 
+
+function wsl2_fix_interop() {
+    for i in $(pstree -np -s $$ | grep -o -E '[0-9]+'); do
+        if [[ -e "/run/WSL/${i}_interop" ]]; then
+            export WSL_INTEROP=/run/WSL/${i}_interop
+        fi
+    done
+}
+
+function wsl2_startup_docker() {
+    local docker_status=$(ps aux | grep dockerd | grep -v grep)
+    [[ -z $docker_status ]] && sudo service docker start
 }
