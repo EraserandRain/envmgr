@@ -3,6 +3,61 @@ function set_device() {
     return $1
 }
 
+# Install
+function install_env() {
+    local ARGS=$(getopt -o '' -l ' \
+        node, \
+        python, \
+        cpp, \
+        ubuntu_docker, \
+        zsh \
+    ' -- "$@")
+    [[ $? != 0 ]] && echo "Parse error! Terminating..." >&2 && exit 1
+    eval set -- $ARGS
+    while true; do
+        case "$1" in
+        --node)
+            $HOME/install/nvm/install_nvm.sh
+            load_nvm
+            nvm install --lts
+            npm i -g npm nrm pnpm
+            nrm use tencent
+            shift
+            ;;
+        --python)
+            sudo apt-get -y install python3 python3-pip
+            shift
+            ;;
+        --cpp)
+            sudo apt-get -y install gcc automake autoconf libtool make build-essential gdb
+            shift
+            ;;
+        --ubuntu_docker)
+            $HOME/install/docker/install_ubuntu_docker.sh
+            pip3 install docker-compose -i https://mirrors.aliyun.com/pypi/simple/
+            load_path
+            shift
+            ;;
+        --zsh)
+            sudo apt-get -y install zsh
+            $HOME/install/zsh/install_omz.sh --skip-chsh
+            git clone https://github.com/zsh-users/zsh-autosuggestions $HOME/.oh-my-zsh/custom/plugins/zsh-autosuggestions
+            git clone https://github.com/zsh-users/zsh-syntax-highlighting.git $HOME/.oh-my-zsh/custom/plugins/zsh-syntax-highlighting
+            chsh -s /usr/bin/zsh
+            shift
+            ;;
+        --)
+            shift
+            break
+            ;;
+        *)
+            echo "Unknown Args"
+            exit 1
+            ;;
+        esac
+    done
+}
+
 function load_path() {
     export PATH=$PATH:$HOME/.local/bin
 }
@@ -41,40 +96,6 @@ function reload_zsh() {
     export PROMPT="%F{cyan}[$1]%f $PROMPT"
 }
 
-function install_python3_env() {
-    sudo apt-get -y install python3 python3-pip
-}
-
-function install_cpp_env() {
-    sudo apt-get -y install gcc automake autoconf libtool make build-essential gdb
-}
-
-function install_node_env() {
-    $HOME/install/nvm/install_nvm.sh
-    load_nvm
-    nvm install --lts
-    npm i -g npm nrm pnpm
-    nrm use tencent
-}
-
-function install_ubuntu_docker() {
-    $HOME/install/docker/install_ubuntu_docker.sh
-}
-
-function install_docker_compose() {
-    install_python3_env
-    pip3 install docker-compose -i https://mirrors.aliyun.com/pypi/simple/
-    load_path
-}
-
-function install_zsh() {
-    sudo apt-get -y install zsh
-    $HOME/install/zsh/install_omz.sh --skip-chsh
-    git clone https://github.com/zsh-users/zsh-autosuggestions $HOME/.oh-my-zsh/custom/plugins/zsh-autosuggestions
-    git clone https://github.com/zsh-users/zsh-syntax-highlighting.git $HOME/.oh-my-zsh/custom/plugins/zsh-syntax-highlighting
-    chsh -s /usr/bin/zsh
-}
-
 function set_apt_mirror() {
     sudo mv /etc/apt/sources.list /etc/apt/sources.list.bak
     sudo cp -r $HOME/install/include/sources.list /etc/apt/sources.list
@@ -96,7 +117,7 @@ function set_git_config() {
     git config --global init.defaultBranch main
 }
 
-# WSL2 
+# WSL2
 
 function wsl2_fix_interop() {
     for i in $(pstree -np -s $$ | grep -o -E '[0-9]+'); do
