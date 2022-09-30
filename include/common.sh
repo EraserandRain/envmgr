@@ -140,15 +140,36 @@ function set_git_config() {
 
 # WSL2
 
-function wsl2_fix_interop() {
-    for i in $(pstree -np -s $$ | grep -o -E '[0-9]+'); do
-        if [[ -e "/run/WSL/${i}_interop" ]]; then
-            export WSL_INTEROP=/run/WSL/${i}_interop
-        fi
+function wsl2_config() {
+    local ARGS=$(getopt -o '' -l ' \
+        fix_interop, \
+        startup_docker \
+    ' -- "$@")
+    [[ $? != 0 ]] && echo "Parse error! Terminating..." >&2 && exit 1
+    eval set -- $ARGS
+    while true; do
+        case "$1" in
+        --fix_interop)
+            for i in $(pstree -np -s $$ | grep -o -E '[0-9]+'); do
+                if [[ -e "/run/WSL/${i}_interop" ]]; then
+                    export WSL_INTEROP=/run/WSL/${i}_interop
+                fi
+            done
+            shift
+            ;;
+        --startup_docker)
+            local docker_status=$(ps aux | grep dockerd | grep -v grep)
+            [[ -z $docker_status ]] && sudo service docker start
+            shift
+            ;;
+        --)
+            shift
+            break
+            ;;
+        *)
+            echo "Unknown Args"
+            exit 1
+            ;;
+        esac
     done
-}
-
-function wsl2_startup_docker() {
-    local docker_status=$(ps aux | grep dockerd | grep -v grep)
-    [[ -z $docker_status ]] && sudo service docker start
 }
