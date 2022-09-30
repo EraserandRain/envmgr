@@ -5,10 +5,6 @@ Device=`hostname -s`
 
 # Loading
 source ~/install/include/common.sh
-load_path
-load_zsh
-load_nvm
-load_alias
 if_jammy_os disable_needrestart
 set_git_config
-reload_zsh $Device
+load_env --nvm --alias --compose --zsh $Device

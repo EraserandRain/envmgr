@@ -58,42 +58,63 @@ function install_env() {
     done
 }
 
-function load_path() {
-    export PATH=$PATH:$HOME/.local/bin
-}
-
-function load_zsh() {
-    export ZSH="$HOME/.oh-my-zsh"
-    ZSH_THEME="lambda"
-    plugins=(
-        git
-        zsh-autosuggestions)
-}
-
-function load_nvm() {
-    export NVM_DIR="$HOME/.nvm"
-    [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"                   # This loads nvm
-    [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion" # This loads nvm bash_completion
-}
-
-function load_vagrant() {
-    export VAGRANT_WSL_ENABLE_WINDOWS_ACCESS=1
-    export PATH="$PATH:/mnt/d/APP/virtualbox"
-}
-
-function load_alias() {
-    alias clr="clear"
-    alias gac="git add . && git commit"
-    alias gst="git status"
-    alias gstb="git status -sb"
-    alias dps="docker ps -as"
-    alias dc="docker-compose"
-    alias vbm="vboxmanage"
-}
-
-function reload_zsh() {
-    source $HOME/.oh-my-zsh/oh-my-zsh.sh
-    export PROMPT="%F{cyan}[$1]%f $PROMPT"
+function load_env() {
+    local ARGS=$(getopt -o '' -l ' \
+        compose, \
+        zsh:, \
+        nvm, \
+        vagrant, \
+        alias \
+    ' -- "$@")
+    [[ $? != 0 ]] && echo "Parse error! Terminating..." >&2 && exit 1
+    eval set -- $ARGS
+    while true; do
+        case "$1" in
+        --compose)
+            export PATH=$PATH:$HOME/.local/bin
+            shift
+            ;;
+        --zsh)
+            export ZSH="$HOME/.oh-my-zsh"
+            ZSH_THEME="lambda"
+            plugins=(
+                git
+                zsh-autosuggestions)
+            source $HOME/.oh-my-zsh/oh-my-zsh.sh
+            export PROMPT="%F{cyan}[$2]%f $PROMPT"
+            shift 2
+            ;;
+        --nvm)
+            export NVM_DIR="$HOME/.nvm"
+            [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"                   # This loads nvm
+            [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion" # This loads nvm bash_completion
+            shift
+            ;;
+        --vagrant)
+            export VAGRANT_WSL_ENABLE_WINDOWS_ACCESS=1
+            export PATH="$PATH:/mnt/d/APP/virtualbox"
+            shift
+            ;;
+        --alias)
+            alias clr="clear"
+            alias gac="git add . && git commit"
+            alias gst="git status"
+            alias gstb="git status -sb"
+            alias dps="docker ps -as"
+            alias dc="docker-compose"
+            alias vbm="vboxmanage"
+            shift
+            ;;
+        --)
+            shift
+            break
+            ;;
+        *)
+            echo "Unknown Args"
+            exit 1
+            ;;
+        esac
+    done
 }
 
 function set_apt_mirror() {
@@ -108,7 +129,7 @@ function disable_needrestart() {
 }
 
 function if_jammy_os() {
-    [[ "$(lsb_release -rs)" == '22.04' ]] && $1
+    [[ "$(lsb_release -rs)" == '22.04' ]] && eval $*
 }
 
 function set_git_config() {

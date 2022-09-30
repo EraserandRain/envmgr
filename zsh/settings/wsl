@@ -5,11 +5,6 @@ Device='wsl'
 
 # Loading
 source ~/install/include/common.sh
-load_path
-load_zsh
-load_nvm
-load_vagrant
-load_alias
 if_jammy_os disable_needrestart
 set_git_config
 
@@ -17,5 +12,5 @@ set_git_config
 wsl2_fix_interop
 wsl2_startup_docker
 
-# Reload 
-reload_zsh $Device
+# Load env
+load_env --nvm --vagrant --alias --compose --zsh $Device

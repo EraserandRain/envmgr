@@ -5,8 +5,5 @@ Device='Docker'
 
 # Loading
 source ~/install/include/common.sh
-load_path
-load_zsh
-load_nvm
-load_alias
-reload_zsh $Device
+set_git_config
+load_env --nvm --alias --zsh $Device
