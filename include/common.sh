@@ -117,7 +117,7 @@ function load_env() {
 
 function set_apt_mirror() {
     sudo mv /etc/apt/sources.list /etc/apt/sources.list.bak
-    sudo cp -r $HOME/install/include/sources.list /etc/apt/sources.list
+    sudo cp -r $HOME/install/apt/ubuntu_2204 /etc/apt/sources.list
     sudo apt-get -y update
 }
 

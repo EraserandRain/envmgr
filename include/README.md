@@ -30,7 +30,7 @@ wsl2_config \
 | `set_apt_mirror`      | Set Tsinghua Mirror for `apt`                               |
 | `disable_needrestart` | Disable "needrestart" feature in Ubuntu 22.04               |
 | `set_git_config`      | Git configuration                                           |
-| `wsl2_config`         | WSL2 configuration,                                         |
+| `wsl2_config`         | WSL2 configuration                                          |
 
 | **Options in `install_env`** | **Description**                                                            |
 | ---------------------------- | -------------------------------------------------------------------------- |
