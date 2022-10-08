@@ -1,6 +1,6 @@
 #!/usr/bin/env zsh
-SCRIPTFILE=$0
-ZSHFILE=
+local SCRIPTFILE=$0
+local ZSHFILE=
 print_usage() {
     cat <<EOF
     
@@ -19,7 +19,7 @@ EOF
 }
 
 update_local_zsh() {
-    cat $HOME/install/zsh/settings/$ZSHFILE > ~/.zshrc
+    cat $HOME/install/zsh/settings/$ZSHFILE > $HOME/.zshrc
     source $HOME/.zshrc
 }
 

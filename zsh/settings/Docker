@@ -4,6 +4,11 @@
 local Device='Docker'
 
 # Loading
-source ~/install/include/common.sh
+source $HOME/install/include/common.sh
+if_jammy_os disable_needrestart
 set_git_config
-load_env --nvm --alias --zsh $Device
+
+load_env \
+    --nvm \
+    --alias \
+    --zsh $Device

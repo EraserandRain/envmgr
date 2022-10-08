@@ -1,10 +1,15 @@
 #!/usr/bin/env zsh
 
 # Set Device
-local Device=`hostname -s`
+local Device=$(hostname -s)
 
 # Loading
-source ~/install/include/common.sh
+source $HOME/install/include/common.sh
 if_jammy_os disable_needrestart
 set_git_config
-load_env --nvm --alias --compose --zsh $Device
+
+load_env \
+    --nvm \
+    --alias \
+    --compose \
+    --zsh $Device
