@@ -1,7 +1,7 @@
 #!/usr/bin/env zsh
 
 # Set Device
-Device='Docker'
+local Device='Docker'
 
 # Loading
 source ~/install/include/common.sh

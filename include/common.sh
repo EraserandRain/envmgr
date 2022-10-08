@@ -1,7 +1,4 @@
 #!/usr/bin/env zsh
-function set_device() {
-    return $1
-}
 
 # Install
 function install_env() {
@@ -18,7 +15,7 @@ function install_env() {
         case "$1" in
         --node)
             $HOME/install/nvm/install_nvm.sh
-            load_nvm
+            load_env --nvm
             nvm install --lts
             npm i -g npm nrm pnpm
             nrm use tencent
@@ -35,7 +32,7 @@ function install_env() {
         --ubuntu_docker)
             $HOME/install/docker/install_ubuntu_docker.sh
             pip3 install docker-compose -i https://mirrors.aliyun.com/pypi/simple/
-            load_path
+            load_env --compose
             shift
             ;;
         --zsh)
@@ -58,6 +55,7 @@ function install_env() {
     done
 }
 
+# Loading
 function load_env() {
     local ARGS=$(getopt -o '' -l ' \
         compose, \
@@ -139,7 +137,6 @@ function set_git_config() {
 }
 
 # WSL2
-
 function wsl2_config() {
     local ARGS=$(getopt -o '' -l ' \
         fix_interop, \

@@ -4,12 +4,14 @@ ZSHFILE=
 print_usage() {
     cat <<EOF
     
+    Description: update local zshrc file ($HOME/.zshrc) 
+
     Usage: $SCRIPTFILE [OPTIONS]    
 
     OPTIONS:
-        -w : update local ~/.zshrc in WSL
-        -d : update local ~/.zshrc in Docker
-        -c : update local ~/.zshrc in Common
+        -w : in WSL env
+        -d : in Docker env
+        -c : in Common env
         -h : show this help and exit    
 
 EOF
@@ -17,8 +19,8 @@ EOF
 }
 
 update_local_zsh() {
-    cat ~/install/zsh/settings/$ZSHFILE > ~/.zshrc
-    source ~/.zshrc
+    cat $HOME/install/zsh/settings/$ZSHFILE > ~/.zshrc
+    source $HOME/.zshrc
 }
 
 # Main
