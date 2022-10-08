@@ -40,6 +40,7 @@ function install_env() {
             $HOME/install/zsh/install_omz.sh --skip-chsh
             git clone https://github.com/zsh-users/zsh-autosuggestions $HOME/.oh-my-zsh/custom/plugins/zsh-autosuggestions
             git clone https://github.com/zsh-users/zsh-syntax-highlighting.git $HOME/.oh-my-zsh/custom/plugins/zsh-syntax-highlighting
+            sudo sed -i '/^$/d;/^#/d;/pam_shells.so/ s/required/sufficient/' /etc/pam.d/chsh
             chsh -s /usr/bin/zsh
             shift
             ;;
