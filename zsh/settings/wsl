@@ -19,4 +19,5 @@ load_env \
     --vagrant \
     --alias \
     --compose \
+    --pyenv \
     --zsh $Device

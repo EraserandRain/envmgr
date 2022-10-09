@@ -11,4 +11,5 @@ set_git_config
 load_env \
     --nvm \
     --alias \
+    --pyenv \
     --zsh $Device

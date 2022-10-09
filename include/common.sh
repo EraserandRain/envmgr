@@ -23,6 +23,8 @@ function install_env() {
             ;;
         --python)
             sudo apt-get -y install python3 python3-pip
+            curl -L https://github.com/pyenv/pyenv-installer/raw/master/bin/pyenv-installer | bash
+            load_env --pyenv
             shift
             ;;
         --cpp)
@@ -63,7 +65,8 @@ function load_env() {
         zsh:, \
         nvm, \
         vagrant, \
-        alias \
+        alias, \
+        pyenv \
     ' -- "$@")
     [[ $? != 0 ]] && echo "Parse error! Terminating..." >&2 && exit 1
     eval set -- $ARGS
@@ -102,6 +105,13 @@ function load_env() {
             alias dps="docker ps -as"
             alias dc="docker-compose"
             alias vbm="vboxmanage"
+            alias cmq="mysql -h 127.0.0.1 -uroot -pmysql57"
+            shift
+            ;;
+        --pyenv)
+            export PYENV_ROOT="$HOME/.pyenv"
+            export PATH="$PYENV_ROOT/bin:$PATH"
+            eval "$(pyenv init --path)"
             shift
             ;;
         --)

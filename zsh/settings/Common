@@ -12,4 +12,5 @@ load_env \
     --nvm \
     --alias \
     --compose \
+    --pyenv \
     --zsh $Device
