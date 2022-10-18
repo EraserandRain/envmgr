@@ -152,7 +152,8 @@ function set_git_config() {
 function wsl2_config() {
     local ARGS=$(getopt -o '' -l ' \
         fix_interop, \
-        startup_docker \
+        startup_docker, \
+        fix_dockerd_failed \
     ' -- "$@")
     [[ $? != 0 ]] && echo "Parse error! Terminating..." >&2 && exit 1
     eval set -- $ARGS
