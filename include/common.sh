@@ -35,6 +35,7 @@ function install_env() {
             $HOME/install/docker/install_ubuntu_docker.sh
             pip3 install docker-compose -i https://mirrors.aliyun.com/pypi/simple/
             load_env --compose
+            if_wsl2 wsl2_config --fix_dockerd_failed
             shift
             ;;
         --zsh)
@@ -170,6 +171,12 @@ function wsl2_config() {
             [[ -z $docker_status ]] && sudo service docker start
             shift
             ;;
+        --fix_dockerd_failed)
+            sudo update-alternatives --set iptables /usr/sbin/iptables-legacy
+            sudo sed '/^#.*ip_forward/s/^#//g' /etc/sysctl.conf -i
+            sudo sysctl -p
+            sudo service docker restart
+            ;;
         --)
             shift
             break
@@ -180,4 +187,8 @@ function wsl2_config() {
             ;;
         esac
     done
+}
+
+function if_wsl2() {
+    [[ "$(uname -r)" =~ 'WSL2' ]] && eval $*
 }
