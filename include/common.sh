@@ -173,6 +173,7 @@ function wsl2_config() {
             shift
             ;;
         --fix_dockerd_failed)
+            sudo apt-get install -y iptables arptables ebtables
             sudo update-alternatives --set iptables /usr/sbin/iptables-legacy
             sudo sed '/^#.*ip_forward/s/^#//g' /etc/sysctl.conf -i
             sudo sysctl -p
