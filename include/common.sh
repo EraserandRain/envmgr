@@ -178,6 +178,7 @@ function wsl2_config() {
             sudo sed '/^#.*ip_forward/s/^#//g' /etc/sysctl.conf -i
             sudo sysctl -p
             sudo service docker restart
+	    shift
             ;;
         --)
             shift
