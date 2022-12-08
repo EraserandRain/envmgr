@@ -39,6 +39,7 @@ wsl2_config \
 | `cpp`                        | Install `gcc`,`automake`,`autoconf`,`libtool`,`make`,`build-essential gdb` |
 | `ubuntu_docker`              | Install `docker`,`docker-compose`                                          |
 | `zsh`                        | Install `zsh`,`oh-my-zsh`                                                  |
+| `go`                         | Install `go1.18`                                                           |
 
 | **Options in `load_env`** | **Description**       |
 | ------------------------- | --------------------- |
@@ -47,6 +48,7 @@ wsl2_config \
 | `nvm`                     | Load `nvm`            |
 | `vagrant`                 | Load `vagrant`        |
 | `alias`                   | Load `alias`          |
+| `go`                      | Load `go`             |
 
 | **Options in `wsl2_config`** | **Description**              |
 | ---------------------------- | ---------------------------- |
