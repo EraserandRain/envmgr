@@ -7,7 +7,8 @@ function install_env() {
         python, \
         cpp, \
         ubuntu_docker, \
-        zsh \
+        zsh, \
+        ssh \
     ' -- "$@")
     [[ $? != 0 ]] && echo "Parse error! Terminating..." >&2 && exit 1
     eval set -- $ARGS
@@ -47,6 +48,11 @@ function install_env() {
             chsh -s /usr/bin/zsh
             shift
             ;;
+        --ssh)
+            sudo apt-get -y install openssh-server
+            load_env --ssh
+            shift
+            ;;
         --)
             shift
             break
@@ -67,7 +73,8 @@ function load_env() {
         nvm, \
         vagrant, \
         alias, \
-        pyenv \
+        pyenv, \
+        ssh \
     ' -- "$@")
     [[ $? != 0 ]] && echo "Parse error! Terminating..." >&2 && exit 1
     eval set -- $ARGS
@@ -113,6 +120,13 @@ function load_env() {
             export PYENV_ROOT="$HOME/.pyenv"
             export PATH="$PYENV_ROOT/bin:$PATH"
             eval "$(pyenv init --path)"
+            shift
+            ;;
+        --ssh)
+            sudo /etc/init.d/ssh start
+            sudo bash -c 'echo "PermitRootLogin yes" >> /etc/ssh/sshd_config'
+            sudo bash -c 'echo root:test | chpasswd'
+            sudo bash -c 'echo "[[ -f /usr/bin/ssh ]] && service ssh start" >> /root/.bashrc'
             shift
             ;;
         --)

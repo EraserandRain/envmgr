@@ -1,15 +1,15 @@
 #!/usr/bin/env zsh
 
 # Set Device
-local Device='Docker'
+local Device="Docker $(hostname -s)"
 
 # Loading
 source $HOME/install/include/common.sh
-if_jammy_os disable_needrestart
 set_git_config
 
 load_env \
     --nvm \
     --alias \
     --pyenv \
+    --ssh \
     --zsh $Device
