@@ -1,0 +1,16 @@
+set nu
+set ai
+set tabstop=4
+set autoindent
+set showmode
+set showcmd
+set mouse=a
+set encoding=utf-8
+set t_Co=256
+set shortmess-=S
+syntax on
+filetype indent on
+set linebreak
+set ruler
+set showmatch
+set incsearch
