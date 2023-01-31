@@ -29,7 +29,7 @@ function install_env() {
             shift
             ;;
         --cpp)
-            sudo apt-get -y install gcc automake autoconf libtool make build-essential gdb
+            sudo apt-get -y install gcc automake autoconf libtool make build-essential gdb cppcheck
             shift
             ;;
         --ubuntu_docker)
