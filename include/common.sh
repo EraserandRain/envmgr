@@ -106,6 +106,7 @@ function load_env() {
             shift
             ;;
         --alias)
+            export PATH=$PATH:$HOME/install/lib/bin
             alias clr="clear"
             alias gac="git add . && git commit"
             alias gst="git status"
