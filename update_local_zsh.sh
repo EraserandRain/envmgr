@@ -19,8 +19,9 @@ EOF
 }
 
 function update_local_zsh() {
-    cat $ENV_LOAD/zsh/settings/$ZSHFILE > $HOME/.zshrc
-    source $HOME/.zshrc
+    source ${HOME}/env-manager/PROJECT_ENV
+    cat ${ENV_LOAD}/zsh/settings/${ZSHFILE} > ${HOME}/.zshrc
+    source ${HOME}/.zshrc
 }
 
 # Main

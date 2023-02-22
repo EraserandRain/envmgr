@@ -4,7 +4,7 @@
 local Device='WSL'
 
 # Loading
-source $HOME/install/include/common.sh
+source ${ENV_ROOT}/include/common.sh
 if_jammy_os disable_needrestart
 
 # WSL2

@@ -1,6 +1,5 @@
 #!/usr/bin/env zsh
-
-source PROJECT_ENV
+source $HOME/env-manager/PROJECT_ENV
 # Install
 function install_env() {
     local ARGS=$(getopt -o '' -l ' \

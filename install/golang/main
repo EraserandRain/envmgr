@@ -3,3 +3,5 @@ sudo apt-get -y install bison
 curl -sSL https://github.com/moovweb/gvm/raw/master/binscripts/gvm-installer | bash
 source $HOME/.gvm/scripts/gvm
 rm -rf $HOME/.gvm/archive
+gvm install go1.20.1 -B
+gvm use go1.20.1
