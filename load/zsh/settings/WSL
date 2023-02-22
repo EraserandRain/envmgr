@@ -1,12 +1,11 @@
 #!/usr/bin/env zsh
 
 # Set Device
-local Device='wsl'
+local Device='WSL'
 
 # Loading
 source $HOME/install/include/common.sh
 if_jammy_os disable_needrestart
-set_git_config
 
 # WSL2
 wsl2_config \
@@ -20,4 +19,5 @@ load_env \
     --alias \
     --compose \
     --pyenv \
+    --git \
     --zsh $Device

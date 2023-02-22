@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+$ENV_ROOT/install/nvm/install_nvm.sh
+load_env --nvm
+nvm install --lts
+npm i -g npm nrm pnpm
+nrm use tencent
+  

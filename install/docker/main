@@ -1,0 +1,6 @@
+#!/usr/bin/bash
+$ENV_ROOT/install/docker/install_ubuntu_docker.sh
+pip3 install docker-compose -i https://mirrors.aliyun.com/pypi/simple/
+load_env --compose
+if_wsl2 wsl2_config --fix_dockerd_failed
+            

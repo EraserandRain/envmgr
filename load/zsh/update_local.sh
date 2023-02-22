@@ -1,7 +1,7 @@
 #!/usr/bin/env zsh
 local SCRIPTFILE=$0
 local ZSHFILE=
-print_usage() {
+function print_usage() {
     cat <<EOF
     
     Description: update local zshrc file ($HOME/.zshrc) 
@@ -18,8 +18,8 @@ EOF
     exit 1
 }
 
-update_local_zsh() {
-    cat $HOME/install/zsh/settings/$ZSHFILE > $HOME/.zshrc
+function update_local_zsh() {
+    cat $ENV_LOAD/zsh/settings/$ZSHFILE > $HOME/.zshrc
     source $HOME/.zshrc
 }
 
@@ -31,7 +31,7 @@ do
             print_usage
             ;;
         w)
-            ZSHFILE=wsl
+            ZSHFILE=WSL
             update_local_zsh
             ;;
         d)

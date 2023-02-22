@@ -1,0 +1,16 @@
+#!/usr/bin/env zsh
+
+# Set Device
+local Device=$(hostname -s)
+
+# Loading
+source ${ENV_ROOT}/include/common.sh
+if_jammy_os disable_needrestart
+
+load_env \
+    --nvm \
+    --alias \
+    --compose \
+    --pyenv \
+    --git \
+    --zsh $Device

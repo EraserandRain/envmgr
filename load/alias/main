@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+export PATH=$PATH:$HOME/install/lib/bin
+alias clr="clear"
+alias gac="git add . && git commit"
+alias gst="git status"
+alias gstb="git status -sb"
+alias dps="docker ps -as"
+alias dc="docker-compose"
+alias vbm="vboxmanage"
+alias cmq="mysql -h 127.0.0.1 -uroot -pmysql57"
+            

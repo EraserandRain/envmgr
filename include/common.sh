@@ -1,12 +1,14 @@
 #!/usr/bin/env zsh
 
+source PROJECT_ENV
 # Install
 function install_env() {
     local ARGS=$(getopt -o '' -l ' \
         node, \
         python, \
         cpp, \
-        ubuntu_docker, \
+        golang, \
+        docker, \
         zsh, \
         ssh \
     ' -- "$@")
@@ -15,42 +17,31 @@ function install_env() {
     while true; do
         case "$1" in
         --node)
-            $HOME/install/nvm/install_nvm.sh
-            load_env --nvm
-            nvm install --lts
-            npm i -g npm nrm pnpm
-            nrm use tencent
+            source ${ENV_INSTALL}/node/main
             shift
             ;;
         --python)
-            sudo apt-get -y install python3 python3-pip
-            curl -L https://github.com/pyenv/pyenv-installer/raw/master/bin/pyenv-installer | bash
-            load_env --pyenv
+            source ${ENV_INSTALL}/python/main
             shift
             ;;
         --cpp)
-            sudo apt-get -y install gcc automake autoconf libtool make build-essential gdb cppcheck
+            source ${ENV_INSTALL}/cpp/main
             shift
             ;;
-        --ubuntu_docker)
-            $HOME/install/docker/install_ubuntu_docker.sh
-            pip3 install docker-compose -i https://mirrors.aliyun.com/pypi/simple/
-            load_env --compose
-            if_wsl2 wsl2_config --fix_dockerd_failed
+        --golang)
+            source ${ENV_INSTALL}/golang/main
+            shift
+            ;;
+        --docker)
+            source ${ENV_INSTALL}/docker/main
             shift
             ;;
         --zsh)
-            sudo apt-get -y install zsh
-            $HOME/install/zsh/install_omz.sh --skip-chsh
-            git clone https://github.com/zsh-users/zsh-autosuggestions $HOME/.oh-my-zsh/custom/plugins/zsh-autosuggestions
-            git clone https://github.com/zsh-users/zsh-syntax-highlighting.git $HOME/.oh-my-zsh/custom/plugins/zsh-syntax-highlighting
-            sudo sed -i '/^$/d;/^#/d;/pam_shells.so/ s/required/sufficient/' /etc/pam.d/chsh
-            chsh -s /usr/bin/zsh
+            source ${ENV_INSTALL}/zsh/main
             shift
             ;;
         --ssh)
-            sudo apt-get -y install openssh-server
-            load_env --ssh
+            source ${ENV_INSTALL}/ssh/main
             shift
             ;;
         --)
@@ -74,6 +65,9 @@ function load_env() {
         vagrant, \
         alias, \
         pyenv, \
+        apt, \
+        git, \
+        vim, \
         ssh \
     ' -- "$@")
     [[ $? != 0 ]] && echo "Parse error! Terminating..." >&2 && exit 1
@@ -81,53 +75,43 @@ function load_env() {
     while true; do
         case "$1" in
         --compose)
-            export PATH=$PATH:$HOME/.local/bin
+            source ${ENV_LOAD}/compose/main
             shift
             ;;
         --zsh)
-            export ZSH="$HOME/.oh-my-zsh"
-            ZSH_THEME="lambda"
-            plugins=(
-                git
-                zsh-autosuggestions)
-            source $HOME/.oh-my-zsh/oh-my-zsh.sh
-            export PROMPT="%F{cyan}[$2]%f $PROMPT"
+            source ${ENV_LOAD}/zsh/main
             shift 2
             ;;
         --nvm)
-            export NVM_DIR="$HOME/.nvm"
-            [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"                   # This loads nvm
-            [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion" # This loads nvm bash_completion
+            source ${ENV_LOAD}/nvm/main
             shift
             ;;
         --vagrant)
-            export VAGRANT_WSL_ENABLE_WINDOWS_ACCESS=1
-            export PATH="$PATH:/mnt/d/APP/virtualbox"
-            shift
+            source ${ENV_LOAD}/vagrant/main
+            shift 
             ;;
         --alias)
-            export PATH=$PATH:$HOME/install/lib/bin
-            alias clr="clear"
-            alias gac="git add . && git commit"
-            alias gst="git status"
-            alias gstb="git status -sb"
-            alias dps="docker ps -as"
-            alias dc="docker-compose"
-            alias vbm="vboxmanage"
-            alias cmq="mysql -h 127.0.0.1 -uroot -pmysql57"
+            source ${ENV_LOAD}/alias/main
             shift
             ;;
         --pyenv)
-            export PYENV_ROOT="$HOME/.pyenv"
-            export PATH="$PYENV_ROOT/bin:$PATH"
-            eval "$(pyenv init --path)"
+            source ${ENV_LOAD}/pyenv/main
+            shift
+            ;;
+        --apt)
+            source ${ENV_LOAD}/apt/main
+            shift
+            ;;
+        --git)
+            source ${ENV_LOAD}/git/main
+            shift
+            ;;
+        --vim)
+            source ${ENV_LOAD}/vim/main
             shift
             ;;
         --ssh)
-            sudo /etc/init.d/ssh start
-            sudo bash -c 'echo "PermitRootLogin yes" >> /etc/ssh/sshd_config'
-            sudo bash -c 'echo root:test | chpasswd'
-            sudo bash -c 'echo "[[ -f /usr/bin/ssh ]] && service ssh start" >> /root/.bashrc'
+            source ${ENV_LOAD}/ssh/main
             shift
             ;;
         --)
@@ -142,12 +126,6 @@ function load_env() {
     done
 }
 
-function set_apt_mirror() {
-    sudo mv /etc/apt/sources.list /etc/apt/sources.list.bak
-    sudo cp -r $HOME/install/apt/ubuntu_2204 /etc/apt/sources.list
-    sudo apt-get -y update
-}
-
 function disable_needrestart() {
     sudo sed -i "/$nrconf{restart}/ s|'i'|'a'|" /etc/needrestart/needrestart.conf
     sudo sed -i "/^#.*$nrconf{restart}/s/^#//" /etc/needrestart/needrestart.conf
@@ -155,12 +133,6 @@ function disable_needrestart() {
 
 function if_jammy_os() {
     [[ "$(lsb_release -rs)" == '22.04' ]] && eval $*
-}
-
-function set_git_config() {
-    cd $HOME
-    git config --global core.editor vim
-    git config --global init.defaultBranch main
 }
 
 # WSL2
