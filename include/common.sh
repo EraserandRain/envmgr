@@ -58,12 +58,13 @@ function install_env() {
 # Loading
 function load_env() {
     local ARGS=$(getopt -o '' -l ' \
-        compose, \
+        docker, \
         zsh:, \
-        nvm, \
+        node, \
+        golang, \
+        python, \
         vagrant, \
         alias, \
-        pyenv, \
         apt, \
         git, \
         vim, \
@@ -73,28 +74,28 @@ function load_env() {
     eval set -- $ARGS
     while true; do
         case "$1" in
-        --compose)
-            source ${ENV_LOAD}/compose/main
+        --docker)
+            source ${ENV_LOAD}/docker/main
             shift
             ;;
         --zsh)
             source ${ENV_LOAD}/zsh/main
             shift 2
             ;;
-        --nvm)
-            source ${ENV_LOAD}/nvm/main
+        --node)
+            source ${ENV_LOAD}/node/main
             shift
             ;;
         --vagrant)
             source ${ENV_LOAD}/vagrant/main
-            shift 
+            shift
             ;;
         --alias)
             source ${ENV_LOAD}/alias/main
             shift
             ;;
-        --pyenv)
-            source ${ENV_LOAD}/pyenv/main
+        --python)
+            source ${ENV_LOAD}/python/main
             shift
             ;;
         --apt)
@@ -107,6 +108,10 @@ function load_env() {
             ;;
         --vim)
             source ${ENV_LOAD}/vim/main
+            shift
+            ;;
+        --golang)
+            source ${ENV_LOAD}/golang/main
             shift
             ;;
         --ssh)
@@ -164,7 +169,7 @@ function wsl2_config() {
             sudo sed '/^#.*ip_forward/s/^#//g' /etc/sysctl.conf -i
             sudo sysctl -p
             sudo service docker restart
-	    shift
+            shift
             ;;
         --)
             shift
@@ -180,4 +185,17 @@ function wsl2_config() {
 
 function if_wsl2() {
     [[ "$(uname -r)" =~ 'WSL2' ]] && eval $*
+}
+
+function is_cmd_exist() {
+    [[ -z $1 ]] && echo "Usage: is_cmd_exist [command1] [command2] ..." && return 1
+    for cmd in "$@"; do
+        if [[ $cmd == $# ]]; then
+            which $cmd >/dev/null 2>&1
+            [[ $? -eq 0 ]] && return 0 || return 2
+        else
+            which $cmd >/dev/null 2>&1
+            [[ $? -eq 0 ]] && continue || return 2
+        fi
+    done
 }

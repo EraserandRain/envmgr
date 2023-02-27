@@ -3,8 +3,10 @@
 # Set Device
 local Device='WSL'
 
-# Loading
+export ENV_ROOT_DIR="env-manager"
+source ${HOME}/${ENV_ROOT_DIR}/PROJECT_ENV
 source ${ENV_ROOT}/include/common.sh
+
 if_jammy_os disable_needrestart
 
 # WSL2
@@ -12,12 +14,11 @@ wsl2_config \
     --fix_interop \
     --startup_docker
 
-# Load env
 load_env \
-    --nvm \
-    --vagrant \
+    --node \
+    --python \
+    --golang \
     --alias \
-    --compose \
-    --pyenv \
+    --docker \
     --git \
     --zsh $Device

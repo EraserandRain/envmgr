@@ -19,32 +19,32 @@ EOF
 }
 
 function update_local_zsh() {
-    source ${HOME}/env-manager/PROJECT_ENV
-    cat ${ENV_LOAD}/zsh/settings/${ZSHFILE} > ${HOME}/.zshrc
+    ENV_ROOT_DIR=$(realpath $0|awk -F/ '{print $4}')
+    source ${HOME}/${ENV_ROOT_DIR}/PROJECT_ENV
+    cat ${ENV_LOAD}/zsh/settings/${ZSHFILE} >${HOME}/.zshrc
     source ${HOME}/.zshrc
 }
 
 # Main
-while getopts "h w d c" OPT
-do
+while getopts "h w d c" OPT; do
     case $OPT in
-        h)
-            print_usage
-            ;;
-        w)
-            ZSHFILE=WSL
-            update_local_zsh
-            ;;
-        d)
-            ZSHFILE=Docker
-            update_local_zsh
-            ;;
-        c)
-            ZSHFILE=Common
-            update_local_zsh
-            ;;
-        *)
-            print_usage
-            ;;
+    h)
+        print_usage
+        ;;
+    w)
+        ZSHFILE=WSL
+        update_local_zsh
+        ;;
+    d)
+        ZSHFILE=Docker
+        update_local_zsh
+        ;;
+    c)
+        ZSHFILE=Common
+        update_local_zsh
+        ;;
+    *)
+        print_usage
+        ;;
     esac
 done

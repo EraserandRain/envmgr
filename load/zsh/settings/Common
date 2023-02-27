@@ -4,13 +4,17 @@
 local Device=$(hostname -s)
 
 # Loading
+export ENV_ROOT_DIR="env-manager"
+source ${HOME}/${ENV_ROOT_DIR}/PROJECT_ENV
 source ${ENV_ROOT}/include/common.sh
+
 if_jammy_os disable_needrestart
 
 load_env \
-    --nvm \
+    --node \
+    --python \
+    --golang \
     --alias \
-    --compose \
-    --pyenv \
+    --docker \
     --git \
     --zsh $Device

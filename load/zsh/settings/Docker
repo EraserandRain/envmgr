@@ -4,12 +4,15 @@
 local Device="Docker $(hostname -s)"
 
 # Loading
+export ENV_ROOT_DIR="env-manager"
+source ${HOME}/${ENV_ROOT_DIR}/PROJECT_ENV
 source ${ENV_ROOT}/include/common.sh
 
 load_env \
-    --nvm \
+    --node \
+    --python \
+    --golang \
     --alias \
-    --pyenv \
     --git \
     --ssh \
     --zsh $Device
