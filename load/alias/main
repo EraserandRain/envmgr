@@ -10,4 +10,4 @@ alias dc="docker-compose"
 alias vbm="vboxmanage"
 alias cmq="mysql -h 127.0.0.1 -uroot -pmysql57"
 alias crs="redis-cli -h 127.0.0.1 -p 6379 -a redis"
-            
+alias set_clash_proxy='export ALL_PROXY="http://${HOSTIP}:7890";curl google.com 2>&1 | grep google'
