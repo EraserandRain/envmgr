@@ -190,12 +190,11 @@ function if_wsl2() {
 function is_cmd_exist() {
     [[ -z $1 ]] && echo "Usage: is_cmd_exist [command1] [command2] ..." && return 1
     for cmd in "$@"; do
-        if [[ $cmd == $# ]]; then
-            which $cmd >/dev/null 2>&1
-            [[ $? -eq 0 ]] && return 0 || return 2
+        if [[ $cmd == ${!#} ]]; then
+            command -V $cmd >/dev/null
+            return $?
         else
-            which $cmd >/dev/null 2>&1
-            [[ $? -eq 0 ]] && continue || return 2
+            command -V $cmd >/dev/null && continue || return $?
         fi
     done
 }
