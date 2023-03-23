@@ -7,6 +7,7 @@ function install_env() {
         python, \
         cpp, \
         golang, \
+        ruby, \
         docker, \
         zsh, \
         ssh \
@@ -29,6 +30,10 @@ function install_env() {
             ;;
         --golang)
             source ${ENV_INSTALL}/golang/main
+            shift
+            ;;
+        --ruby)
+            source ${ENV_INSTALL}/ruby/main
             shift
             ;;
         --docker)
@@ -62,6 +67,7 @@ function load_env() {
         zsh:, \
         node, \
         golang, \
+        ruby, \
         python, \
         vagrant, \
         alias, \
@@ -112,6 +118,10 @@ function load_env() {
             ;;
         --golang)
             source ${ENV_LOAD}/golang/main
+            shift
+            ;;
+        --ruby)
+            source ${ENV_LOAD}/ruby/main
             shift
             ;;
         --ssh)
