@@ -1,3 +1,4 @@
 #!/usr/bin/env bash
 local RUBY_VERSION=$(rvm current)
+source $HOME/.rvm/scripts/rvm
 export PATH="$HOME/.rvm/rubies/$RUBY_VERSION/bin:$PATH"
