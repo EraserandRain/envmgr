@@ -1,4 +1,0 @@
-#!/usr/bin/env bash
-sudo mv /etc/apt/sources.list /etc/apt/sources.list.bak
-sudo cp -r ${ENV_LOAD}/apt/ubuntu_2204 /etc/apt/sources.list
-sudo apt-get -y update

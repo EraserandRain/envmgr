@@ -71,7 +71,6 @@ function load_env() {
         python, \
         vagrant, \
         alias, \
-        apt, \
         git, \
         vim, \
         ssh \
@@ -102,10 +101,6 @@ function load_env() {
             ;;
         --python)
             source ${ENV_LOAD}/python/main
-            shift
-            ;;
-        --apt)
-            source ${ENV_LOAD}/apt/main
             shift
             ;;
         --git)
@@ -141,8 +136,11 @@ function load_env() {
 }
 
 function disable_needrestart() {
-    sudo sed -i "/$nrconf{restart}/ s|'i'|'a'|" /etc/needrestart/needrestart.conf
-    sudo sed -i "/^#.*$nrconf{restart}/s/^#//" /etc/needrestart/needrestart.conf
+    local needrestart_config="/etc/needrestart/needrestart.conf"
+    [[ -e $needrestart_config ]] && {
+        sudo sed -i "/$nrconf{restart}/ s|'i'|'a'|" $needrestart_config
+        sudo sed -i "/^#.*$nrconf{restart}/s/^#//" $needrestart_config
+    }
 }
 
 function if_jammy_os() {

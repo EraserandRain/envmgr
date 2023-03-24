@@ -1,7 +1,7 @@
 #!/usr/bin/env zsh
 
 # Set Device
-local Device='WSL'
+local Device="WSL: $(lsb_release -ds)"
 
 export ENV_ROOT_DIR="env-manager"
 source ${HOME}/${ENV_ROOT_DIR}/PROJECT_ENV

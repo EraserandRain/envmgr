@@ -4,4 +4,7 @@ curl -sSL https://github.com/moovweb/gvm/raw/master/binscripts/gvm-installer | b
 source $HOME/.gvm/scripts/gvm
 rm -rf $HOME/.gvm/archive
 gvm install go1.20.1 -B
-gvm use go1.20.1
+# go1.20.1
+gvm use go1.20.1 2>&1 >/dev/null
+go env -w GO111MODULE=on
+go env -w GOPROXY=https://goproxy.cn

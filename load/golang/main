@@ -2,8 +2,3 @@
 
 # gvm
 [[ -s "$HOME/.gvm/scripts/gvm" ]] && source "$HOME/.gvm/scripts/gvm"
-
-# go1.20.1
-gvm use go1.20.1 2>&1 >/dev/null
-go env -w GO111MODULE=on
-go env -w GOPROXY=https://goproxy.cn
