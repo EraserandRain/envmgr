@@ -40,8 +40,9 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	current_distro, _ := Exec_cmd("lsb_release -is")
-	current_version, _ := Exec_cmd("lsb_release -rs")
+	current_distro, _ := Exec_cmd("lsb_release -is",true)
+	current_version, _ := Exec_cmd("lsb_release -rs",false)
+	fmt.Println(current_distro,current_version)
 	fmt.Printf(
 		"%s\n%s%s%s\n",
 		strings.Repeat("=", 60),
@@ -61,13 +62,15 @@ func main() {
 	}
 }
 
-func Exec_cmd(command string,isPrint bool) (string, error) {
+func Exec_cmd(command string, isPrint bool) (string, error) {
 	cmd := exec.Command("bash", "-c", command)
 	output, err := cmd.Output()
 	if err != nil {
 		fmt.Println("Exec command failed:", err)
 		return "", err
 	}
-        if isPrint {fmt.Println(string(output))
-	return string(output), nil
+	if isPrint {
+		fmt.Println(string(output))
+	}
+		return string(output), nil
 }
