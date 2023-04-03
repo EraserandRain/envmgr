@@ -1,19 +1,8 @@
-// func main(){
-// 	destr=$(lsb_release -is)
-// 	version=$(lsb_release -rs)
-// printf "=%.0s" {1..60}
-// printf "\n=%.0s" {1..60}
-// # sudo mv /etc/apt/sources.list /etc/apt/sources.list.bak
-// # sudo cp -r ./source/${destr}_${version} /etc/apt/sources.list
-// # sudo apt-get -y update
-
-// }
-
 package main
 
 import (
 	"fmt"
-	"io/ioutil"
+	"os"
 	"os/exec"
 	"strings"
 
@@ -30,7 +19,7 @@ type Distro struct {
 }
 
 func main() {
-	yamlFile, err := ioutil.ReadFile("source.yaml")
+	yamlFile, err := os.ReadFile("source.yaml")
 	if err != nil {
 		panic(err)
 	}
@@ -40,29 +29,37 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	current_distro, _ := Exec_cmd("lsb_release -is",true)
-	current_version, _ := Exec_cmd("lsb_release -rs",false)
-	fmt.Println(current_distro,current_version)
-	fmt.Printf(
-		"%s\n%s%s%s\n",
-		strings.Repeat("=", 60),
-		"Using "+current_distro+" "+current_version,
-		strings.Repeat("=", 60))
 
+	current_distro, _ := Exec_cmd("lsb_release -is", false)
+	current_version, _ := Exec_cmd("lsb_release -rs", false)
+	fmt.Printf(
+		"%s\n%s%s\n",
+		strings.Repeat("=", 60),
+		fmt.Sprintf("Current OS Version: %s %s\n", current_distro, current_version),
+		strings.Repeat("=", 60))
+	
+	var current_source strings.Builder
 	for key, distro := range distros {
-		fmt.Println("Distro:", key)
-		for _, os := range distro.OS {
-			fmt.Println("  OS Version:", os.Version)
-			fmt.Println("  OS Name:", os.Name)
-			fmt.Println("  OS Source:")
-			for _, source := range os.Source {
-				fmt.Println("    -", source)
+		if key == current_distro {
+			for _, os := range distro.OS {
+				for _, source := range os.Source {
+					current_source.WriteString(fmt.Sprintf("%s\n",source))
+				}
 			}
 		}
 	}
+	
+	source_list := "/etc/apt/sources.list"
+	source_list_bak := "/etc/apt/sources.list.bak"
+	var cmd string = fmt.Sprintf("sudo mv %s %s",source_list,source_list_bak)
+	Exec_cmd(cmd,true)
+	cmd = fmt.Sprintf("echo -e %q | sudo tee -a %s",current_source.String(),source_list)
+	Exec_cmd(cmd,true)
+	cmd = "sudo apt-get -y update"
+	Exec_cmd(cmd,true)
 }
 
-func Exec_cmd(command string, isPrint bool) (string, error) {
+func Exec_cmd(command string, isPrint bool)   (string, error) {
 	cmd := exec.Command("bash", "-c", command)
 	output, err := cmd.Output()
 	if err != nil {
@@ -72,5 +69,5 @@ func Exec_cmd(command string, isPrint bool) (string, error) {
 	if isPrint {
 		fmt.Println(string(output))
 	}
-		return string(output), nil
+	return strings.TrimRight(string(output), "\n"), nil
 }
