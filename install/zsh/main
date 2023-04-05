@@ -1,8 +1,19 @@
 #!/usr/bin/env bash
+
+# zsh
 sudo apt-get -y install zsh
-$ENV_ROOT/install/zsh/install_omz.sh --skip-chsh
-git clone https://github.com/zsh-users/zsh-autosuggestions $HOME/.oh-my-zsh/custom/plugins/zsh-autosuggestions
-git clone https://github.com/zsh-users/zsh-syntax-highlighting.git $HOME/.oh-my-zsh/custom/plugins/zsh-syntax-highlighting
+
+# omz
+curl -L https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh | bash -s -- --skip-chsh
+
+# omz plugins
+omz_plugins=(zsh-autosuggestions zsh-syntax-highlighting)
+for plugin in "${omz_plugins[@]}"
+do
+    plugin_dir="$HOME/.oh-my-zsh/custom/plugins/$plugin"
+    [[ -d $plugin_dir ]] && rm -rf $plugin_dir
+    git clone https://github.com/zsh-users/$plugin $plugin_dir
+done
 sudo sed -i '/^$/d;/^#/d;/pam_shells.so/ s/required/sufficient/' /etc/pam.d/chsh
 chsh -s /usr/bin/zsh
             

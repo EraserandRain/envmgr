@@ -148,11 +148,17 @@ function if_jammy_os() {
 }
 
 # WSL2
+
+function if_wsl2() {
+    [[ "$(uname -r)" =~ 'WSL2' ]] && eval $*
+}
+
 function wsl2_config() {
     local ARGS=$(getopt -o '' -l ' \
         fix_interop, \
         startup_docker, \
-        fix_dockerd_failed \
+        fix_dockerd_failed, \
+        set_clash_proxy \
     ' -- "$@")
     [[ $? != 0 ]] && echo "Parse error! Terminating..." >&2 && exit 1
     eval set -- $ARGS
@@ -179,6 +185,11 @@ function wsl2_config() {
             sudo service docker restart
             shift
             ;;
+        --set_clash_proxy)
+            if_wsl2 export ALL_PROXY="http://${HOSTIP}:7890"
+            curl google.com 2>&1 | grep google
+            shift
+            ;;
         --)
             shift
             break
@@ -189,10 +200,6 @@ function wsl2_config() {
             ;;
         esac
     done
-}
-
-function if_wsl2() {
-    [[ "$(uname -r)" =~ 'WSL2' ]] && eval $*
 }
 
 function is_cmd_exist() {

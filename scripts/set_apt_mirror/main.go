@@ -42,13 +42,15 @@ func main() {
 	for key, distro := range distros {
 		if key == current_distro {
 			for _, os := range distro.OS {
-				for _, source := range os.Source {
-					current_source.WriteString(fmt.Sprintf("%s\n",source))
+				if os.Version == current_version {
+					for _, source := range os.Source {
+						current_source.WriteString(fmt.Sprintf("%s\n",source))
+					}
 				}
 			}
 		}
 	}
-	
+
 	source_list := "/etc/apt/sources.list"
 	source_list_bak := "/etc/apt/sources.list.bak"
 	var cmd string = fmt.Sprintf("sudo mv %s %s",source_list,source_list_bak)

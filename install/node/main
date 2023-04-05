@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 $ENV_INSTALL/node/install_nvm.sh
-load_env --nvm
+load_env --node
 nvm install --lts
 npm i -g npm nrm pnpm
 nrm use tencent
