@@ -20,7 +20,7 @@ EOF
 
 function update_local_zsh() {
     ENV_ROOT_DIR=$(realpath $0|awk -F/ '{print $4}')
-    source ${HOME}/${ENV_ROOT_DIR}/PROJECT_ENV
+    source ${HOME}/${ENV_ROOT_DIR}/Manifest
     cat ${ENV_LOAD}/zsh/settings/${ZSHFILE} >${HOME}/.zshrc
     source ${HOME}/.zshrc
 }

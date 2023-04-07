@@ -1,5 +1,5 @@
 #!/usr/bin/env zsh
-source $HOME/env-manager/PROJECT_ENV
+source $HOME/env-manager/Manifest
 # Install
 function install_env() {
     local ARGS=$(getopt -o '' -l ' \

@@ -11,7 +11,7 @@ function check_github() {
 }
 
 export ENV_ROOT_DIR="env-manager"
-source ${HOME}/${ENV_ROOT_DIR}/PROJECT_ENV
+source ${HOME}/${ENV_ROOT_DIR}/Manifest
 source ${ENV_ROOT}/include/common.sh
 
 
