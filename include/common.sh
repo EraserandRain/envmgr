@@ -143,6 +143,11 @@ function disable_needrestart() {
     }
 }
 
+
+function if_bionic_os() {
+    [[ "$(lsb_release -rs)" == '18.04' ]] && eval $*
+}
+
 function if_jammy_os() {
     [[ "$(lsb_release -rs)" == '22.04' ]] && eval $*
 }
