@@ -1,22 +1,10 @@
 #!/usr/bin/env bash
-
-function check_github() {
-  curl github.com 
-  if [ $? -ne 0 ]; then
-    echo "Failed to connect to github.com"
-    exit 1
-  else
-    echo "Connected to github.com"
-  fi
-}
-
 export ENV_ROOT_DIR="env-manager"
 source ${HOME}/${ENV_ROOT_DIR}/Manifest
 source ${ENV_ROOT}/include/common.sh
 
-
-wsl2_config --set_clash_proxy
-check_github
+# HOSTIP=
+load_env --proxy
 
 
 is_cmd_exist zsh omz && load_env --zsh $(hostname -s) || install_env --zsh

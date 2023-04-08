@@ -148,7 +148,6 @@ function disable_needrestart() {
     }
 }
 
-
 function if_bionic_os() {
     [[ "$(lsb_release -rs)" == '18.04' ]] && eval $*
 }
@@ -194,7 +193,6 @@ function wsl2_config() {
             sudo service docker restart
             shift
             ;;
-   
         --)
             shift
             break
