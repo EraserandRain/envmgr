@@ -23,3 +23,6 @@ load_env \
     --git \
     --vagrant \
     --zsh $Device
+
+# Custom
+[[ -e ${ENV_LOAD}/zsh/settings/custom ]] && source ${ENV_LOAD}/zsh/settings/custom

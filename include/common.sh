@@ -73,7 +73,8 @@ function load_env() {
         alias, \
         git, \
         vim, \
-        ssh \
+        ssh, \
+        proxy \
     ' -- "$@")
     [[ $? != 0 ]] && echo "Parse error! Terminating..." >&2 && exit 1
     eval set -- $ARGS
@@ -123,6 +124,10 @@ function load_env() {
             source ${ENV_LOAD}/ssh/main
             shift
             ;;
+        --proxy)
+            source ${ENV_LOAD}/proxy/main
+            shift
+            ;;
         --)
             shift
             break
@@ -162,8 +167,7 @@ function wsl2_config() {
     local ARGS=$(getopt -o '' -l ' \
         fix_interop, \
         startup_docker, \
-        fix_dockerd_failed, \
-        set_clash_proxy \
+        fix_dockerd_failed \
     ' -- "$@")
     [[ $? != 0 ]] && echo "Parse error! Terminating..." >&2 && exit 1
     eval set -- $ARGS
@@ -190,11 +194,7 @@ function wsl2_config() {
             sudo service docker restart
             shift
             ;;
-        --set_clash_proxy)
-            if_wsl2 export ALL_PROXY="http://${HOSTIP}:7890"
-            curl google.com 2>&1 | grep google
-            shift
-            ;;
+   
         --)
             shift
             break
