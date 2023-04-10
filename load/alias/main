@@ -1,13 +1,20 @@
 #!/usr/bin/env bash
 export PATH=$PATH:$HOME/install/lib/bin
 alias clr="clear"
+# Git
 alias gac="git add . && git commit"
 alias gst="git status"
 alias gstb="git status -sb"
 alias glog="git log --oneline --decorate --graph"
+# Docker
 alias dps="docker ps -as"
 alias dlog="docker logs --tail 50 --follow --timestamps"
 alias dc="docker-compose"
+# Others
 alias vbm="vboxmanage"
 alias cmq="mysql -h 127.0.0.1 -uroot -pmysql57"
 alias crs="redis-cli -h 127.0.0.1 -p 6379 -a redis"
+# Minikube
+alias mkb="minikube"
+alias mkbst="minikube status"
+alias mkbc="minikube kubectl --"
