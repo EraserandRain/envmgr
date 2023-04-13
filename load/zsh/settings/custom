@@ -1,0 +1,7 @@
+#!/usr/bin/env zsh
+
+
+# Proxy
+
+# HOSTIP=
+# load_env --proxy

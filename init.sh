@@ -3,8 +3,8 @@ export ENV_ROOT_DIR="env-manager"
 source ${HOME}/${ENV_ROOT_DIR}/Manifest
 source ${ENV_ROOT}/include/common.sh
 
-# HOSTIP=
-load_env --proxy
+# Custom
+[[ -e ${ENV_LOAD}/zsh/settings/custom ]] && source ${ENV_LOAD}/zsh/settings/custom
 
 
 is_cmd_exist zsh omz && load_env --zsh $(hostname -s) || install_env --zsh
