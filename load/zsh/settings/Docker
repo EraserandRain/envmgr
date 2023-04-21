@@ -9,10 +9,10 @@ source ${HOME}/${ENV_ROOT_DIR}/Manifest
 source ${ENV_ROOT}/include/common.sh
 
 load_env \
+    --alias \
     --node \
     --python \
     --golang \
-    --alias \
     --git \
     --ssh \
     --zsh $Device

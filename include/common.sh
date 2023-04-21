@@ -10,7 +10,8 @@ function install_env() {
         ruby, \
         docker, \
         zsh, \
-        ssh \
+        ssh, \
+        k8s \
     ' -- "$@")
     [[ $? != 0 ]] && echo "Parse error! Terminating..." >&2 && exit 1
     eval set -- $ARGS
@@ -48,6 +49,10 @@ function install_env() {
             source ${ENV_INSTALL}/ssh/main
             shift
             ;;
+        --k8s)
+            source ${ENV_INSTALL}/k8s/main
+            shift
+            ;;
         --)
             shift
             break
@@ -74,7 +79,8 @@ function load_env() {
         git, \
         vim, \
         ssh, \
-        proxy \
+        proxy, \
+        k8s \
     ' -- "$@")
     [[ $? != 0 ]] && echo "Parse error! Terminating..." >&2 && exit 1
     eval set -- $ARGS
@@ -126,6 +132,10 @@ function load_env() {
             ;;
         --proxy)
             source ${ENV_LOAD}/proxy/main
+            shift
+            ;;
+        --k8s)
+            source ${ENV_LOAD}/k8s/main
             shift
             ;;
         --)

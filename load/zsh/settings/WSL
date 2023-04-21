@@ -15,10 +15,10 @@ wsl2_config \
     --startup_docker
 
 load_env \
+    --alias \
     --node \
     --python \
     --golang \
-    --alias \
     --docker \
     --git \
     --vagrant \

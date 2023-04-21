@@ -11,10 +11,10 @@ source ${ENV_ROOT}/include/common.sh
 if_jammy_os disable_needrestart
 
 load_env \
+    --alias \
     --node \
     --python \
     --golang \
-    --alias \
     --docker \
     --git \
     --zsh $Device
