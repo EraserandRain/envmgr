@@ -1,0 +1,30 @@
+Debian:
+  os:
+  - version: '11'
+    name: bullseye
+    source:
+    - deb http://mirrors.tencentyun.com/debian bullseye main contrib non-free
+    - deb http://mirrors.tencentyun.com/debian bullseye-updates main contrib non-free
+    - deb http://mirrors.tencentyun.com/debian-security bullseye-security main contrib non-free
+    - deb http://mirrors.tencentyun.com/debian bullseye-backports main contrib non-free
+    - deb http://mirrors.tencentyun.com/debian bullseye-proposed-updates main contrib non-free
+Ubuntu:
+  os:
+  - version: '20.04'
+    name: focal
+    source:
+    - deb https://mirrors.tuna.tsinghua.edu.cn/ubuntu/ focal main restricted universe multiverse
+    - deb https://mirrors.tuna.tsinghua.edu.cn/ubuntu/ focal-updates main restricted universe multiverse
+    - deb https://mirrors.tuna.tsinghua.edu.cn/ubuntu/ focal-backports main restricted universe multiverse
+    - deb https://mirrors.tuna.tsinghua.edu.cn/ubuntu/ focal-security main restricted universe multiverse
+  - version: '22.04'
+    name: jammy
+    source:
+    - deb http://mirrors.tuna.tsinghua.edu.cn/ubuntu/ jammy main restricted
+    - deb http://mirrors.tuna.tsinghua.edu.cn/ubuntu/ jammy-updates main restricted
+    - deb http://mirrors.tuna.tsinghua.edu.cn/ubuntu/ jammy universe
+    - deb http://mirrors.tuna.tsinghua.edu.cn/ubuntu/ jammy-updates universe
+    - deb http://mirrors.tuna.tsinghua.edu.cn/ubuntu/ jammy multiverse
+    - deb http://mirrors.tuna.tsinghua.edu.cn/ubuntu/ jammy-updates multiverse
+    - deb http://mirrors.tuna.tsinghua.edu.cn/ubuntu/ jammy-backports main restricted universe multiverse
+    - deb http://mirrors.tuna.tsinghua.edu.cn/ubuntu/ jammy-security main restricted universe multiverse

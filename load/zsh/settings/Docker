@@ -1,0 +1,22 @@
+#!/usr/bin/env zsh
+
+# Set Device
+local Device="Docker $(hostname -s)"
+
+# Loading
+export ENV_ROOT_DIR="env-manager"
+source ${HOME}/${ENV_ROOT_DIR}/Manifest
+source ${ENV_ROOT}/include/common.sh
+
+load_env \
+    --alias \
+    --node \
+    --python \
+    --golang \
+    --git \
+    --ssh \
+    --zsh $Device
+
+
+# Custom
+[[ -e ${ENV_LOAD}/zsh/settings/custom ]] && source ${ENV_LOAD}/zsh/settings/custom

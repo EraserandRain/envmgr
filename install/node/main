@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+$ENV_INSTALL/node/install_nvm.sh
+load_env --node
+if_bionic_os nvm install 16.15.1 && nvm alias default 16.15.1 || nvm install --lts
+npm i -g npm nrm pnpm
+nrm use tencent
+  
