@@ -25,3 +25,7 @@ alias mkcg="minikube kubectl -- get"
 alias mkcgp="minikube kubectl -- get pods --show-labels"
 alias mkcdp="minikube kubectl -- describe pod"
 alias mkcl="minikube kubectl -- logs"
+# Ansible
+alias a-p="ansible-playbook"
+alias a-i="ansible-inventory"
+alias a-g="ansible-galaxy"
