@@ -1,0 +1,4 @@
+- name: Test task
+  debug:
+    msg: "{{ inventory_hostname }}"
+    
