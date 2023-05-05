@@ -1,9 +1,3 @@
-<<<<<<< HEAD
 *.retry
-
 log/
-=======
 *tmp
-.vscode
-
->>>>>>> parent of 6e6be7b (feat: init branch dev-ansible)
