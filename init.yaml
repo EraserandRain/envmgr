@@ -1,16 +1,16 @@
 ---
-# - name: Generate SSH keys on master node
-#   hosts: localhost
-#   gather_facts: false
-#   vars:
-#     sshkey: ~/.ssh/id_rsa
-#   tasks:
-#     - name: Generate SSH keys on master node
-#       changed_when: false
-#       shell: |
-#         ssh-keygen -t rsa -f {{ sshkey }} -N ''
-#       args:
-#         creates: "{{ sshkey }}"
+- name: Generate SSH keys on master node
+  hosts: localhost
+  gather_facts: false
+  vars:
+    sshkey: ~/.ssh/id_rsa
+  tasks:
+    - name: Generate SSH keys on master node
+      changed_when: false
+      shell: |
+        ssh-keygen -t rsa -f {{ sshkey }} -N ''
+      args:
+        creates: "{{ sshkey }}"
 
 
 - name: Init connection and python env
