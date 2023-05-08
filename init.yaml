@@ -1,0 +1,74 @@
+---
+# - name: Generate SSH keys on master node
+#   hosts: localhost
+#   gather_facts: false
+#   vars:
+#     sshkey: ~/.ssh/id_rsa
+#   tasks:
+#     - name: Generate SSH keys on master node
+#       changed_when: false
+#       shell: |
+#         ssh-keygen -t rsa -f {{ sshkey }} -N ''
+#       args:
+#         creates: "{{ sshkey }}"
+
+
+- name: Init connection and python env
+  hosts: worker
+  gather_facts: false
+  vars:
+    python_default_version: 3.10.4
+  tasks:
+    # - name: SSH Connection Configuration
+    #   changed_when: false
+    #   connection: local
+    #   shell: |
+    #     ssh-keyscan {{ inventory_hostname }} >> ~/.ssh/known_hosts
+    #     sshpass -p'vagrant' ssh-copy-id vagrant@{{ inventory_hostname }}
+
+    - name: Install pyenv on worker node
+      environment:
+        PYENV_ROOT: $HOME/.pyenv
+        PATH: $PYENV_ROOT/bin:$PATH
+      # block:
+        # - name: Download pyenv
+      vars:
+        pyenv_repo: https://github.com/pyenv/pyenv-installer/raw/master/bin/pyenv-installer
+      become_user: vagrant
+      shell: |
+        set -o pipefail
+        curl -L {{ pyenv_repo }} | bash
+      args:
+        executable: /bin/bash
+        creates: /home/{{ lookup('env', 'USER') }}/.pyenv
+      register: result
+
+    - name: Debug
+      debug:
+        msg: result.stdout_lines
+
+        # - name: Load pyenv
+        #   changed_when: false
+        #   shell: |
+        #     export PYENV_ROOT="{{ PYENV_ROOT }}"
+        #     export PATH="{{ PATH }}"
+        #     eval "$(pyenv init --path)"
+        #   args:
+        #     executable: /bin/bash
+
+        # - name: Setting pyenv in bash
+        #   lineinfile:
+        #     path: $HOME/.bashrc
+        #     line: "{{ item }}"
+        #   loop:
+        #     - export PYENV_ROOT="{{ PYENV_ROOT }}"
+        #     - export PATH="{{ PATH }}"
+        #     - eval "$(pyenv init --path)"
+
+
+    # - name: Install python3 ( Default Version is {{ python_default_version }} ) on worker node
+
+
+# - name:
+  # hosts: worker
+  # gather_facts: false
