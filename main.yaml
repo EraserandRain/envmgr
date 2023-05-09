@@ -1,0 +1,9 @@
+---
+- name: init
+  hosts: worker
+  gather_facts: false
+  vars_files: 
+    - vars.yaml
+  tasks:
+    - import_playbook: init/sshkey.yaml
+    - import_playbook: init/install_python.yaml

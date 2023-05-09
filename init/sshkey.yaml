@@ -1,0 +1,30 @@
+---
+- name: Generate SSH keys on master node
+  hosts: localhost
+  gather_facts: false
+  vars:
+    sshkey: ~/.ssh/id_rsa
+  tasks:
+    - name: Generate SSH keys on master node
+      changed_when: false
+      shell: |
+        ssh-keygen -t rsa -f {{ sshkey }} -N ''
+      args:
+        creates: "{{ sshkey }}"
+
+
+- name: SSH Connection Configuration
+  hosts: worker
+  gather_facts: false
+  vars:
+    ssh_user: vagrant
+  tasks:
+    - name: SSH Connection Configuration
+      changed_when: false
+      connection: local
+      environment:
+        SSHPASS: vagrant
+      shell: |
+        ssh-keygen -R {{ inventory_hostname }}
+        ssh-keyscan {{ inventory_hostname }} >> ~/.ssh/known_hosts
+        sshpass -e ssh-copy-id {{ ssh_user }}@{{ inventory_hostname }}
