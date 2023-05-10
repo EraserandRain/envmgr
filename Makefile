@@ -1,14 +1,5 @@
 SHELL := /bin/bash
-LIST := a b c
+.PHONY: init
 
-build: build_all
-
-build_%:
-	@if [[ "$*" == "all" ]]; then \
-		echo $(LIST); \
-	elif [[ "$(LIST)" == *"$*"* ]]; then \
-		echo $*; \
-	else \
-		echo "Error: $* not found in the list ($(LIST)))"; \
-	fi
-	
+init:
+	ansible-playbook entry.yml --skip-tags sshkey

@@ -1,0 +1,4 @@
+---
+# vars file for init
+home_path: /home/{{ lookup('env', 'USER') }}
+python_default_version: 3.10.4

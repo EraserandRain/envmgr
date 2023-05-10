@@ -1,0 +1,42 @@
+---
+- name: Create ~/downloads directory if not exists
+  file:
+    path: "{{ home_path }}/downloads"
+    state: directory
+    mode: '0755'
+
+- name: Check if pyenv has been installed
+  stat:
+    path: "{{ home_path }}/.pyenv"
+  register: pyenv_dir
+
+- name: Download pyenv-installer
+  get_url:
+    url: https://github.com/pyenv/pyenv-installer/raw/master/bin/pyenv-installer
+    dest: "{{ home_path }}/downloads"
+    mode: '0755'
+  when: not pyenv_dir.stat.exists
+
+- name: Install pyenv by pyenv-installer
+  script:
+    
+        # - name: Load pyenv
+        #   changed_when: false
+        #   shell: |
+        #     export PYENV_ROOT="{{ PYENV_ROOT }}"
+        #     export PATH="{{ PATH }}"
+        #     eval "$(pyenv init --path)"
+        #   args:
+        #     executable: /bin/bash
+
+        # - name: Setting pyenv in bash
+        #   lineinfile:
+        #     path: $HOME/.bashrc
+        #     line: "{{ item }}"
+        #   loop:
+        #     - export PYENV_ROOT="{{ PYENV_ROOT }}"
+        #     - export PATH="{{ PATH }}"
+        #     - eval "$(pyenv init --path)"
+
+
+    # - name: Install python3 ( Default Version is {{ python_default_version }} ) on worker node

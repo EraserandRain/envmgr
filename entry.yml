@@ -1,0 +1,8 @@
+---
+- name: Init
+  hosts: worker
+  gather_facts: false
+  roles:
+    - init
+  tags:
+    - init
