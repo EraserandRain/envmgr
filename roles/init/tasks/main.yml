@@ -4,11 +4,11 @@
   import_tasks: sshkey.yml
   tags: sshkey
 
-- name: Install pyenv and python3 on worker node
-  environment:
-    PYENV_ROOT: $HOME/.pyenv
-    PATH: $PYENV_ROOT/bin:$PATH
-  import_tasks: install_python.yml
+# - name: Install pyenv and python3 on worker node
+#   environment:
+#     PYENV_ROOT: $HOME/.pyenv
+#     PATH: $PYENV_ROOT/bin:$PATH
+#   import_tasks: install_python.yml
 
 - name: Get PATH from worker node
   hosts: worker
