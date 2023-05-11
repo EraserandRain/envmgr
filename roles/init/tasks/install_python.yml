@@ -1,25 +1,19 @@
 ---
-- name: Create ~/downloads directory if not exists
-  file:
-    path: "{{ home_path }}/downloads"
-    state: directory
-    mode: '0755'
-
-- name: Check if pyenv has been installed
-  stat:
-    path: "{{ home_path }}/.pyenv"
-  register: pyenv_dir
-
 - name: Download pyenv-installer
   get_url:
     url: https://github.com/pyenv/pyenv-installer/raw/master/bin/pyenv-installer
-    dest: "{{ home_path }}/downloads"
+    dest: "/tmp"
     mode: '0755'
-  when: not pyenv_dir.stat.exists
 
 - name: Install pyenv by pyenv-installer
-  script:
-    
+  command: /bin/sh /tmp/pyenv-installer
+  args:
+    creates: "{{ home_path }}/.pyenv"
+  register: results
+
+- name: Display Debug
+  debug:
+    var: results.stdout
         # - name: Load pyenv
         #   changed_when: false
         #   shell: |
