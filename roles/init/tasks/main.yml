@@ -4,41 +4,10 @@
   import_tasks: sshkey.yml
   tags: sshkey
 
-# - name: Install pyenv and python3 on worker node
-#   environment:
-#     PYENV_ROOT: $HOME/.pyenv
-#     PATH: $PYENV_ROOT/bin:$PATH
-#   import_tasks: install_python.yml
-
-- name: Get PATH from worker node
-  hosts: worker
-  tasks:
-    - command: echo $PATH
-      changed_when: false
-      register: worker_PATH
-
-- name: Install pyenv and python (Default version is {{ python_default_version }})
-  hosts: worker
-  gather_facts: false
+- name: Install pyenv and python3 on worker node
   vars:
-    home_path: "{{ lookup('env', 'HOME') }}"
-    python_default_version: 3.10.4
+    PYENV_ROOT: "{{ ansible_env.HOME }}/.pyenv"
+    PYENV_CACHE: "{{ PYENV_ROOT }}/cache"
   environment:
-    PATH: "{{ worker_PATH.stdout }}:/usr/local/bin"
-  roles:
-    - role: staticdev.pyenv
-      pyenv_version: "v2.3.9"
-      pyenv_virtualenv_version: "v1.1.5"
-      pyenv_update_version: "810db78"
-      pyenv_shellrc_file: "{{ home_path }}/.shrc"
-      pyenv_path: "{{ home_path }}/.pyenv"
-      pyenvrc_path: "{{ home_path }}"
-      pyenv_global:
-        - "{{ python_default_version }}"
-      pyenv_enable_autocompletion: false
-      pyenv_python_versions:
-        - "{{ python_default_version }}"
-      pyenv_virtualenvs:
-        - venv_name: latest_v310
-          py_version: "{{ python_default_version }}"
-
+    PYENV_ROOT: "{{ ansible_env.HOME }}/.pyenv"
+  import_tasks: install_python.yml

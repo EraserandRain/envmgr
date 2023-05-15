@@ -1,36 +1,67 @@
 ---
 - name: Download pyenv-installer
+  connection: local
   get_url:
     url: https://github.com/pyenv/pyenv-installer/raw/master/bin/pyenv-installer
     dest: "/tmp"
-    mode: '0755'
+    mode: "0755"
+    force: false
 
 - name: Install pyenv by pyenv-installer
-  command: /bin/sh /tmp/pyenv-installer
+  script: /tmp/pyenv-installer
   args:
-    creates: "{{ home_path }}/.pyenv"
-  register: results
+    executable: /bin/bash
+    creates: "{{ ansible_env.HOME }}/.pyenv"
 
-- name: Display Debug
-  debug:
-    var: results.stdout
-        # - name: Load pyenv
-        #   changed_when: false
-        #   shell: |
-        #     export PYENV_ROOT="{{ PYENV_ROOT }}"
-        #     export PATH="{{ PATH }}"
-        #     eval "$(pyenv init --path)"
-        #   args:
-        #     executable: /bin/bash
+- name: Setting pyenv in bash
+  lineinfile:
+    path: "{{ ansible_env.HOME }}/.bashrc"
+    line: "{{ item }}"
+  loop:
+    - export PYENV_ROOT="$HOME/.pyenv"
+    - export PATH="$PYENV_ROOT/bin:$PATH"
+    - eval "$(pyenv init --path)"
 
-        # - name: Setting pyenv in bash
-        #   lineinfile:
-        #     path: $HOME/.bashrc
-        #     line: "{{ item }}"
-        #   loop:
-        #     - export PYENV_ROOT="{{ PYENV_ROOT }}"
-        #     - export PATH="{{ PATH }}"
-        #     - eval "$(pyenv init --path)"
+- name: Update apt cache and install dependencies
+  become: true
+  apt:
+    pkg:
+      - build-essential
+      - libssl-dev
+      - zlib1g-dev
+      - libbz2-dev
+      - libreadline-dev
+      - libsqlite3-dev
+      - curl
+      - libncursesw5-dev
+      - xz-utils
+      - tk-dev
+      - libxml2-dev
+      - libxmlsec1-dev
+      - libffi-dev
+      - liblzma-dev
+    update_cache: yes
 
+- name: Create ~/.pyenv/cache if not exists
+  file:
+    path: "{{ PYENV_CACHE }}"
+    state: directory
+    mode: '0755'
 
-    # - name: Install python3 ( Default Version is {{ python_default_version }} ) on worker node
+- name: Download python3 ( Default Version is {{ python_default_version }} )
+  get_url:
+    url: "https://npm.taobao.org/mirrors/python/{{ python_default_version }}/Python-{{ python_default_version }}.tar.xz"
+    dest: "{{ PYENV_CACHE }}/Python-{{ python_default_version }}.tar.xz"
+    force: false
+
+- name: Install python3
+  shell: |
+    export PYENV_ROOT="{{ PYENV_ROOT }}"
+    export PATH="{{ PYENV_ROOT }}/bin:{{ ansible_env.PATH }}"
+    pyenv init --path
+    pyenv install {{ python_default_version }}
+    pyenv global {{ python_default_version }}
+    pip3 install --upgrade pip
+  args:
+    executable: /bin/bash
+    creates: "{{ PYENV_ROOT }}/shims/python3"
