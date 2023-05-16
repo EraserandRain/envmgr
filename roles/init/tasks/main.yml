@@ -6,8 +6,8 @@
 
 - name: Install pyenv and python3 on worker node
   vars:
-    PYENV_ROOT: "{{ ansible_env.HOME }}/.pyenv"
-    PYENV_CACHE: "{{ PYENV_ROOT }}/cache"
+    pyenv_root: "{{ ansible_env.HOME }}/.pyenv"
+    pyenv_cache: "{{ pyenv_root }}/cache"
   environment:
     PYENV_ROOT: "{{ ansible_env.HOME }}/.pyenv"
   import_tasks: install_python.yml

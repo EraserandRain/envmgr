@@ -25,6 +25,7 @@
 - name: Update apt cache and install dependencies
   become: true
   apt:
+    update_cache: true
     pkg:
       - build-essential
       - libssl-dev
@@ -40,28 +41,28 @@
       - libxmlsec1-dev
       - libffi-dev
       - liblzma-dev
-    update_cache: yes
 
 - name: Create ~/.pyenv/cache if not exists
   file:
-    path: "{{ PYENV_CACHE }}"
+    path: "{{ pyenv_cache }}"
     state: directory
     mode: '0755'
 
 - name: Download python3 ( Default Version is {{ python_default_version }} )
   get_url:
     url: "https://npm.taobao.org/mirrors/python/{{ python_default_version }}/Python-{{ python_default_version }}.tar.xz"
-    dest: "{{ PYENV_CACHE }}/Python-{{ python_default_version }}.tar.xz"
+    dest: "{{ pyenv_cache }}/Python-{{ python_default_version }}.tar.xz"
+    mode: "0775"
     force: false
 
 - name: Install python3
   shell: |
-    export PYENV_ROOT="{{ PYENV_ROOT }}"
-    export PATH="{{ PYENV_ROOT }}/bin:{{ ansible_env.PATH }}"
+    export PYENV_ROOT="{{ pyenv_root }}"
+    export PATH="{{ pyenv_root }}/bin:{{ ansible_env.PATH }}"
     pyenv init --path
     pyenv install {{ python_default_version }}
     pyenv global {{ python_default_version }}
     pip3 install --upgrade pip
   args:
     executable: /bin/bash
-    creates: "{{ PYENV_ROOT }}/shims/python3"
+    creates: "{{ pyenv_root }}/shims/python3"
