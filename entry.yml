@@ -7,8 +7,8 @@
   tags:
     - init
 
-# - name: Oh my zsh
-#   hosts: master
-#   roles:
-#     - gantsign.oh-my-zsh
-
+- name: Oh my zsh
+  hosts: node
+  roles:
+    - gantsign.oh-my-zsh
+  vars_files: vars/gantsign.oh-my-zsh.yml
