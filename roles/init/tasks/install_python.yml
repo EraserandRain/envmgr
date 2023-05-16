@@ -11,11 +11,11 @@
   script: /tmp/pyenv-installer
   args:
     executable: /bin/bash
-    creates: "{{ ansible_env.HOME }}/.pyenv"
+    creates: "{{ node_env.HOME }}/.pyenv"
 
 - name: Setting pyenv in bash
   lineinfile:
-    path: "{{ ansible_env.HOME }}/.bashrc"
+    path: "{{ node_env.HOME }}/.bashrc"
     line: "{{ item }}"
   loop:
     - export PYENV_ROOT="$HOME/.pyenv"
@@ -46,7 +46,7 @@
   file:
     path: "{{ pyenv_cache }}"
     state: directory
-    mode: '0755'
+    mode: "0755"
 
 - name: Download python3 ( Default Version is {{ python_default_version }} )
   get_url:
@@ -55,10 +55,16 @@
     mode: "0755"
     force: false
 
+- name: Get ENV PATH from node
+  shell: |
+    echo -n $PATH
+  changed_when: false
+  register: node_path
+
 - name: Install python3
   shell: |
     export PYENV_ROOT="{{ pyenv_root }}"
-    export PATH="{{ pyenv_root }}/bin:{{ ansible_env.PATH }}"
+    export PATH="{{ pyenv_root }}/bin:{{ node_path.stdout }}"
     eval "$(pyenv init --path)"
     pyenv install {{ python_default_version }}
     pyenv global {{ python_default_version }}

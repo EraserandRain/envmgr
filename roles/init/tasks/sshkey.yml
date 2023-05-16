@@ -2,7 +2,7 @@
 - name: Generate SSH keys on master node
   changed_when: false
   vars:
-    sshkey: "{{ ansible_env.HOME }}/.ssh/id_rsa"
+    sshkey: "{{ node_env.HOME }}/.ssh/id_rsa"
   shell: |
     ssh-keygen -t rsa -f {{ sshkey }} -N ''
   args:
@@ -14,5 +14,5 @@
     SSHPASS: vagrant
   shell: |
     ssh-keygen -R {{ inventory_hostname }}
-    ssh-keyscan {{ inventory_hostname }} >> {{ ansible_env.HOME }}/.ssh/known_hosts
-    sshpass -e ssh-copy-id {{ ansible_env.USER }}@{{ inventory_hostname }}
+    ssh-keyscan {{ inventory_hostname }} >> {{ node_env.HOME }}/.ssh/known_hosts
+    sshpass -e ssh-copy-id {{ node_env.USER }}@{{ inventory_hostname }}
