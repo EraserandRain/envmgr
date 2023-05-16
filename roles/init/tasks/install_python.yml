@@ -59,7 +59,7 @@
   shell: |
     export PYENV_ROOT="{{ pyenv_root }}"
     export PATH="{{ pyenv_root }}/bin:{{ ansible_env.PATH }}"
-    pyenv init --path
+    eval "$(pyenv init --path)"
     pyenv install {{ python_default_version }}
     pyenv global {{ python_default_version }}
     pip3 install --upgrade pip
