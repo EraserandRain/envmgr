@@ -52,7 +52,7 @@
   get_url:
     url: "https://npm.taobao.org/mirrors/python/{{ python_default_version }}/Python-{{ python_default_version }}.tar.xz"
     dest: "{{ pyenv_cache }}/Python-{{ python_default_version }}.tar.xz"
-    mode: "0775"
+    mode: "0755"
     force: false
 
 - name: Install python3

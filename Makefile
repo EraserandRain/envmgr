@@ -4,3 +4,6 @@ SHELL := /bin/bash
 init:
 	ansible-playbook entry.yml --skip-tags sshkey
 	# ansible-playbook entry.yml --skip-tags sshkey -vvv
+
+lint:
+	ansible-lint ./roles
