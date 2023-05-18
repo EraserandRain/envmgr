@@ -1,0 +1,7 @@
+---
+# global vars file for zsh
+omz:
+  home: "{{ ansible_env.HOME }}/.oh-my-zsh"
+  plugins: "{{ ansible_env.HOME }}/.oh-my-zsh/plugins"
+ 
+include_vars: alias.yml

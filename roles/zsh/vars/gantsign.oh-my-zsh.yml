@@ -6,7 +6,9 @@ users:
       plugins:
         - git
         - zsh-autosuggestions
+        - pyenv
+        - python
       install: true
       update_mode: disabled
       update_frequency: 13
-      writhe_zshrc: true
+      write_zshrc: true

@@ -1,14 +1,17 @@
 ---
 - name: Init
-  hosts: worker
+  hosts: node
   gather_facts: false
   roles:
     - init
   tags:
     - init
 
-- name: Oh my zsh
+- name: Install and Setting zsh
   hosts: node
+  vars_files: roles/zsh/vars/gantsign.oh-my-zsh.yml
   roles:
     - gantsign.oh-my-zsh
-  vars_files: vars/gantsign.oh-my-zsh.yml
+    - zsh
+  tags:
+    - zsh
