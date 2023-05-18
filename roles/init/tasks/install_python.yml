@@ -55,16 +55,16 @@
     mode: "0755"
     force: false
 
-- name: Get ENV PATH from node
+- name: Get ENV PATH
   shell: |
     echo -n $PATH
   changed_when: false
-  register: node_path
+  register: env_path
 
 - name: Install python3
   shell: |
     export PYENV_ROOT="{{ pyenv_root }}"
-    export PATH="{{ pyenv_root }}/bin:{{ node_path.stdout }}"
+    export PATH="{{ pyenv_root }}/bin:{{ env_path.stdout }}"
     eval "$(pyenv init --path)"
     pyenv install {{ python_default_version }}
     pyenv global {{ python_default_version }}

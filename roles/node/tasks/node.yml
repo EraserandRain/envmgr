@@ -1,0 +1,18 @@
+---
+- name: Install yarn
+  community.general.npm:
+    name: yarn
+    global: true
+    executable: "{{ npm_path }}"
+
+- name: Install pnpm
+  community.general.npm:
+    name: pnpm
+    global: true
+    executable: "{{ npm_path }}"
+
+- name: Install nrm
+  community.general.npm:
+    name: nrm
+    global: true
+    executable: "{{ npm_path }}"

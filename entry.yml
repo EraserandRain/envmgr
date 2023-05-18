@@ -7,7 +7,7 @@
   tags:
     - init
 
-- name: Install and Setting zsh
+- name: Install and Configure zsh
   hosts: node
   vars_files: roles/zsh/vars/gantsign.oh-my-zsh.yml
   roles:
@@ -15,3 +15,16 @@
     - zsh
   tags:
     - zsh
+
+- name: Install and Configure node
+  hosts: node
+  vars_files: roles/node/vars/stephdewit.nvm.yml
+  environment:
+    NVM_DIR: "{{ ansible_env.HOME }}/.nvm"
+  roles:
+    - role: stephdewit.nvm
+      become: yes
+      become_user: "{{ ansible_env.USER }}"
+    - role: node
+  tags:
+    - node

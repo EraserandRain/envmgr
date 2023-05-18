@@ -1,0 +1,7 @@
+---
+# var file for role stephdewit.nvm
+nvm_version: 'latest'
+nvm_node_version: 16.15.1
+nvm_shell_init_file: "{{ ansible_env.HOME }}/.zshrc"
+nvm_install_path: "{{ ansible_env.HOME }}/.nvm"
+nvm_install_deps: false

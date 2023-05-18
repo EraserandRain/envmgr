@@ -10,5 +10,8 @@ init:
 zsh:
 	ansible-playbook entry.yml -t zsh
 
+node:
+	ansible-playbook entry.yml -t node
+
 lint:
 	ansible-lint ./roles

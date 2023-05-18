@@ -3,7 +3,12 @@ Quick Deployment to install and configure packages with ansible.
 ## Dependencies
 
 ```bash
-ansible-galaxy install gantsign.oh-my-zsh
+ansible-galaxy collection install \
+    community.general
+
+ansible-galaxy install \
+    gantsign.oh-my-zsh \
+    stephdewit.nvm
 ```
 
 ## Reference
