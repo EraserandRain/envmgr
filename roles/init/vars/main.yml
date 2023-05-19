@@ -3,5 +3,3 @@
 node_env:
   USER: "{{ lookup('env', 'USER') }}"
   HOME: "{{ lookup('env', 'HOME') }}"
-
-python_default_version: 3.10.4

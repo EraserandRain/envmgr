@@ -1,17 +1,22 @@
-SHELL := /bin/bash
 .PHONY: init
 
+SHELL := /bin/bash
+ENTRY_FILE := entry.yml
+
 total:
-	ansible-playbook entry.yml
+	ansible-playbook $(ENTRY_FILE)
 
 init:
-	ansible-playbook entry.yml -t init
+	ansible-playbook $(ENTRY_FILE) -t init
 
 zsh:
-	ansible-playbook entry.yml -t zsh
+	ansible-playbook $(ENTRY_FILE) -t zsh
+
+python:
+	ansible-playbook $(ENTRY_FILE) -t python
 
 node:
-	ansible-playbook entry.yml -t node
+	ansible-playbook $(ENTRY_FILE) -t node
 
 lint:
 	ansible-lint ./roles

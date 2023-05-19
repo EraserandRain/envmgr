@@ -3,11 +3,3 @@
   connection: local
   import_tasks: sshkey.yml
   tags: sshkey
-
-- name: Install pyenv and python3 on worker node
-  vars:
-    pyenv_root: "{{ node_env.HOME }}/.pyenv"
-    pyenv_cache: "{{ pyenv_root }}/cache"
-  environment:
-    PYENV_ROOT: "{{ node_env.HOME }}/.pyenv"
-  import_tasks: install_python.yml

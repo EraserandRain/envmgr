@@ -1,0 +1,6 @@
+---
+- name: Install and Configure python3
+  environment:
+    PYENV_ROOT: "{{ ansible_env.HOME }}/.pyenv"
+    PATH: "{{ pyenv_root }}/bin:{{ ansible_env.PATH }}"
+  import_tasks: python.yml

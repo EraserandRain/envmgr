@@ -26,3 +26,9 @@
   lineinfile:
     dest: "{{ ansible_env.HOME }}/.zshrc"
     line: PROMPT='%F{cyan}[$(hostname)]%f λ %~/ $(git_prompt_info)%{$reset_color%}'
+
+- name: Create ~/.zprofile if not exists
+  file:
+    path: "{{ ansible_env.HOME }}/.zprofile"
+    state: touch
+    mode: "0664"

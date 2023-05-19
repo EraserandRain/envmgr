@@ -16,6 +16,13 @@
   tags:
     - zsh
 
+- name: Install and Configure python
+  hosts: node
+  roles:
+    - role: python
+  tags:
+    - python
+
 - name: Install and Configure node
   hosts: node
   vars_files: roles/node/vars/stephdewit.nvm.yml
