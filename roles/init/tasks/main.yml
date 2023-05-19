@@ -7,3 +7,7 @@
 - name: Sync time
   import_tasks: sync_time.yml
   tags: sync_time
+
+- name: Update git
+  import_tasks: upgrade_git.yml
+  tags: git

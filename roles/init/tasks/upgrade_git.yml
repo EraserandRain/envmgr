@@ -1,0 +1,13 @@
+---
+- name: Add git PPA
+  become: true
+  apt_repository:
+    repo: ppa:git-core/ppa
+  
+
+- name: Upgrade git
+  become: true
+  apt:
+    pkg: git
+    update_cache: false
+    state: latest
