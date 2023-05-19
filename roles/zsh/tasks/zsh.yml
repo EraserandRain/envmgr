@@ -8,6 +8,9 @@
   git:
     repo: https://github.com/zsh-users/zsh-autosuggestions
     dest: "{{ omz.plugins }}/zsh-autosuggestions"
+    version: master
+    bare: true
+    update: false
   when: not plugin_zsh_autosuggestions.stat.exists
 
 - name: Include alias varsfile
@@ -16,7 +19,7 @@
 - name: Add alias to zshrc
   lineinfile:
     dest: "{{ ansible_env.HOME }}/.zshrc"
-    line: "alias {{item.key}}='{{ item.value }}' "
+    line: "alias {{ item.key }}='{{ item.value }}' "
   with_dict: "{{ zsh_alias }}"
 
 - name: Customize zsh PROMPT
