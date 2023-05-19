@@ -1,0 +1,13 @@
+---
+- name: Install dependencies
+  become: true
+  apt:
+    pkg: 
+      - ntp
+      - ntpdate
+    state: present
+
+- name: Set CST timezone 
+  become: true
+  community.general.timezone:
+    name: Asia/Shanghai

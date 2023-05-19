@@ -3,3 +3,7 @@
   connection: local
   import_tasks: sshkey.yml
   tags: sshkey
+
+- name: Sync time
+  import_tasks: sync_time.yml
+  tags: sync_time
