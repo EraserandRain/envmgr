@@ -25,6 +25,7 @@ zsh_alias:
   a-p: ansible-playbook
   a-i: ansible-inventory
   a-g: ansible-galaxy
+  a-l: ansible-lint
   # Others
   clr: clear
   vbm: vboxmanage
