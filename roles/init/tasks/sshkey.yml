@@ -1,18 +1,20 @@
 ---
 - name: Generate SSH keys on master node
   changed_when: false
-  vars:
-    sshkey: "{{ node_env.HOME }}/.ssh/id_rsa"
   shell: |
-    ssh-keygen -t rsa -f {{ sshkey }} -N ''
+    ssh-keygen -t rsa -f {{ private_key }} -N ''
   args:
-    creates: "{{ sshkey }}"
+    creates: "{{ private_key }}"
+
+- name: Remove host key from known_hosts
+  known_hosts:
+    name: "{{ inventory_hostname }}"
+    state: absent
 
 - name: SSH Connection Configuration
   changed_when: false
   environment:
     SSHPASS: vagrant
   shell: |
-    ssh-keygen -R {{ inventory_hostname }}
     ssh-keyscan {{ inventory_hostname }} >> {{ node_env.HOME }}/.ssh/known_hosts
     sshpass -e ssh-copy-id {{ node_env.USER }}@{{ inventory_hostname }}

@@ -1,0 +1,23 @@
+---
+- name: Add git PPA
+  become: true
+  apt_repository:
+    repo: ppa:git-core/ppa
+
+- name: Upgrade git
+  become: true
+  apt:
+    pkg: git
+    state: latest
+
+- name: Set vim as default git editor
+  community.general.git_config:
+    name: core.editor
+    value: vim
+    scope: global
+
+- name: Set main as default git branch
+  community.general.git_config:
+    name: init.defaultBranch
+    value: main
+    scope: global

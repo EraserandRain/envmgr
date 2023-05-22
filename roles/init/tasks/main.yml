@@ -1,6 +1,9 @@
 ---
 - name: Init SSH Connection
   connection: local
+  vars:
+    private_key: "{{ node_env.HOME }}/.ssh/id_rsa"
+    public_key: "{{ node_env.HOME }}/.ssh/id_rsa.pub"
   import_tasks: sshkey.yml
   tags: sshkey
 
@@ -9,5 +12,5 @@
   tags: sync_time
 
 - name: Update git
-  import_tasks: upgrade_git.yml
+  import_tasks: git.yml
   tags: git
