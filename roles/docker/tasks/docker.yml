@@ -1,0 +1,49 @@
+- name: Download docker installation script if not exists
+  connection: local
+  get_url:
+    url: https://get.docker.com
+    dest: "/tmp/install_docker.sh"
+    mode: "0755"
+    force: false
+
+- name: Install docker by installation script
+  script: /tmp/install_docker.sh
+  args:
+    creates: /usr/bin/docker
+
+- name: Add docker group
+  become: true
+  group:
+    name: docker
+    state: present
+
+- name: Add user to docker group
+  become: true
+  user:
+    name: "{{ ansible_env.USER }}"
+    groups: docker
+    append: true
+
+- name: Restart docker service
+  become: true
+  service:
+    name: docker
+    state: restarted
+
+- name: Set permission for docker.sock
+  become: true
+  file:
+    path: /var/run/docker.sock
+    mode: '0666'
+
+- name: Install docker-compose
+  pip:
+    name: docker-compose
+    state: latest
+    executable: "{{ pip_path }}"
+
+- name: Checkout "eraserandrain/container" repo
+  git:
+    repo: https://github.com/EraserandRain/container
+    dest: "{{ ansible_env.HOME }}/container"
+    version: main

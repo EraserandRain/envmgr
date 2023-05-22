@@ -42,3 +42,11 @@
     - role: golang
   tags:
     - golang
+
+- name: Install and Configure docker
+  hosts: node
+  vars_files: vars/global.yml
+  roles:
+    - role: docker
+  tags:
+    - docker
