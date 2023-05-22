@@ -50,3 +50,11 @@
     - role: docker
   tags:
     - docker
+
+- name: Install and Configure ruby
+  hosts: node
+  vars_files: roles/ruby/vars/rvm.ruby.yml
+  roles:
+    - role: rvm.ruby
+  tags:
+    - ruby

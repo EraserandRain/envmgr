@@ -1,0 +1,13 @@
+---
+# var file for role rvm.ruby
+ruby_default_version: 3.0.5
+rvm1_rubies:
+  - "ruby-{{ ruby_default_version }}"
+rvm1_bundler_install: true
+rvm1_install_path: "{{ ansible_env.HOME }}/.rvm"
+rvm1_install_flags: '--auto-dotfiles  --user-install'
+rvm1_user: "{{ ansible_env.USER }}"
+rvm1_rvm_latest_installer: 'https://raw.githubusercontent.com/rvm/rvm/master/binscripts/rvm-installer'
+rvm1_rvm_version: 'stable'
+rvm1_gpg_key_server: 'hkp://pgp.mit.edu'
+rvm1_gpg_keys: '409B6B1796C275462A1703113804BB82D39DC0E3'

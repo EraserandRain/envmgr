@@ -8,8 +8,10 @@ ansible-galaxy collection install \
 
 ansible-galaxy install \
     gantsign.oh-my-zsh \
-    stephdewit.nvm
+    stephdewit.nvm \
+    rvm.ruby
 ```
 
 ## Reference
 【 [gantsign.oh-my-zsh](https://github.com/gantsign/ansible-role-oh-my-zsh) 】
+【 [rvm.ruby](https://github.com/rvm/rvm1-ansible) 】

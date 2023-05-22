@@ -24,5 +24,8 @@ golang:
 docker:
 	ansible-playbook $(ENTRY_FILE) -t docker
 
+ruby:
+	ansible-playbook $(ENTRY_FILE) -t ruby
+
 lint:
 	ansible-lint ./roles

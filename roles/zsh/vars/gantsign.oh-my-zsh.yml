@@ -1,3 +1,4 @@
+---
 # var file for role gantsign.oh-my-zsh
 users:
   - username: "{{ ansible_env.USER }}"
@@ -9,6 +10,8 @@ users:
         - pyenv
         - python
         - nvm
+        - ruby
+        - rvm
       install: true
       update_mode: disabled
       update_frequency: 13
