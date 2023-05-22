@@ -18,5 +18,8 @@ python:
 node:
 	ansible-playbook $(ENTRY_FILE) -t node
 
+golang:
+	ansible-playbook $(ENTRY_FILE) -t golang
+
 lint:
 	ansible-lint ./roles

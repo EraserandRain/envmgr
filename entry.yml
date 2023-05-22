@@ -35,3 +35,10 @@
     - role: node
   tags:
     - node
+
+- name: Install and Configure golang
+  hosts: node
+  roles:
+    - role: golang
+  tags:
+    - golang

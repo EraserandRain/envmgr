@@ -1,0 +1,5 @@
+---
+# vars file for golang
+golang_default_version: 1.20.4
+gvm_root: "{{ ansible_env.HOME }}/.gvm"
+gvm_path: "{{ gvm_root }}/scripts/gvm"
