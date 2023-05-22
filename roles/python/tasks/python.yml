@@ -67,7 +67,7 @@
     executable: /bin/bash
     creates: "{{ python_path }}"
 
-- name: Upgrade pip 
+- name: Upgrade pip
   pip:
     name: pip
     state: latest

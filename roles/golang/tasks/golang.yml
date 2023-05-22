@@ -27,6 +27,7 @@
     - "{{ ansible_env.HOME }}/.bashrc"
     - "{{ ansible_env.HOME }}/.zshrc"
     - "{{ ansible_env.HOME }}/.profile"
+
 - name: Install golang (Default Version is {{ golang_default_version }})
   shell: |
     source "{{ gvm_path }}"
@@ -36,3 +37,4 @@
     go env -w GOPROXY=https://goproxy.cn
   args:
     executable: /bin/bash
+    creates: "{{ golang_path }}"
