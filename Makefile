@@ -2,6 +2,7 @@
 
 SHELL := /bin/bash
 ENTRY_FILE := entry.yml
+MASTER_FILE := master.yml
 
 total:
 	ansible-playbook $(ENTRY_FILE)
@@ -26,6 +27,12 @@ docker:
 
 ruby:
 	ansible-playbook $(ENTRY_FILE) -t ruby
+
+master:
+	ansible-playbook $(MASTER_FILE) 
+
+master-minikube:
+	ansible-playbook $(MASTER_FILE) -t minikube
 
 lint:
 	ansible-lint ./roles

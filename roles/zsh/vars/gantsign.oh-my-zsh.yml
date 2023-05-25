@@ -12,6 +12,7 @@ users:
         - nvm
         - ruby
         - rvm
+        - minikube
       install: true
       update_mode: disabled
       update_frequency: 13

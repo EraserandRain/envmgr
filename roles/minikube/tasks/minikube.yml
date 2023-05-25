@@ -1,0 +1,5 @@
+---
+- name: Download and install minikube deb file
+  become: true
+  apt:
+    deb: https://storage.googleapis.com/minikube/releases/latest/minikube_latest_amd64.deb

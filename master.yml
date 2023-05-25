@@ -1,0 +1,7 @@
+---
+- name: Install and Configure minikube
+  hosts: master
+  roles:
+    - minikube
+  tags:
+    - minikube
