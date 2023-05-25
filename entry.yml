@@ -58,3 +58,10 @@
     - role: rvm.ruby
   tags:
     - ruby
+
+- name: Install and Configure minikube
+  hosts: master
+  roles:
+    - minikube
+  tags:
+    - minikube
