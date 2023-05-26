@@ -65,3 +65,10 @@
     - minikube
   tags:
     - minikube
+
+- name: Install and Configure k8s
+  hosts: node
+  roles:
+    - k8s
+  tags:
+    - k8s

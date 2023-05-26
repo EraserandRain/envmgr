@@ -1,0 +1,9 @@
+---
+- name: Pre-install work
+  become: true
+  import_tasks: prework.yml
+
+# - name: Master node k8s installation
+#   when: inventory_hostname in groups['worker']
+
+# - name: Worker node k8s installation

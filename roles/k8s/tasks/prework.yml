@@ -1,0 +1,20 @@
+---
+- name: Check if br_netfilter module is loaded
+  shell: |
+    set -o pipefail
+    lsmod | grep br_netfilter
+  register: lsmod_output
+  changed_when: false
+  failed_when: false
+
+- name: Load br_netfilter module if not already loaded
+  command: modprobe br_netfilter
+  when: lsmod_output.rc != 0
+  changed_when: true
+  notify: Apply sysctl configurations
+
+- name: Disable swap
+  shell: |
+    swapoff -a
+    sed -ri '/\sswap\s/s/^#?/#/' /etc/fstab
+  changed_when: false

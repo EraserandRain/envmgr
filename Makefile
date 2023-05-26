@@ -31,5 +31,8 @@ ruby:
 minikube:
 	ansible-playbook $(ENTRY_FILE) -t minikube
 
+k8s:	
+	ansible-playbook $(ENTRY_FILE) -t k8s
+
 lint:
 	ansible-lint ./roles
