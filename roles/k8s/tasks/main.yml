@@ -3,7 +3,8 @@
   become: true
   import_tasks: prework.yml
 
-# - name: Master node k8s installation
-#   when: inventory_hostname in groups['worker']
+- name: Master node k8s installation
+  import_tasks: master.yml
+  when: inventory_hostname in groups['master']
 
 # - name: Worker node k8s installation
