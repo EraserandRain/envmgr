@@ -1,5 +1,5 @@
 ---
-- name: Generate SSH keys on master node
+- name: Generate SSH keys
   changed_when: false
   shell: |
     ssh-keygen -t rsa -f {{ private_key }} -N ''

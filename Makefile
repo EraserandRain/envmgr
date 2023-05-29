@@ -10,6 +10,9 @@ total:
 init:
 	ansible-playbook $(ENTRY_FILE) -t init
 
+skip-init:
+	ansible-playbook $(ENTRY_FILE) --skip-tags init
+
 zsh:
 	ansible-playbook $(ENTRY_FILE) -t zsh
 

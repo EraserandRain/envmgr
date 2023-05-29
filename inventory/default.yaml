@@ -1,9 +1,8 @@
 all:
   children:
     node:
-      hosts:
-        master:
       children:
+        master:
+          hosts: master1
         worker:
-          hosts:
-            worker[1:2]
+          hosts: worker[1:2]
