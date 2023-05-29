@@ -29,3 +29,13 @@
       - kubelet
       - kubeadm
       - kubectl
+
+- name: Hold kubelet kubeadm kubectl
+  become: true
+  dpkg_selections:
+    name: "{{ item }}"
+    selection: hold
+  loop:
+    - kubelet
+    - kubeadm
+    - kubectl
