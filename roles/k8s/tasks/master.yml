@@ -40,7 +40,25 @@
     - kubeadm
     - kubectl
 
+- name: Enable CRI plugin
+  become: true
+  lineinfile:
+    path: /etc/containerd/config.toml
+    regexp: '^disabled_plugins\s*=\s*\[.*\]$'
+    line: 'enabled_plugins = ["cri"]'
+
+- name: Add CRI configuration
+  become: true
+  blockinfile:
+    path: /etc/containerd/config.toml
+    marker: "# {mark} ANSIBLE MANAGED BLOCK"
+    block: |
+      [plugins."io.containerd.grpc.v1.cri".containerd]
+        endpoint = "unix:///var/run/containerd/containerd.sock"
+    insertafter: '^enabled_plugins =.*$'
+
 - name: Start containerd service
+  become: true
   systemd:
     name: containerd
-    state: started
+    state: restarted
