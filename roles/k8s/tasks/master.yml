@@ -39,3 +39,8 @@
     - kubelet
     - kubeadm
     - kubectl
+
+- name: Start containerd service
+  systemd:
+    name: containerd
+    state: started
