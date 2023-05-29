@@ -1,5 +1,6 @@
 ---
 # global vars file for zsh
 omz:
-  ome: "{{ ansible_env.HOME }}/.oh-my-zsh"
+  root: "{{ ansible_env.HOME }}/.oh-my-zsh"
   plugins: "{{ ansible_env.HOME }}/.oh-my-zsh/plugins"
+  custom_plugins: "{{ ansible_env.HOME }}/.oh-my-zsh/custom/plugins"

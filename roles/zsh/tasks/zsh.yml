@@ -1,15 +1,14 @@
 ---
 - name: Check if Plugin zsh-autosuggestions exists
   stat:
-    path: "{{ omz.plugins }}/zsh-autosuggestions"
+    path: "{{ omz.custom_plugins }}/zsh-autosuggestions"
   register: plugin_zsh_autosuggestions
 
 - name: Download Plugin zsh-autosuggestions if not exists
   git:
-    repo: https://github.com/zsh-users/zsh-autosuggestions
-    dest: "{{ omz.plugins }}/zsh-autosuggestions"
+    repo: https://github.com/zsh-users/zsh-autosuggestions.git
+    dest: "{{ omz.custom_plugins }}/zsh-autosuggestions"
     version: master
-    bare: true
     update: false
   when: not plugin_zsh_autosuggestions.stat.exists
 
