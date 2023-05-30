@@ -1,8 +1,15 @@
+# Env-manager(deprecated)
 ## Usage
 ```bash
-# Export script
-source ~/install/include/common.sh
+# Firstly install
+./init.sh
+```
 
+Zsh config files are saved in `load/zsh/settings/` .
+You can custom `load/zsh/settings/custom` for customizing.
+
+Here is some usages for zsh configuration. 
+```bash
 # Install Packages
 install_env \
 --node \
