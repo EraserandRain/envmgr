@@ -13,6 +13,7 @@ users:
         - ruby
         - rvm
         - minikube
+        - kubectl
       install: true
       update_mode: disabled
       update_frequency: 13

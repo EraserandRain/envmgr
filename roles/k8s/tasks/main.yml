@@ -5,3 +5,6 @@
 
 - name: Install and Configure k8s
   import_tasks: k8s.yml
+
+# - name: Start cluster
+#   import_tasks: cluster.yml
