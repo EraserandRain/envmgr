@@ -1,5 +1,0 @@
-#!/usr/bin/env bash
-sudo /etc/init.d/ssh start
-sudo bash -c 'echo "PermitRootLogin yes" >> /etc/ssh/sshd_config'
-sudo bash -c 'echo root:test | chpasswd'
-sudo bash -c 'echo "[[ -f /usr/bin/ssh ]] && service ssh start" >> /root/.bashrc'

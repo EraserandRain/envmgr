@@ -1,0 +1,19 @@
+---
+# var file for role gantsign.oh-my-zsh
+users:
+  - username: "{{ ansible_env.USER }}"
+    oh_my_zsh:
+      theme: lambda
+      plugins:
+        - git
+        - zsh-autosuggestions
+        - pyenv
+        - python
+        - nvm
+        - ruby
+        - rvm
+        - minikube
+      install: true
+      update_mode: disabled
+      update_frequency: 13
+      write_zshrc: true

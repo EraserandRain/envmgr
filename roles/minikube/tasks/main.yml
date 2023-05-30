@@ -1,0 +1,3 @@
+---
+- name: Install minikube
+  import_tasks: minikube.yml

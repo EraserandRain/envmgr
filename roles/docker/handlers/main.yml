@@ -1,0 +1,7 @@
+---
+# handlers file for role docker
+- name: Reload docker daemon
+  become: true
+  systemd:
+    daemon_reload: true
+    name: docker

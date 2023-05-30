@@ -1,0 +1,15 @@
+---
+- name: Install yarn
+  community.general.npm:
+    name: yarn
+    global: true
+
+- name: Install pnpm
+  community.general.npm:
+    name: pnpm
+    global: true
+
+- name: Install nrm
+  community.general.npm:
+    name: nrm
+    global: true

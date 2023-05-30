@@ -1,0 +1,7 @@
+---
+- name: Pre-install work
+  become: true
+  import_tasks: prework.yml
+
+- name: Install and Configure k8s
+  import_tasks: k8s.yml

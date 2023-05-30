@@ -1,0 +1,40 @@
+- name: Install dependencies
+  become: true
+  apt:
+    pkg:
+      - bison
+
+- name: Download gvm-installer if not exists
+  connection: local
+  get_url:
+    url: https://github.com/moovweb/gvm/raw/master/binscripts/gvm-installer
+    dest: "/tmp"
+    mode: "0755"
+    force: false
+
+- name: Install gvm by gvm-installer
+  script: /tmp/gvm-installer
+  args:
+    executable: /bin/bash
+    creates: "{{ gvm_root }}"
+
+- name: Setting gvm in profile files
+  blockinfile:
+    path: "{{ item }}"
+    block: |
+      [[ -s "$HOME/.gvm/scripts/gvm" ]] && source "$HOME/.gvm/scripts/gvm"
+  loop:
+    - "{{ ansible_env.HOME }}/.bashrc"
+    - "{{ ansible_env.HOME }}/.zshrc"
+    - "{{ ansible_env.HOME }}/.profile"
+
+- name: Install golang (Default Version is {{ golang_default_version }})
+  shell: |
+    source "{{ gvm_path }}"
+    gvm install go{{ golang_default_version }} -B
+    gvm use go{{ golang_default_version }} --default
+    go env -w GO111MODULE=on
+    go env -w GOPROXY=https://goproxy.cn
+  args:
+    executable: /bin/bash
+    creates: "{{ golang_path }}"

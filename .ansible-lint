@@ -1,0 +1,4 @@
+skip_list:
+  - name[missing]
+  - fqcn[action-core]
+  - '403'

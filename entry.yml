@@ -1,0 +1,74 @@
+---
+- name: Init
+  hosts: node
+  gather_facts: false
+  roles:
+    - init
+  tags:
+    - init
+
+- name: Install and Configure zsh
+  hosts: node
+  vars_files: roles/zsh/vars/gantsign.oh-my-zsh.yml
+  roles:
+    - gantsign.oh-my-zsh
+    - zsh
+  tags:
+    - zsh
+
+- name: Install and Configure python
+  hosts: node
+  roles:
+    - role: python
+  tags:
+    - python
+
+- name: Install and Configure node
+  hosts: node
+  vars_files: roles/node/vars/stephdewit.nvm.yml
+  environment:
+    NVM_DIR: "{{ ansible_env.HOME }}/.nvm"
+  roles:
+    - role: stephdewit.nvm
+      become: true
+      become_user: "{{ ansible_env.USER }}"
+    - role: node
+  tags:
+    - node
+
+- name: Install and Configure golang
+  hosts: node
+  roles:
+    - role: golang
+  tags:
+    - golang
+
+- name: Install and Configure docker
+  hosts: node
+  vars_files: vars/global.yml
+  roles:
+    - role: docker
+  tags:
+    - docker
+
+- name: Install and Configure ruby
+  hosts: node
+  vars_files: roles/ruby/vars/rvm.ruby.yml
+  roles:
+    - role: rvm.ruby
+  tags:
+    - ruby
+
+- name: Install and Configure minikube
+  hosts: master
+  roles:
+    - minikube
+  tags:
+    - minikube
+
+- name: Install and Configure k8s
+  hosts: node
+  roles:
+    - k8s
+  tags:
+    - k8s

@@ -1,0 +1,5 @@
+---
+# vars file for init
+node_env:
+  USER: "{{ lookup('env', 'USER') }}"
+  HOME: "{{ lookup('env', 'HOME') }}"
