@@ -1,8 +1,0 @@
-#!/usr/bin/env bash
-
-export http_proxy="http://$HOSTIP:7890"
-export https_proxy="http://$HOSTIP:7890"
-export all_proxy="socks5://$HOSTIP:7890"
-export ALL_PROXY="socks5://$HOSTIP:7890"
-echo "Google: $(curl -i google.com 2>&1 | grep HTTP)"
-echo "Github: $(curl -i https://github.com 2>&1 | grep HTTP/2)"

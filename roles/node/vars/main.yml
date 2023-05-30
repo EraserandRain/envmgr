@@ -1,0 +1,4 @@
+---
+# global vars file for node
+node_default_version: 16.15.1
+node_bin_path: "{{ ansible_env.HOME }}/.nvm/versions/node/v{{ node_default_version }}/bin"

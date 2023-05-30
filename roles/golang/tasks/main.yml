@@ -1,0 +1,3 @@
+---
+- name: Install and Configure golang
+  import_tasks: golang.yml

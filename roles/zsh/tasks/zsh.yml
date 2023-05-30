@@ -1,0 +1,33 @@
+---
+- name: Check if Plugin zsh-autosuggestions exists
+  stat:
+    path: "{{ omz.custom_plugins }}/zsh-autosuggestions"
+  register: plugin_zsh_autosuggestions
+
+- name: Download Plugin zsh-autosuggestions if not exists
+  git:
+    repo: https://github.com/zsh-users/zsh-autosuggestions.git
+    dest: "{{ omz.custom_plugins }}/zsh-autosuggestions"
+    version: master
+    update: false
+  when: not plugin_zsh_autosuggestions.stat.exists
+
+- name: Include alias varsfile
+  include_vars: alias.yml
+
+- name: Add alias to zshrc
+  lineinfile:
+    dest: "{{ ansible_env.HOME }}/.zshrc"
+    line: "alias {{ item.key }}='{{ item.value }}' "
+  with_dict: "{{ zsh_alias }}"
+
+- name: Customize zsh PROMPT
+  lineinfile:
+    dest: "{{ ansible_env.HOME }}/.zshrc"
+    line: PROMPT='%F{cyan}[$(hostname)]%f λ %~/ $(git_prompt_info)%{$reset_color%}'
+
+- name: Create ~/.zprofile if not exists
+  file:
+    path: "{{ ansible_env.HOME }}/.zprofile"
+    state: touch
+    mode: "0664"

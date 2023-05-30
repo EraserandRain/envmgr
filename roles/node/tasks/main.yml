@@ -1,0 +1,5 @@
+---
+- name: Node Settings
+  import_tasks: node.yml
+  environment:
+    PATH: "{{ node_bin_path }}:{{ lookup('env', 'PATH') }}"
