@@ -1,2 +1,0 @@
-#!/usr/bin/env bash
-cat ${ENV_LOAD}/vim/vimrc > $HOME/vimrc

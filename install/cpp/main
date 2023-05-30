@@ -1,2 +1,0 @@
-#!/usr/bin/env bash
-sudo apt-get -y install gcc automake autoconf libtool make build-essential gdb cppcheck

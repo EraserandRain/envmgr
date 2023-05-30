@@ -1,8 +1,0 @@
-ENV_ROOT=$HOME/env-manager
-ENV_INSTALL=$ENV_ROOT/install
-ENV_LOAD=$ENV_ROOT/load
-HOSTIP=$(cat /etc/resolv.conf |grep -oP '(?<=nameserver\ ).*')
-
-
-# Version
-PYTHON_DEFAULT="3.10.4"
