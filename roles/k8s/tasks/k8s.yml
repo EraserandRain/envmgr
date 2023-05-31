@@ -26,9 +26,9 @@
   apt:
     update_cache: true
     pkg:
-      - kubelet
-      - kubeadm
-      - kubectl
+      - "kubelet={{ k8s_default_version }}"
+      - "kubeadm={{ k8s_default_version }}"
+      - "kubectl={{ k8s_default_version }}"
 
 - name: Hold kubelet kubeadm kubectl
   become: true
@@ -57,7 +57,7 @@
         endpoint = "unix:///var/run/containerd/containerd.sock"
     insertafter: '^enabled_plugins =.*$'
 
-- name: Start containerd service
+- name: Restart containerd service
   become: true
   systemd:
     name: containerd
