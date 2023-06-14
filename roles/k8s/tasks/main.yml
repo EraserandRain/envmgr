@@ -4,7 +4,11 @@
   import_tasks: prework.yml
 
 - name: Install and Configure k8s
-  import_tasks: k8s.yml
+  import_tasks: kubeadm.yml
+
+- name: Install helm
+  import_tasks: helm.yml
+  when: "'master' in group_names"
 
 # - name: Start cluster
 #   import_tasks: cluster.yml
