@@ -10,25 +10,25 @@
 - name: Add k8s apt key
   become: true
   apt_key:
-    url: https://packages.cloud.google.com/apt/doc/apt-key.gpg 
+    url: https://packages.cloud.google.com/apt/doc/apt-key.gpg
     keyring: /etc/apt/keyrings/kubernetes-archive-keyring.gpg
     state: present
 
 - name: Add k8s apt repository
   become: true
   apt_repository:
-    repo: 'deb [signed-by=/etc/apt/keyrings/kubernetes-archive-keyring.gpg] https://apt.kubernetes.io/ kubernetes-xenial main'
+    repo: "deb [signed-by=/etc/apt/keyrings/kubernetes-archive-keyring.gpg] https://apt.kubernetes.io/ kubernetes-xenial main"
     state: present
-    filename: kubernetes.list
+    filename: kubeadm
 
 - name: Install kubelet kubeadm kubectl
   become: true
   apt:
     update_cache: true
     pkg:
-      - kubelet
-      - kubeadm
-      - kubectl
+      - "kubelet={{ kubernetes_default_version }}"
+      - "kubeadm={{ kubernetes_default_version }}"
+      - "kubectl={{ kubernetes_default_version }}"
 
 - name: Hold kubelet kubeadm kubectl
   become: true
@@ -55,9 +55,9 @@
     block: |
       [plugins."io.containerd.grpc.v1.cri".containerd]
         endpoint = "unix:///var/run/containerd/containerd.sock"
-    insertafter: '^enabled_plugins =.*$'
+    insertafter: "^enabled_plugins =.*$"
 
-- name: Start containerd service
+- name: Restart containerd service
   become: true
   systemd:
     name: containerd

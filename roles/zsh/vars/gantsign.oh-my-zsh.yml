@@ -13,6 +13,8 @@ users:
         - ruby
         - rvm
         - minikube
+        - kubectl
+        - helm
       install: true
       update_mode: disabled
       update_frequency: 13

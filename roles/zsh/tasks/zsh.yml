@@ -21,10 +21,15 @@
     line: "alias {{ item.key }}='{{ item.value }}' "
   with_dict: "{{ zsh_alias }}"
 
-- name: Customize zsh PROMPT
-  lineinfile:
-    dest: "{{ ansible_env.HOME }}/.zshrc"
-    line: PROMPT='%F{cyan}[$(hostname)]%f λ %~/ $(git_prompt_info)%{$reset_color%}'
+- name: Customize Lines
+  blockinfile:
+    path: "{{ ansible_env.HOME }}/.zshrc"
+    block: |
+      # Settings gvm
+      [[ -s "$HOME/.gvm/scripts/gvm" ]] && source "$HOME/.gvm/scripts/gvm"
+      # Customize ZSH PROMPT
+      PROMPT='%F{cyan}[$(hostname)]%f λ %~/ $(git_prompt_info)%{$reset_color%}'
+    marker: "### ANSIBLE MANAGED CUSTOM BLOCK ###"
 
 - name: Create ~/.zprofile if not exists
   file:
