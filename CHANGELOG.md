@@ -9,3 +9,7 @@
 
 ## 2023.05.30
 Remove files from old versions.
+
+## 2023.07.17
+- Rename the repo to "envmgr".
+- Rewrite the `README.md`.
