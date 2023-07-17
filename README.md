@@ -1,4 +1,4 @@
-# Env-Manager
+# Envmgr
 Quick Deployment to install and configure packages with ansible.
 ## Quick Start
 ### Dependencies
