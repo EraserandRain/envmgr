@@ -13,7 +13,7 @@ ansible-galaxy install \
     rvm.ruby
 ```
 ### Config host
-Host messages has been save in `inventory/default.yaml`.
+Host messages has been saved in `inventory/default.yaml`.
 
 `master` group is for all and `worker` group is for kubernetes worker nodes.
 ```yaml
