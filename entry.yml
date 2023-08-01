@@ -25,13 +25,7 @@
 
 - name: Install and Configure node
   hosts: node
-  vars_files: roles/node/vars/stephdewit.nvm.yml
-  environment:
-    NVM_DIR: "{{ ansible_env.HOME }}/.nvm"
   roles:
-    - role: stephdewit.nvm
-      become: true
-      become_user: "{{ ansible_env.USER }}"
     - role: node
   tags:
     - node

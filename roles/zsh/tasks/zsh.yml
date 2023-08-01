@@ -29,6 +29,9 @@
       [[ -s "$HOME/.gvm/scripts/gvm" ]] && source "$HOME/.gvm/scripts/gvm"
       # Customize ZSH PROMPT
       PROMPT='%F{cyan}[$(hostname)]%f λ %~/ $(git_prompt_info)%{$reset_color%}'
+      # Enable volta pnpm support
+      export VOLTA_FEATURE_PNPM=1
+      source $HOME/.profile
     marker: "### ANSIBLE MANAGED CUSTOM BLOCK ###"
 
 - name: Create ~/.zprofile if not exists

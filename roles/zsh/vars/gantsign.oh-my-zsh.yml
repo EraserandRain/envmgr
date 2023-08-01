@@ -9,7 +9,7 @@ users:
         - zsh-autosuggestions
         - pyenv
         - python
-        - nvm
+        - volta
         - ruby
         - rvm
         - minikube

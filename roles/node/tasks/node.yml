@@ -1,15 +1,21 @@
 ---
-- name: Install yarn
-  community.general.npm:
-    name: yarn
-    global: true
+- name: Download volta installer if not exists
+  connection: local
+  get_url:
+    url: https://get.volta.sh
+    dest: /tmp/volta-installer
+    mode: "0755"
+    force: false
 
-- name: Install pnpm
-  community.general.npm:
-    name: pnpm
-    global: true
+- name: Install volta by volta installer
+  script: /tmp/volta-installer
+  args:
+    executable: /bin/bash
+    creates: "{{ volta_root }}"
 
-- name: Install nrm
-  community.general.npm:
-    name: nrm
-    global: true
+- name: Install node ( Default Version is {{ node_default_version }} ) and pnpm
+  shell: |
+    volta install node@{{ node_default_version }} 
+    volta install pnpm@latest
+  args:
+    executable: /bin/zsh

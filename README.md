@@ -9,7 +9,6 @@ ansible-galaxy collection install \
 
 ansible-galaxy install \
     gantsign.oh-my-zsh \
-    stephdewit.nvm \
     rvm.ruby
 ```
 ### Config host
