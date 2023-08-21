@@ -31,6 +31,7 @@
 - name: Install golang (Default Version is {{ golang_default_version }})
   shell: |
     source "{{ gvm_path }}"
+    gvm install go1.4 -B
     gvm install go{{ golang_default_version }} -B
     gvm use go{{ golang_default_version }} --default
     go env -w GO111MODULE=on
