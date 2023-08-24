@@ -53,10 +53,10 @@
     mode: '0666'
 
 - name: Install docker-compose
-  pip:
-    name: docker-compose
-    state: latest
-    executable: "{{ pip_path }}"
+  become: true
+  apt:
+    pkg:
+      - docker-compose-plugin
 
 - name: Checkout "eraserandrain/container" repo
   git:

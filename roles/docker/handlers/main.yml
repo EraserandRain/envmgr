@@ -1,7 +1,7 @@
 ---
 # handlers file for role docker
-- name: Reload docker daemon
+- name: Restart Docker service
   become: true
-  systemd:
-    daemon_reload: true
+  service:
     name: docker
+    state: restarted

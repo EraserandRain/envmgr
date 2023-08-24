@@ -7,7 +7,7 @@ zsh_alias:
   gstb: git status -sb
   glog: git log --oneline --decorate --graph
   # Docker
-  dc: docker-compose
+  dc: docker compose
   dps: docker ps -as
   dlog: docker logs --tail 50 --follow --timestamps
   # Minikube
