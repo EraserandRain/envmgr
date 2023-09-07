@@ -9,7 +9,7 @@
 
 - name: Install and Configure zsh
   hosts: node
-  vars_files: 
+  vars_files:
     - roles/zsh/vars/gantsign.oh-my-zsh.yml
     - vars/global.yml
   roles:
