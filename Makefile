@@ -14,7 +14,7 @@ init:
 skip-init:
 	$(play) --skip-tags init
 
-zsh python node golang docker ruby minikube k8s:
+zsh java python node golang docker ruby minikube k8s:
 	$(play) -t $@
 
 lint:

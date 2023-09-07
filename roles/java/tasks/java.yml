@@ -1,0 +1,16 @@
+- name: Install Java (Default Version is {{ java_default_version }})
+  become: true
+  apt:
+    update_cache: true
+    pkg:
+      - openjdk-8-jdk
+
+- name: Setting java in profile files
+  blockinfile:
+    path: "{{ item }}"
+    block: |
+      export JAVA_HOME={{ java_home }}
+  loop:
+    - "{{ ansible_env.HOME }}/.bashrc"
+    - "{{ ansible_env.HOME }}/.zshrc"
+    - "{{ ansible_env.HOME }}/.profile"

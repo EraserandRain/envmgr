@@ -25,6 +25,8 @@
   blockinfile:
     path: "{{ ansible_env.HOME }}/.zshrc"
     block: |
+      # Settings java
+      export JAVA_HOME="{{ java_home }}"
       # Settings gvm
       [[ -s "$HOME/.gvm/scripts/gvm" ]] && source "$HOME/.gvm/scripts/gvm"
       # Customize ZSH PROMPT

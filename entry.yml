@@ -9,12 +9,22 @@
 
 - name: Install and Configure zsh
   hosts: node
-  vars_files: roles/zsh/vars/gantsign.oh-my-zsh.yml
+  vars_files: 
+    - roles/zsh/vars/gantsign.oh-my-zsh.yml
+    - vars/global.yml
   roles:
     - gantsign.oh-my-zsh
     - zsh
   tags:
     - zsh
+
+- name: Install and Configure java
+  hosts: node
+  vars_files: vars/global.yml
+  roles:
+    - role: java
+  tags:
+    - java
 
 - name: Install and Configure python
   hosts: node
