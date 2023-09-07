@@ -44,7 +44,7 @@
     name: docker
     enabled: true
     state: started
-  notify: Reload docker daemon
+  notify: Reload Docker Service
 
 - name: Set permission for docker.sock
   become: true
