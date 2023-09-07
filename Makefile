@@ -3,39 +3,19 @@
 
 SHELL := /bin/bash
 ENTRY_FILE := entry.yml
+play := ansible-playbook $(ENTRY_FILE)
 
 total:
-	ansible-playbook $(ENTRY_FILE)
+	$(play)
 
 init:
-	ansible-playbook $(ENTRY_FILE) -t init
+	$(play) -t init
 
 skip-init:
-	ansible-playbook $(ENTRY_FILE) --skip-tags init
+	$(play) --skip-tags init
 
-zsh:
-	ansible-playbook $(ENTRY_FILE) -t zsh
-
-python:
-	ansible-playbook $(ENTRY_FILE) -t python
-
-node:
-	ansible-playbook $(ENTRY_FILE) -t node
-
-golang:
-	ansible-playbook $(ENTRY_FILE) -t golang
-
-docker:
-	ansible-playbook $(ENTRY_FILE) -t docker
-
-ruby:
-	ansible-playbook $(ENTRY_FILE) -t ruby
-
-minikube:
-	ansible-playbook $(ENTRY_FILE) -t minikube
-
-k8s:	
-	ansible-playbook $(ENTRY_FILE) -t k8s
+zsh python node golang docker ruby minikube k8s:
+	$(play) -t $@
 
 lint:
 	ansible-lint ./roles
