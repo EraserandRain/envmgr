@@ -15,6 +15,7 @@ users:
         - minikube
         - kubectl
         - helm
+        - vscode
       install: true
       update_mode: disabled
       update_frequency: 13
