@@ -1,5 +1,5 @@
 ---
-- name: Install role {{ role_name }} dependencies
+- name: Install dependencies for role {{ role_name }}
   become: true
   apt:
     pkg:

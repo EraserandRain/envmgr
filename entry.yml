@@ -76,3 +76,10 @@
     - k8s
   tags:
     - k8s
+
+- name: Install and Configure kubernetes tools
+  hosts: node
+  roles:
+    - kubernetes_tools
+  tags:
+    - kubernetes_tools

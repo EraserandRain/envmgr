@@ -1,0 +1,7 @@
+- name: Install kuberctl
+  import_tasks: kubectl.yml
+  when: "'master' in group_names"
+
+- name: Install helm
+  import_tasks: helm.yml
+  when: "'master' in group_names"
