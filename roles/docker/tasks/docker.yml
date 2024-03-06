@@ -57,9 +57,3 @@
   apt:
     pkg:
       - docker-compose-plugin
-
-- name: Checkout "eraserandrain/container" repo
-  git:
-    repo: https://github.com/EraserandRain/container
-    dest: "{{ ansible_env.HOME }}/container"
-    version: main
