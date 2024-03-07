@@ -45,7 +45,7 @@ Supported Setup Items:
 - minikube
 - kubeadm,kubelet (1.23.3-00)
 - kubenetes tools:
-  - kuberctl (default version: 1.29)
+  - kubectl (default version: 1.29)
   - helm
 
 ```bash
