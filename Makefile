@@ -18,7 +18,7 @@ zsh java python node golang docker ruby k8s:
 	$(play) -t $@
 
 minikube:
-	$(play) -t minikube kubernetes_tools
+	$(play) -t "minikube,kubernetes_tools"
 
 lint:
 	mkdir -p log/
