@@ -1,8 +1,7 @@
 ---
 - name: Install and Configure node
-  environment: 
+  environment:
     VOLTA_HOME: "{{ ansible_env.HOME }}/.volta"
     PATH: "{{ volta_root }}/bin:{{ ansible_env.PATH }}"
     VOLTA_FEATURE_PNPM: "1"
   import_tasks: node.yml
-  

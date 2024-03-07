@@ -37,6 +37,7 @@
         "storage-driver": "overlay2"
       }
     dest: /etc/docker/daemon.json
+    mode: "0644"
 
 - name: Enable docker service
   become: true
