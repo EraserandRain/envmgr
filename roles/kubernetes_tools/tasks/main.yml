@@ -1,4 +1,4 @@
-- name: Install kuberctl
+- name: Install kubectl
   import_tasks: kubectl.yml
   when: "'master' in group_names"
 

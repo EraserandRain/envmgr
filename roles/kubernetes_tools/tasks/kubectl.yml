@@ -18,20 +18,20 @@
 - name: Add kubernetes apt key
   become: true
   apt_key:
-    url: "https://pkgs.k8s.io/core:/stable:/v{{ kuberctl_default_version }}/deb/Release.key"
+    url: "https://pkgs.k8s.io/core:/stable:/v{{ kubectl_default_version }}/deb/Release.key"
     keyring: /etc/apt/keyrings/kubernetes-apt-keyring.gpg
     state: present
 
-- name: Add k8s apt repository
+- name: Add kubectl apt repository
   become: true
   apt_repository:
-    repo: "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v{{ kuberctl_default_version }}/deb/ /"
+    repo: "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v{{ kubectl_default_version }}/deb/ /"
     state: present
-    filename: kubeadm
+    filename: kubectl
 
-- name: Install kubectl (Default Version is {{ kuberctl_default_version }})
+- name: Install kubectl (Default Version is {{ kubectl_default_version }})
   become: true
   apt:
     update_cache: true
     pkg:
-      - "kubectl={{ kuberctl_default_version }}"
+      - "kubectl={{ kubectl_default_version }}"
