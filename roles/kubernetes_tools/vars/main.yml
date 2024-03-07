@@ -1,0 +1,3 @@
+---
+# vars file for role kubernetes_tools
+kuberctl_default_version: 1.29

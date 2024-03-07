@@ -12,11 +12,11 @@
     mode: u+r,g+r,o+r
   when: inventory_hostname in groups['master']
 
-- name: Copy /etc/kubernetes/admin.conf to ~/.kube/config 
+- name: Copy /etc/kubernetes/admin.conf to ~/.kube/config
   become: true
   copy:
     src: /etc/kubernetes/admin.conf
-    dest: "{{ ansible_env.HOME }}/.kube/config"  
+    dest: "{{ ansible_env.HOME }}/.kube/config"
     owner: "{{ ansible_env.USER }}"
     group: "{{ ansible_env.USER }}"
-    mode: 0644
+    mode: "0644"

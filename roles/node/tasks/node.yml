@@ -13,9 +13,16 @@
     executable: /bin/bash
     creates: "{{ volta_root }}"
 
-- name: Install node ( Default Version is {{ node_default_version }} ) and pnpm
+- name: Install node ( Default Version is {{ node_default_version }} )
   shell: |
-    volta install node@{{ node_default_version }} 
+    volta install node@{{ node_default_version }}
+  args:
+    executable: /bin/zsh
+    creates: "{{ volta_root }}/bin/node"
+
+- name: Install pnpm
+  shell: |
     volta install pnpm@latest
   args:
     executable: /bin/zsh
+    creates: "{{ volta_root }}/bin/pnpm"

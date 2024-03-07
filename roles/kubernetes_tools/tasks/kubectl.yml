@@ -1,0 +1,37 @@
+---
+- name: Install dependencies for role {{ role_name }}
+  become: true
+  apt:
+    update_cache: true
+    pkg:
+      - apt-transport-https
+      - ca-certificates
+      - curl
+
+- name: Create /etc/apt/keyrings if not exists
+  become: true
+  file:
+    path: "/etc/apt/keyrings"
+    state: directory
+    mode: "0755"
+
+- name: Add kubernetes apt key
+  become: true
+  apt_key:
+    url: "https://pkgs.k8s.io/core:/stable:/v{{ kuberctl_default_version }}/deb/Release.key"
+    keyring: /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+    state: present
+
+- name: Add k8s apt repository
+  become: true
+  apt_repository:
+    repo: "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v{{ kuberctl_default_version }}/deb/ /"
+    state: present
+    filename: kubeadm
+
+- name: Install kubectl (Default Version is {{ kuberctl_default_version }})
+  become: true
+  apt:
+    update_cache: true
+    pkg:
+      - "kubectl={{ kuberctl_default_version }}"
