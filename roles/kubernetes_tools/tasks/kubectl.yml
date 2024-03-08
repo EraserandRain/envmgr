@@ -34,4 +34,4 @@
   apt:
     update_cache: true
     pkg:
-      - "kubectl={{ kubectl_default_version }}"
+      - "kubectl"
