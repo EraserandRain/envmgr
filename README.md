@@ -7,12 +7,11 @@
 ### Dependencies
 
 ```bash
-ansible-galaxy collection install \
-    community.general
+make dependency
 
-ansible-galaxy install \
-    gantsign.oh-my-zsh \
-    rvm.ruby
+# or
+
+ansible-galaxy install -r requirements.yaml
 ```
 
 ### Config host
