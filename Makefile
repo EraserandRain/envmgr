@@ -1,25 +1,30 @@
+.ONESHELL:
 .DEFAULT_GOAL := total
 .PHONY: init
 
 SHELL := /bin/bash
-ENTRY_FILE := entry.yml
+ENTRY_FILE := entry.yaml
 play := ansible-playbook $(ENTRY_FILE)
+create_log_dir := (mkdir -p log/ || true)
 
-total:
-	$(play)
+total: init skip-init
 
-init:
+dependency:
+	@$(create_log_dir)
+	ansible-galaxy install -r requirements.yaml
+
+lint:
+	@$(create_log_dir)
+	ansible-lint ./roles
+
+init: dependency
 	$(play) -t init
 
 skip-init:
 	$(play) --skip-tags init
 
-zsh java python node golang docker ruby k8s:
+zsh java python node golang docker ruby k8s kubernetes_tools:
 	$(play) -t $@
 
-minikube:
-	$(play) -t "minikube,kubernetes_tools"
-
-lint:
-	mkdir -p log/
-	ansible-lint ./roles
+minikube: docker kubernetes_tools
+	$(play) -t minikube
