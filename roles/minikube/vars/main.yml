@@ -1,0 +1,3 @@
+---
+cridockerd_default_version: 0.3.11
+cridockerd_pkg_url: https://github.com/Mirantis/cri-dockerd/releases/download/v{{ cridockerd_default_version }}/cri-dockerd_{{ cridockerd_default_version }}.3-0.{{ ansible_distribution | lower }}-{{ ansible_lsb.codename }}_{{ 'amd64' if ansible_architecture == 'x86_64' }}.deb
