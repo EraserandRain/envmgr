@@ -7,4 +7,4 @@
 - name: Download and install cri-dockerd (Kubernetes v1.24+ requires) deb file 
   become: true
   apt:
-    deb: {{ cridockerd_pkg_url }}
+    deb: "{{ cridockerd_pkg_url }}"
