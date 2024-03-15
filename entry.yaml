@@ -54,6 +54,7 @@
     - role: docker
   tags:
     - docker
+    - minikube
 
 - name: Install and Configure ruby
   hosts: node
@@ -83,3 +84,4 @@
     - kubernetes_tools
   tags:
     - kubernetes_tools
+    - minikube
