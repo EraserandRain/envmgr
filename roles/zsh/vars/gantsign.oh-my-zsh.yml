@@ -16,6 +16,7 @@ users:
         - kubectl
         - helm
         - vscode
+        - poetry
       install: true
       update_mode: disabled
       update_frequency: 13

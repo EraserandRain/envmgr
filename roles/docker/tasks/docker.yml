@@ -24,12 +24,19 @@
     groups: docker
     append: true
 
+- name: Check if systemd exists
+  stat:
+    path: /run/systemd/system
+  register: systemd_check
+
 - name: Create /etc/docker/daemon.json
   become: true
   copy:
     content: |
       {
+        {% if systemd_check.stat.exists %}
         "exec-opts": ["native.cgroupdriver=systemd"],
+        {% endif %}
         "log-driver": "json-file",
         "log-opts": {
           "max-size": "100m"
@@ -51,7 +58,7 @@
   become: true
   file:
     path: /var/run/docker.sock
-    mode: '0666'
+    mode: "0666"
 
 - name: Install docker-compose
   become: true

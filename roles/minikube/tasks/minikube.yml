@@ -4,7 +4,7 @@
   apt:
     deb: https://storage.googleapis.com/minikube/releases/latest/minikube_latest_amd64.deb
 
-- name: Download and install cri-dockerd (Kubernetes v1.24+ requires) deb file 
+- name: Download and install cri-dockerd (Kubernetes v1.24+ requires) deb file
   become: true
   apt:
     deb: "{{ cridockerd_pkg_url }}"
