@@ -3,3 +3,4 @@ skip_list:
   - fqcn[action-core]
   - '403'
   - var-naming[no-role-prefix]
+  - yaml[line-length]
