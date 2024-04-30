@@ -3,7 +3,7 @@
   become: true
   import_tasks: prework.yml
 
-- name: Install and Configure k8s
+- name: Install and Configure kubeadm
   import_tasks: kubeadm.yml
 
 # - name: Start cluster

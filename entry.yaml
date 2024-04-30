@@ -71,12 +71,12 @@
   tags:
     - minikube
 
-- name: Install and Configure k8s
+- name: Install and Configure kubeadm
   hosts: node
   roles:
-    - k8s
+    - kubeadm
   tags:
-    - k8s
+    - kubeadm
 
 - name: Install and Configure kubernetes tools
   hosts: node
