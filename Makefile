@@ -31,3 +31,6 @@ lang:
 
 cloud_dev:
 	$(play) -t docker,kubernetes_tools
+
+template:
+	python3 scripts/template.py
