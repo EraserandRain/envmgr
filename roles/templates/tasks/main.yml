@@ -1,0 +1,3 @@
+---
+- name: Install and Configure {{ role_name }}
+  import_tasks: "{{ role_name }}.yml"
