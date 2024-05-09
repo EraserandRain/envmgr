@@ -1,0 +1,4 @@
+---
+- name: Install and Configure aws
+  import_tasks: "aws.yml"
+  when: "'aws' in ansible_run_tags"

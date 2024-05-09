@@ -85,3 +85,11 @@
   tags:
     - kubernetes_tools
     - minikube
+
+- name: Install and Configure cloud tools
+  hosts: node
+  roles:
+    - cloud
+  tags:
+    - cloud
+    - aws
