@@ -36,6 +36,15 @@
       source $HOME/.profile
     marker: "### ANSIBLE MANAGED CUSTOM BLOCK ###"
 
+- name: Customize Lines in .profile
+  blockinfile:
+    path: "{{ ansible_env.HOME }}/.profile"
+    block: |
+      export PYENV_ROOT="$HOME/.pyenv"
+      export PATH="$PYENV_ROOT/bin:$PATH"
+      eval "$(pyenv init --path)"
+    marker: "### ANSIBLE MANAGED CUSTOM BLOCK IN .profile ###"
+
 - name: Create ~/.zprofile if not exists
   file:
     path: "{{ ansible_env.HOME }}/.zprofile"
