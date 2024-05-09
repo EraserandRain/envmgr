@@ -5,3 +5,4 @@
     name: awscli
     state: latest
     executable: "{{ pip_path }}"
+    extra_args: --user
