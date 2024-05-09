@@ -23,7 +23,7 @@ init: dependency
 skip-init:
 	$(play) --skip-tags init
 
-zsh java python node golang docker ruby minikube kubeadm kubernetes_tools:
+zsh java python node golang docker ruby minikube kubeadm kubernetes_tools cloud aws:
 	$(play) -t $@
 
 lang:

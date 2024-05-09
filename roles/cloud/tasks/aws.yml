@@ -1,0 +1,7 @@
+---
+
+- name: Install awscli with pip
+  pip:
+    name: awscli
+    state: latest
+    executable: "{{ pip_path }}"
