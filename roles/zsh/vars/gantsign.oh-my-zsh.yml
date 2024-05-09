@@ -17,6 +17,9 @@ users:
         - helm
         - vscode
         - poetry
+        - terraform
+        - aws
+        - azure
       install: true
       update_mode: disabled
       update_frequency: 13
