@@ -41,7 +41,7 @@ Supported Setup Items:
 - golang (default version: 1.20.4)
 - ruby   (default version: 3.0.5)
 - docker
-- minikube
+- minikube (latest)
 - kubeadm,kubelet (1.23.3-00)
 - kubenetes tools:
   - kubectl (default version: 1.29)

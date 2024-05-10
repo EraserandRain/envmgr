@@ -4,7 +4,15 @@
   apt:
     deb: https://storage.googleapis.com/minikube/releases/latest/minikube_latest_amd64.deb
 
+- name: Get latest release
+  uri:
+    url: "{{ cridockerd_api_url }}"
+    method: GET
+    return_content: true
+    status_code: 200
+  register: cridockerd_latest_release
+
 - name: Download and install cri-dockerd (Kubernetes v1.24+ requires) deb file
   become: true
   apt:
-    deb: "{{ cridockerd_pkg_url }}"
+    deb: "{{ cridockerd_github_url }}/releases/download/{{ cridockerd_latest_release.json.tag_name }}/cri-dockerd_{{ cridockerd_latest_release.json.tag_name | regex_replace('^v', '') }}.3-0.{{ ansible_distribution | lower }}-{{ ansible_lsb.codename }}_{{ 'amd64' if ansible_architecture == 'x86_64' }}.deb"
