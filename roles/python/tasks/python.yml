@@ -51,13 +51,6 @@
     state: directory
     mode: "0755"
 
-- name: Download python3 ( Default Version is {{ python_default_version }} )
-  get_url:
-    url: "https://npm.taobao.org/mirrors/python/{{ python_default_version }}/Python-{{ python_default_version }}.tar.xz"
-    dest: "{{ pyenv_cache }}/Python-{{ python_default_version }}.tar.xz"
-    mode: "0755"
-    force: false
-
 - name: Install python3
   shell: |
     eval "$(pyenv init --path)"
@@ -67,8 +60,11 @@
     executable: /bin/bash
     creates: "{{ python_path }}"
 
-- name: Upgrade pip
+- name: Install and upgrade python tools
   pip:
-    name: pip
+    name: 
+      - pip
+      - setuptools
+      - poetry
     state: latest
     executable: "{{ pip_path }}"
