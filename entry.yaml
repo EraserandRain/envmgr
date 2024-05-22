@@ -1,95 +1,21 @@
 ---
-- name: Init
-  hosts: node
-  gather_facts: false
-  roles:
-    - init
-  tags:
-    - init
-
-- name: Install and Configure zsh
+- name: Install and Configure Env Tools
   hosts: node
   vars_files:
-    - roles/zsh/vars/gantsign.oh-my-zsh.yml
     - vars/global.yml
+    - roles/zsh/vars/gantsign.oh-my-zsh.yml
+    - roles/ruby/vars/rvm.ruby.yml
   roles:
-    - gantsign.oh-my-zsh
-    - zsh
-  tags:
-    - zsh
-
-- name: Install and Configure java
-  hosts: node
-  vars_files: vars/global.yml
-  roles:
-    - role: java
-  tags:
-    - java
-
-- name: Install and Configure python
-  hosts: node
-  roles:
-    - role: python
-  tags:
-    - python
-
-- name: Install and Configure node
-  hosts: node
-  roles:
-    - role: node
-  tags:
-    - node
-
-- name: Install and Configure golang
-  hosts: node
-  roles:
-    - role: golang
-  tags:
-    - golang
-
-- name: Install and Configure docker
-  hosts: node
-  vars_files: vars/global.yml
-  roles:
-    - role: docker
-  tags:
-    - docker
-    - minikube
-
-- name: Install and Configure ruby
-  hosts: node
-  vars_files: roles/ruby/vars/rvm.ruby.yml
-  roles:
-    - role: rvm.ruby
-  tags:
-    - ruby
-
-- name: Install and Configure minikube
-  hosts: master
-  roles:
-    - minikube
-  tags:
-    - minikube
-
-- name: Install and Configure kubeadm
-  hosts: node
-  roles:
-    - kubeadm
-  tags:
-    - kubeadm
-
-- name: Install and Configure kubernetes tools
-  hosts: node
-  roles:
-    - kubernetes_tools
-  tags:
-    - kubernetes_tools
-    - minikube
-
-- name: Install and Configure cloud tools
-  hosts: node
-  roles:
-    - cloud
-  tags:
-    - cloud
-    - aws
+    - { role: init, tags: [init] }
+    - { role: gantsign.oh-my-zsh, tags: [zsh] }
+    - { role: zsh, tags: [zsh] }
+    - { role: java, tags: [java] }
+    - { role: python, tags: [python] }
+    - { role: node, tags: [node] }
+    - { role: golang, tags: [golang] }
+    - { role: rvm.ruby, tags: [ruby] }
+    - { role: docker, tags: [docker, minikube] }
+    - { role: minikube, tags: [minikube] }
+    - { role: kubeadm, tags: [kubeadm] }
+    - { role: kubernetes_tools, tags: [kubernetes_tools, minikube] }
+    - { role: cloud, tags: [cloud] }
