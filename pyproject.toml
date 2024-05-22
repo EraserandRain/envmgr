@@ -1,0 +1,54 @@
+[tool.poetry]
+name = "envmgr"
+version = "0.1.0"
+description = "Quick deployment to install and configure packages with ansible."
+authors = ["EraserRain"]
+readme = "README.md"
+package-mode = false
+
+[tool.poetry.dependencies]
+python = ">=3.10,<4.0"
+ansible = ">=6.5.0"
+ansible-lint = ">=6.8.2"
+poetry = ">=1.2.0"
+
+[tool.poetry.extras]
+poetry_plugin = ["poetry"]
+
+[tool.poetry.scripts]
+poe = "poethepoet:main"
+
+[tool.poetry.plugins."poetry.application.plugin"]
+poethepoet = "poethepoet.plugin:PoetryPlugin"
+
+[tool.poe.tasks.hello]
+help = "Say Hello"
+script = "scripts:hello"
+
+[tool.poe.tasks.install]
+help = "Install and Configure envmgr with ansible"
+script = "scripts:install"
+
+[tool.poe.tasks.create]
+help = "Create a new role"
+script = "scripts:create"
+
+[tool.poe.tasks.test_connection]
+help = "Test the connection to the server"
+cmd = "ansible -m ping all"
+
+[tool.poe.tasks.lint]
+help = "Lint the roles"
+cmd = "ansible-lint ./roles"
+
+[tool.poe.tasks.install-dep]
+help = "Install envmgr dependencies"
+sequence = [
+    { cmd = "poetry install" },
+    { cmd = "mkdir -p log/"},
+    { cmd = "ansible-galaxy install -r requirements.yaml" },
+]
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
