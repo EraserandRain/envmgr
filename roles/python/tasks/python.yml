@@ -62,7 +62,7 @@
 
 - name: Install and upgrade python tools
   pip:
-    name: 
+    name:
       - pip
       - setuptools
       - poetry
