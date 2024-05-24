@@ -1,20 +1,20 @@
 # Envmgr
 
-`envmgr` is a tool for quick deployment to install and configure packages with ansible.
+`envmgr` is a tool for quick deployment to install and configure tools with ansible.
 
 ## Quick Start
 
 ### Dependencies
 
 ```bash
-make dependency
+# Install poe plugin
+poetry self add poethepoet 
 
-# or
-
-ansible-galaxy install -r requirements.yaml
+# Install required dependencies
+poe install-dep            
 ```
 
-### Config host
+### Host Settings
 
 Host messages has been saved in `inventory/default.yaml`.
 
@@ -31,7 +31,20 @@ all:
           hosts: worker[1:2]  # Change host here
 ```
 
-### Start installation
+### Setup Tools
+
+Setup specified tools
+
+```bash
+# install specified tools
+poe install [tags] 
+
+# install all
+poe install all    
+
+# install node
+poe install node   
+```
 
 Supported Setup Items:
 
@@ -46,13 +59,19 @@ Supported Setup Items:
 - kubenetes tools:
   - kubectl (default version: 1.29)
   - helm
+- cloud
+  - awscli
+
+Test connection
 
 ```bash
-make total # All processes
+poe ping
+```
 
-make init # init
+Create a new role
 
-make skip-init # skip init
+```bash
+poe create [role]
 ```
 
 ## Reference
