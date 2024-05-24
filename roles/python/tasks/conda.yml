@@ -1,0 +1,23 @@
+---
+- name: Download miniconda installer if not exists
+  connection: local
+  get_url:
+    url: https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
+    dest: "/tmp/miniconda-installer.sh"
+    mode: "0755"
+    force: false
+
+- name: Install miniconda by miniconda installer
+  script: /tmp/miniconda-installer.sh -b -u -p ~/miniconda3
+  args:
+    creates: "{{ conda_bin }}/conda"
+
+- name: Setting conda in profile files
+  blockinfile:
+    path: "{{ item }}"
+    block: |
+      export PATH="{{ conda_bin }}:$PATH"
+  loop:
+    - "{{ ansible_env.HOME }}/.bashrc"
+    - "{{ ansible_env.HOME }}/.zshrc"
+    - "{{ ansible_env.HOME }}/.profile"

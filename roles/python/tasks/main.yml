@@ -1,6 +1,8 @@
 ---
-- name: Install and Configure python3
-  environment:
-    PYENV_ROOT: "{{ ansible_env.HOME }}/.pyenv"
-    PATH: "{{ pyenv_root }}/bin:{{ ansible_env.PATH }}"
+- name: Install and Configure python
   import_tasks: python.yml
+
+- name: Install and Configure conda
+  import_tasks: conda.yml
+  tags:
+    - conda
