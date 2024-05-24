@@ -37,11 +37,24 @@ def install():
     env = os.environ.copy()
     env["ANSIBLE_FORCE_COLOR"] = "true"
 
-    result = subprocess.run(command, capture_output=True, text=True, env=env)
+    # Use Popen for real-time output
+    process = subprocess.Popen(
+        command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, env=env
+    )
 
     print("Tags:", args.tags)
-    print(result.stdout)
+
+    # Read and print output line by line
+    try:
+        for line in process.stdout:
+            print(line, end="")
+        process.stdout.close()
+        process.wait()
+    except KeyboardInterrupt:
+        process.terminate()
+        process.wait()
     pass
+
 
 def create():
     """
@@ -63,6 +76,7 @@ def create():
     else:
         parser.print_help()
     pass
+
 
 def generate_role(role_name):
     """
