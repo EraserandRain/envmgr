@@ -32,7 +32,7 @@ script = "scripts:install"
 help = "Create a new role"
 script = "scripts:create"
 
-[tool.poe.tasks.test_connection]
+[tool.poe.tasks.ping]
 help = "Test the connection to the server"
 cmd = "ansible -m ping all"
 
