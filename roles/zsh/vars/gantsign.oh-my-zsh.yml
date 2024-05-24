@@ -7,7 +7,6 @@ users:
       plugins:
         - git
         - zsh-autosuggestions
-        - pyenv
         - python
         - volta
         - ruby
