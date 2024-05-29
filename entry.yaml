@@ -10,7 +10,6 @@
     - { role: gantsign.oh-my-zsh, tags: [zsh] }
     - { role: zsh, tags: [zsh] }
     - { role: java, tags: [java] }
-    - { role: python, tags: [python] }
     - { role: node, tags: [node] }
     - { role: golang, tags: [golang] }
     - { role: rvm.ruby, tags: [ruby] }

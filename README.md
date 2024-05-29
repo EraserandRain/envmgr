@@ -56,7 +56,6 @@ rye run install -l
 Supported Setup Items:
 
 - zsh
-- python (default version: 3.10.4)
 - node   (default version: 16.15.1)
 - golang (default version: 1.20.4)
 - ruby   (default version: 3.0.5)

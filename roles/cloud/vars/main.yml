@@ -1,8 +1,2 @@
 ---
 # vars file for {{ role_name }}
-
-pyenv_root: "{{ ansible_env.HOME }}/.pyenv"
-pyenv_cache: "{{ pyenv_root }}/cache"
-python_shims_path: "{{ pyenv_root }}/shims"
-python_path: "{{ python_shims_path }}/python3"
-pip_path: "{{ python_shims_path }}/pip3"
