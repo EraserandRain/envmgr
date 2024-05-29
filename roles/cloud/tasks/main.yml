@@ -1,5 +1,5 @@
 ---
 - name: Install and Configure aws
   import_tasks: "aws.yml"
-  tags: 
+  tags:
     - aws

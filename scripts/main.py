@@ -1,8 +1,23 @@
-import argparse, os, shutil, subprocess
+import argparse
+import os
+import shutil
+import subprocess
 from pathlib import Path
+import yaml
 
-ENTRY_FILE = "entry.yaml"
-play = ["ansible-playbook", ENTRY_FILE]
+
+def load_tags_from_yaml(file_path):
+    with open(file_path, "r") as file:
+        data = yaml.safe_load(file)
+    tags = set()
+    for item in data:
+        if "roles" in item:
+            for role in item["roles"]:
+                if "tags" in role:
+                    tags.update(role["tags"])
+
+    return sorted(tags)
+    pass
 
 
 def install():
@@ -17,16 +32,31 @@ def install():
     parser.add_argument(
         "tags",
         nargs="*",
-        help="List of tags",
+        help="List of tags: tag1 tag2 ...",
+    )
+
+    # Add an optional argument to list tags
+    parser.add_argument(
+        "-l", "--list-tags", action="store_true", help="List all available tags"
     )
 
     args = parser.parse_args()
+
+    # Define the path to the entry.yaml file
+    yaml_file_path = "entry.yaml"
+
+    if args.list_tags:
+        tags = load_tags_from_yaml(yaml_file_path)
+        print("Envmgr available tags:")
+        for tag in tags:
+            print(tag)
+        return
 
     if not args.tags:
         parser.print_help()
         return
 
-    # Construct command based on tags
+    play = ["ansible-playbook", yaml_file_path]
     if args.tags[0].lower() == "all":
         command = play
     else:
