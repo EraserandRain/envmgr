@@ -1,2 +1,5 @@
 ---
 # vars file for {{ role_name }}
+
+hashicorp_keyring: /etc/apt/keyrings/hashicorp-archive-keyring.gpg
+hashicorp_repo_url: https://apt.releases.hashicorp.com
