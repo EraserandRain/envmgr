@@ -13,6 +13,7 @@
     - { role: node, tags: [node] }
     - { role: golang, tags: [golang] }
     - { role: rvm.ruby, tags: [ruby] }
+    - { role: dotnet, tags: [dotnet] }
     - { role: docker, tags: [docker, minikube] }
     - { role: minikube, tags: [minikube] }
     - { role: kubeadm, tags: [kubeadm] }
