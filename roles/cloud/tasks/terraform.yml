@@ -16,3 +16,10 @@
     update_cache: true
     pkg:
       - "terraform"
+
+- name: Enable terraform plugin cache
+  template:
+    src: .terraformrc.j2
+    dest: "{{ ansible_env.HOME }}/.terraformrc"
+    mode: 420
+    backup: true
