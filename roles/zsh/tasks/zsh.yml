@@ -27,12 +27,18 @@
     block: |
       # Settings java
       export JAVA_HOME="{{ java_home }}"
+
       # Settings gvm
       [[ -s "$HOME/.gvm/scripts/gvm" ]] && source "$HOME/.gvm/scripts/gvm"
+      
       # Customize ZSH PROMPT
       PROMPT='%F{cyan}[$(whoami) $(hostname)]%f λ %~/ $(git_prompt_info)%{$reset_color%}'
+      
       # Enable volta pnpm support
+      export VOLTA_HOME="$HOME/.volta"
+      export PATH="$VOLTA_HOME/bin:$PATH"
       export VOLTA_FEATURE_PNPM=1
+
       source $HOME/.profile
     marker: "### ANSIBLE MANAGED CUSTOM BLOCK ###"
 
