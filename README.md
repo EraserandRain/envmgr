@@ -63,7 +63,7 @@ Supported Setup Items:
 - minikube (latest)
 - kubeadm,kubelet (1.23.3-00)
 - kubenetes tools:
-  - kubectl (default version: 1.29)
+  - kubectl (default version: 1.31)
   - helm
 - cloud
   - awscli
