@@ -14,5 +14,3 @@
       - "dotnet-sdk-{{ dotnet_default_version }}"
       - "aspnetcore-runtime-{{ dotnet_default_version }}"
       - "dotnet-runtime-{{ dotnet_default_version }}"
-      
-
