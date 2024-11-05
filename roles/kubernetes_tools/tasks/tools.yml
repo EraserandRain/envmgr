@@ -1,0 +1,78 @@
+---
+- name: Install dependencies for role {{ role_name }}
+  become: true
+  apt:
+    update_cache: true
+    pkg:
+      - conntrack
+
+- name: Get the latest release version of crictl from GitHub API
+  uri:
+    url: https://api.github.com/repos/kubernetes-sigs/cri-tools/releases/latest
+    method: GET
+    return_content: yes
+  register: crictl_latest_version
+
+- name: Set CRICTL_VERSION
+  set_fact:
+    crictl_version: "{{ crictl_latest_version.json.tag_name }}"
+
+- name: Set CRICTL_TAR
+  set_fact:
+    crictl_tar: "crictl-{{ crictl_version }}-linux-amd64.tar.gz"
+
+- name: Download crictl tar file ({{ crictl_version }})
+  get_url:
+    url: "https://github.com/kubernetes-sigs/cri-tools/releases/download/{{ crictl_version }}/{{ crictl_tar }}"
+    dest: "/tmp/{{ crictl_tar }}"
+
+- name: Extract crictl
+  become: true
+  unarchive:
+    src: "/tmp/{{ crictl_tar }}"
+    dest: "/usr/local/bin"
+    remote_src: yes
+
+- name: Remove crictl downloaded tarball
+  file:
+    path: "/tmp/{{ crictl_tar }}"
+    state: absent
+
+- name: Get the latest release version of CNI plugin from GitHub API
+  uri:
+    url: https://api.github.com/repos/containernetworking/plugins/releases/latest
+    method: GET
+    return_content: yes
+  register: cni_plugin_latest_version
+
+- name: Set CNI_PLUGIN_VERSION
+  set_fact:
+    cni_plugin_version: "{{ cni_plugin_latest_version.json.tag_name }}"
+
+- name: Set CNI_PLUGIN_TAR
+  set_fact:
+    cni_plugin_tar: "cni-plugins-linux-amd64-{{ cni_plugin_version }}.tgz"
+
+- name: Download CNI plugin tar file ({{ cni_plugin_version }})
+  get_url:
+    url: "https://github.com/containernetworking/plugins/releases/download/{{ cni_plugin_version }}/{{ cni_plugin_tar }}"
+    dest: "/tmp/{{ cni_plugin_tar }}"
+
+- name: Create CNI plugin installation directory
+  become: true
+  file:
+    path: /opt/cni/bin
+    state: directory
+    mode: "0755"
+
+- name: Extract CNI plugin
+  become: true
+  unarchive:
+    src: "/tmp/{{ cni_plugin_tar }}"
+    dest: /opt/cni/bin
+    remote_src: yes
+
+- name: Remove CNI plugin downloaded tarball
+  file:
+    path: "/tmp/{{ cni_plugin_tar }}"
+    state: absent

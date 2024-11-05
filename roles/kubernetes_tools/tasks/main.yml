@@ -5,3 +5,7 @@
 - name: Install helm
   import_tasks: helm.yml
   when: "'master' in group_names"
+
+- name: Install kubernetes requirement tools
+  import_tasks: tools.yml
+  when: "'master' in group_names"
