@@ -10,10 +10,10 @@
     - { role: gantsign.oh-my-zsh, tags: [zsh] }
     - { role: zsh, tags: [zsh] }
     - { role: java, tags: [java] }
-    - { role: python, tags: [python] }
     - { role: node, tags: [node] }
     - { role: golang, tags: [golang] }
     - { role: rvm.ruby, tags: [ruby] }
+    - { role: dotnet, tags: [dotnet] }
     - { role: docker, tags: [docker, minikube] }
     - { role: minikube, tags: [minikube] }
     - { role: kubeadm, tags: [kubeadm] }

@@ -6,12 +6,16 @@
 
 ### Dependencies
 
-```bash
-# Install poe plugin
-poetry self add poethepoet 
+Envmgr requires Python 3.8 or later and the rye package.
 
-# Install required dependencies
-poe install-dep            
+Please install `rye` first 【[rye installation](https://rye.astral.sh/guide/installation/)】.
+
+```bash
+# Install rye
+curl -sSf https://rye.astral.sh/get | RYE_INSTALL_OPTION="--yes" bash
+
+# Setup envmgr
+rye run setup            
 ```
 
 ### Host Settings
@@ -36,20 +40,22 @@ all:
 Setup specified tools
 
 ```bash
-# install specified tools
-poe install [tags] 
+# Install specified tools
+rye run install [tag1 tag2 ...] 
 
-# install all
-poe install all    
+# Install all roles
+rye run install all    
 
-# install node
-poe install node   
+# Install zsh
+rye run install zsh   
+
+# List available tags
+rye run install -l
 ```
 
 Supported Setup Items:
 
 - zsh
-- python (default version: 3.10.4)
 - node   (default version: 16.15.1)
 - golang (default version: 1.20.4)
 - ruby   (default version: 3.0.5)
@@ -57,7 +63,7 @@ Supported Setup Items:
 - minikube (latest)
 - kubeadm,kubelet (1.23.3-00)
 - kubenetes tools:
-  - kubectl (default version: 1.29)
+  - kubectl (default version: 1.31)
   - helm
 - cloud
   - awscli
@@ -65,16 +71,18 @@ Supported Setup Items:
 Test connection
 
 ```bash
-poe ping
+rye run ping
 ```
 
 Create a new role
 
 ```bash
-poe create [role]
+rye run create [role]
 ```
 
 ## Reference
+
+【[rye](https://rye.astral.sh/guide)】
 
 【 [gantsign.oh-my-zsh](https://github.com/gantsign/ansible-role-oh-my-zsh) 】
 

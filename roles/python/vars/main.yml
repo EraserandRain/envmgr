@@ -1,4 +1,0 @@
----
-# global vars file for python
-python_default_version: 3.10.4
-conda_bin: "{{ ansible_env.HOME }}/miniconda3/bin"

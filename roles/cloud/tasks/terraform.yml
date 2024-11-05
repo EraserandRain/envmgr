@@ -1,0 +1,25 @@
+---
+
+- name: Perpare hashicorp dependencies
+  debug:
+    msg: "Perpare hashicorp dependencies"
+  changed_when: true
+  notify:
+    - Setup hashicorp
+
+- name: Flush handlers
+  meta: flush_handlers
+
+- name: Install terraform
+  become: true
+  apt:
+    update_cache: true
+    pkg:
+      - "terraform"
+
+- name: Enable terraform plugin cache
+  template:
+    src: .terraformrc.j2
+    dest: "{{ ansible_env.HOME }}/.terraformrc"
+    mode: 420
+    backup: true

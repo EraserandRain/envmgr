@@ -1,0 +1,16 @@
+---
+- name: Install dependencies for role {{ role_name }}
+  become: true
+  apt:
+    update_cache: true
+    pkg:
+      - zlib1g
+
+- name: Install dotnet (Default Version is {{ dotnet_default_version }})
+  become: true
+  apt:
+    update_cache: true
+    pkg:
+      - "dotnet-sdk-{{ dotnet_default_version }}"
+      - "aspnetcore-runtime-{{ dotnet_default_version }}"
+      - "dotnet-runtime-{{ dotnet_default_version }}"

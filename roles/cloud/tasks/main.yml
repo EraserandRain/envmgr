@@ -1,5 +1,7 @@
 ---
-- name: Install and Configure aws
-  import_tasks: "aws.yml"
-  tags: 
-    - aws
+- name: Install and Configure terraform
+  import_tasks: "terraform.yml"
+  tags:
+    - terraform
+    - tf
+    - hashicorp
