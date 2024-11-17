@@ -1,3 +1,6 @@
 ---
 # vars file for role kubernetes_tools
 kubectl_default_version: 1.31
+
+helm:
+  diff_plugin_url: "https://github.com/databus23/helm-diff"
