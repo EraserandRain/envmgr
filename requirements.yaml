@@ -1,6 +1,8 @@
 ---
 collections:
   - name: community.general
+  - name: community.kubernetes
+  - name: kubernetes.core
 
 roles:
   - src: gantsign.oh-my-zsh
