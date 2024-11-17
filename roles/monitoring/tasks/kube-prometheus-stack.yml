@@ -1,0 +1,54 @@
+---
+- name: Add Prometheus Community Helm repo
+  kubernetes.core.helm_repository:
+    name: "{{ prometheus_chart.repository }}"
+    repo_url: "{{ prometheus_chart.repo_url }}"
+    state: present
+
+- name: Create monitoring namespace
+  kubernetes.core.k8s:
+    name: "{{ prometheus_namespace }}"
+    api_version: v1
+    kind: Namespace
+    state: present
+
+- name: Check if prometheus is already installed
+  kubernetes.core.helm_info:
+    name: "{{ prometheus_release_name }}"
+    namespace: "{{ prometheus_namespace }}"
+  register: helm_status
+  ignore_errors: true
+
+- name: Install Prometheus Stack
+  kubernetes.core.helm:
+    name: "{{ prometheus_release_name }}"
+    chart_ref: "{{ prometheus_chart.repository }}/{{ prometheus_chart.name }}"
+    release_namespace: "{{ prometheus_namespace }}"
+    create_namespace: true
+    values: "{{ prometheus_values }}"
+  when: helm_status.failed
+
+- name: Upgrade Prometheus Stack if exists
+  kubernetes.core.helm:
+    name: "{{ prometheus_release_name }}"
+    chart_ref: "{{ prometheus_chart.repository }}/{{ prometheus_chart.name }}"
+    release_namespace: "{{ prometheus_namespace }}"
+    values: "{{ prometheus_values }}"
+  when: not helm_status.failed
+
+# 可选：添加等待服务就绪的任务
+- name: Wait for pods to be ready
+  kubernetes.core.k8s_info:
+    kind: Pod
+    namespace: "{{ prometheus_namespace }}"
+    wait: yes
+    wait_timeout: "{{ pod_wait_timeout }}"
+    wait_condition:
+      type: Ready
+  register: pod_list
+  vars:
+    ansible_retries: "{{ pod_wait_retries }}"
+    ansible_delay: "{{ pod_wait_delay }}"
+  until: pod_list.resources | map(attribute='status.conditions') | flatten | selectattr('type', 'equalto', 'Ready') | map(attribute='status') | list | unique | list == ['True']
+  retries: "{{ ansible_retries }}"
+  delay: "{{ ansible_delay }}"
