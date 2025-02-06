@@ -6,18 +6,42 @@ from pathlib import Path
 import yaml
 
 
+# ANSI color codes
+class Colors:
+    GREEN = "\033[32m"
+    RED = "\033[31m"
+    RESET = "\033[0m"
+
+
 def load_tags_from_yaml(file_path):
+    role_tags = set()
+    task_tags = set()
+
+    # Load role-level tags in entry.yaml
     with open(file_path, "r") as file:
         data = yaml.safe_load(file)
-    tags = set()
-    for item in data:
-        if "roles" in item:
-            for role in item["roles"]:
-                if "tags" in role:
-                    tags.update(role["tags"])
+        for item in data:
+            if "roles" in item:
+                for role in item["roles"]:
+                    if "tags" in role:
+                        role_tags.update(role["tags"])
 
-    return sorted(tags)
-    pass
+    # Load task-level tags from each role's main.yml
+    roles_dir = "roles"
+    for role_name in os.listdir(roles_dir):
+        main_yml = os.path.join(roles_dir, role_name, "tasks", "main.yml")
+        if os.path.exists(main_yml):
+            with open(main_yml, "r") as file:
+                try:
+                    tasks = yaml.safe_load(file)
+                    if tasks:
+                        for task in tasks:
+                            if "tags" in task:
+                                task_tags.update(task["tags"])
+                except yaml.YAMLError:
+                    continue
+
+    return sorted(role_tags), sorted(task_tags)
 
 
 def install():
@@ -46,15 +70,46 @@ def install():
     yaml_file_path = "entry.yaml"
 
     if args.list_tags:
-        tags = load_tags_from_yaml(yaml_file_path)
+        role_tags, task_tags = load_tags_from_yaml(yaml_file_path)
         print("Envmgr available tags:")
-        for tag in tags:
-            print(tag)
+        print("\nRole level tags:")
+        for tag in role_tags:
+            print(f"  - {tag}")
+        print("\nTask level tags:")
+        for tag in task_tags:
+            print(f"  - {tag}")
         return
 
     if not args.tags:
         parser.print_help()
         return
+
+    role_tags, task_tags = load_tags_from_yaml(yaml_file_path)
+    selected_tags = set(args.tags)
+
+    # Check if tags exist
+    all_tags = set(role_tags + task_tags)
+    invalid_tags = selected_tags - {"all"} - all_tags
+    if invalid_tags:
+        print(
+            f"{Colors.RED}Warning: Unknown tags: {', '.join(invalid_tags)}{Colors.RESET}"
+        )
+        print("Use -l or --list-tags to see all available tags")
+        return
+
+    # Display execution info
+    print("\nRunning Ansible playbook with:")
+    if args.tags[0].lower() == "all":
+        print(f"{Colors.GREEN}  All tags will be executed{Colors.RESET}")
+    else:
+        print(f"{Colors.GREEN}  Tags:", end=" ")
+        for tag in args.tags:
+            if tag in role_tags:
+                print(f"[Role: {tag}]", end=" ")
+            elif tag in task_tags:
+                print(f"[Task: {tag}]", end=" ")
+        print(f"{Colors.RESET}")
+    print()
 
     play = ["ansible-playbook", yaml_file_path]
     if args.tags[0].lower() == "all":
@@ -71,8 +126,6 @@ def install():
     process = subprocess.Popen(
         command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, env=env
     )
-
-    print("Tags:", args.tags)
 
     # Read and print output line by line
     try:

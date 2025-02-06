@@ -37,21 +37,47 @@ all:
 
 ### Setup Tools
 
-Setup specified tools
+Setup specified tools using role-level or task-level tags:
 
 ```bash
+# List all available tags (both role-level and task-level)
+rye run install -l
+
 # Install specified tools
 rye run install [tag1 tag2 ...] 
 
 # Install all roles
 rye run install all    
 
-# Install zsh
-rye run install zsh   
-
-# List available tags
-rye run install -l
+# Examples:
+rye run install zsh              # Install zsh (role-level)
+rye run install github_cli       # Install GitHub CLI (task-level)
+rye run install init,github_cli  # Install multiple components
 ```
+
+#### Available Tags
+
+##### Role-level Tags
+Role-level tags install complete functional modules:
+- zsh
+- node   (default version: 16.15.1)
+- golang (default version: 1.20.4)
+- ruby   (default version: 3.0.5)
+- docker
+- minikube (latest)
+- kubeadm,kubelet (1.23.3-00)
+- kubernetes_tools
+- cloud
+- init
+- monitoring
+
+##### Task-level Tags
+Task-level tags execute specific configuration tasks:
+- github_cli (install GitHub CLI)
+- git (configure git)
+- sync_time (synchronize system time)
+
+You can use `rye run install -l` to see the complete list of available tags.
 
 Supported Setup Items:
 
