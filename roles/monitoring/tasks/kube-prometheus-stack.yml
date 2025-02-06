@@ -41,7 +41,7 @@
   kubernetes.core.k8s_info:
     kind: Pod
     namespace: "{{ prometheus_namespace }}"
-    wait: yes
+    wait: true
     wait_timeout: "{{ pod_wait_timeout }}"
     wait_condition:
       type: Ready
