@@ -8,3 +8,8 @@
   import_tasks: git.yml
   tags:
     - git
+
+- name: Setup GitHub CLI
+  import_tasks: github_cli.yml
+  tags:
+    - github_cli

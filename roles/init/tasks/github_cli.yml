@@ -1,0 +1,42 @@
+---
+- name: Check if wget is installed
+  command: which wget
+  register: wget_check
+  ignore_errors: true
+  changed_when: false
+
+- name: Install wget if not present
+  apt:
+    name: wget
+    state: present
+    update_cache: true
+  become: true
+  when: wget_check.rc != 0
+
+- name: Create keyrings directory
+  file:
+    path: /etc/apt/keyrings
+    state: directory
+    mode: "0755"
+  become: true
+
+- name: Download GitHub CLI GPG key
+  get_url:
+    url: https://cli.github.com/packages/githubcli-archive-keyring.gpg
+    dest: /etc/apt/keyrings/githubcli-archive-keyring.gpg
+    mode: "0644"
+  become: true
+
+- name: Add GitHub CLI repository
+  apt_repository:
+    repo: "deb [arch={{ ansible_architecture }} signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main"
+    state: present
+    filename: github-cli
+  become: true
+
+- name: Install GitHub CLI
+  apt:
+    name: gh
+    state: present
+    update_cache: true
+  become: true
