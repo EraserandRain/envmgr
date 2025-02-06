@@ -27,7 +27,7 @@
 
 - name: Install helm-diff plugin
   become: false
-  shell: helm plugin install {{ helm.diff_plugin_url }}
+  command: helm plugin install {{ helm.diff_plugin_url }}
   register: plugin_result
   changed_when: plugin_result.rc == 0
   failed_when:
