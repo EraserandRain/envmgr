@@ -16,7 +16,7 @@ build-backend = "hatchling.build"
 [tool.rye]
 managed = true
 dev-dependencies = [
-    "ansible-lint>=24.5.0",
+    "ansible-lint>=25.1.2",
 ]
 
 [tool.hatch.metadata]
