@@ -12,9 +12,9 @@
     executable: /bin/bash
     creates: "{{ volta_root }}"
 
-- name: Install node ( Default Version is {{ node_default_version }} )
+- name: Install node (Latest Version)
   shell: |
-    volta install node@{{ node_default_version }}
+    volta install node@lts
   args:
     executable: /bin/zsh
     creates: "{{ volta_root }}/bin/node"
