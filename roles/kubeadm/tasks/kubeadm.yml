@@ -7,17 +7,24 @@
       - ca-certificates
       - curl
 
+- name: Create /etc/apt/keyrings if not exists
+  become: true
+  file:
+    path: "/etc/apt/keyrings"
+    state: directory
+    mode: "0755"
+
 - name: Add kubeadm apt key
   become: true
   apt_key:
-    url: https://packages.cloud.google.com/apt/doc/apt-key.gpg
-    keyring: /etc/apt/keyrings/kubernetes-archive-keyring.gpg
+    url: "https://pkgs.k8s.io/core:/stable:/v{{ kubernetes_major_version }}/deb/Release.key"
+    keyring: /etc/apt/keyrings/kubernetes-apt-keyring.gpg
     state: present
 
 - name: Add kubeadm apt repository
   become: true
   apt_repository:
-    repo: "deb [signed-by=/etc/apt/keyrings/kubernetes-archive-keyring.gpg] https://apt.kubernetes.io/ kubernetes-xenial main"
+    repo: "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v{{ kubernetes_major_version }}/deb/ /"
     state: present
     filename: kubeadm
 
