@@ -101,6 +101,11 @@ Pipfile.lock
 #   https://python-poetry.org/docs/basic-usage/#commit-your-poetrylock-file-to-version-control
 poetry.lock
 
+# uv
+#   uv.lock should generally be included in version control for reproducible builds
+#   but can be ignored for libraries
+uv.lock
+
 # pdm
 #   Similar to Pipfile.lock, it is generally recommended to include pdm.lock in version control.
 #pdm.lock

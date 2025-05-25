@@ -1,4 +1,7 @@
 ---
+- name: Setup directories
+  import_tasks: directories.yml
+
 - name: Sync time
   import_tasks: sync_time.yml
   tags:

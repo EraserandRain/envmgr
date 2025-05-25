@@ -1,7 +1,14 @@
 import os
 import shutil
 
-def generate_role(role_name):
+
+def generate_role(role_name: str) -> None:
+    """
+    Generate a new Ansible role by copying template files.
+
+    Args:
+        role_name: The name of the role to create
+    """
     # Define paths
     base_path = "roles"
     template_path = os.path.join(base_path, "templates")
@@ -11,10 +18,12 @@ def generate_role(role_name):
     os.makedirs(role_path, exist_ok=True)
 
     # Copy template files to role directory
-    for root, dirs, files in os.walk(template_path):
+    for root, _dirs, files in os.walk(template_path):
         for file in files:
             src_file = os.path.join(root, file)
-            dst_file = os.path.join(role_path, root.replace(template_path, "").lstrip(os.path.sep), file)
+            dst_file = os.path.join(
+                role_path, root.replace(template_path, "").lstrip(os.path.sep), file
+            )
             os.makedirs(os.path.dirname(dst_file), exist_ok=True)
             shutil.copy(src_file, dst_file)
 

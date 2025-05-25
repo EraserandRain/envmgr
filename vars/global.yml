@@ -1,5 +1,8 @@
 # global vars
 
+# Installers cache directory
+installers_cache_dir: "{{ ansible_env.HOME }}/.cache/envmgr/installers"
+
 # Java
 java_default_version: 8
 java_home: /usr/bin/java

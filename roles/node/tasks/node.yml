@@ -1,14 +1,13 @@
 ---
 - name: Download volta installer if not exists
-  connection: local
   get_url:
     url: https://get.volta.sh
-    dest: /tmp/volta-installer
+    dest: "{{ installers_cache_dir }}/volta-installer"
     mode: "0755"
     force: false
 
 - name: Install volta by volta installer
-  script: /tmp/volta-installer
+  script: "{{ installers_cache_dir }}/volta-installer"
   args:
     executable: /bin/bash
     creates: "{{ volta_root }}"
