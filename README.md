@@ -124,7 +124,7 @@ uv run ping -i inventory/password.yaml
 ##### Role-level Tags
 Role-level tags install complete functional modules:
 - zsh
-- node   (default version: 16.15.1)
+- node   (latest version)
 - golang (default version: 1.20.4)
 - ruby   (default version: 3.0.5)
 - docker
@@ -146,7 +146,7 @@ You can use `uv run install -l` to see the complete list of available tags.
 Supported Setup Items:
 
 - zsh
-- node   (default version: 16.15.1)
+- node   (latest version)
 - golang (default version: 1.20.4)
 - ruby   (default version: 3.0.5)
 - docker
