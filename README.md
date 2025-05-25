@@ -32,10 +32,10 @@ all:
           hosts:
             localhost:
               ansible_connection: local
-              ansible_become: yes
-              ansible_become_method: sudo
               ansible_python_interpreter: "{{ ansible_playbook_python }}"
 ```
+
+> **Note:** The default configuration now installs tools under the current user instead of requiring root privileges for better security and user experience.
 
 **For Remote Hosts:**
 
@@ -85,9 +85,11 @@ uv run install [tag1 tag2 ...]
 uv run install all    
 
 # Examples:
-uv run install zsh              # Install zsh (role-level)
+uv run install init             # Setup base environment and directories
+uv run install zsh              # Install zsh with oh-my-zsh and aliases
 uv run install github_cli       # Install GitHub CLI (task-level)
-uv run install init,github_cli  # Install multiple components
+uv run install golang dotnet    # Install multiple tools (space-separated)
+uv run install kubernetes_tools # Install kubectl, helm, crictl, CNI plugins
 ```
 
 **Remote execution:**
@@ -127,7 +129,7 @@ Role-level tags install complete functional modules:
 - ruby   (default version: 3.0.5)
 - docker
 - minikube (latest)
-- kubeadm,kubelet (1.23.3-00)
+- kubeadm,kubelet (1.31.9-1.1)
 - kubernetes_tools
 - cloud
 - init
@@ -149,8 +151,8 @@ Supported Setup Items:
 - ruby   (default version: 3.0.5)
 - docker
 - minikube (latest)
-- kubeadm,kubelet (1.23.3-00)
-- kubenetes tools:
+- kubeadm,kubelet (1.31.9-1.1)
+- kubernetes_tools:
   - kubectl (default version: 1.31)
   - helm
 - cloud
