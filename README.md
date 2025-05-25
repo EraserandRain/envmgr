@@ -6,53 +6,115 @@
 
 ### Dependencies
 
-Envmgr requires Python 3.8 or later and the rye package.
+Envmgr requires Python 3.10 or later and the uv package.
 
-Please install `rye` first 【[rye installation](https://rye.astral.sh/guide/installation/)】.
+Please install `uv` first 【[uv installation](https://docs.astral.sh/uv/getting-started/installation/)】.
 
 ```bash
-# Install rye
-curl -sSf https://rye.astral.sh/get | RYE_INSTALL_OPTION="--yes" bash
+# Install uv
+curl -LsSf https://astral.sh/uv/install.sh | sh
 
 # Setup envmgr
-rye run setup            
+uv run setup            
 ```
 
 ### Host Settings
 
-Host messages has been saved in `inventory/default.yaml`.
+Host configuration is saved in `inventory/default.yaml`. By default, it's configured for local execution.
 
-`master` group is for all and `worker` group is for kubernetes worker nodes.
-
+**Default Configuration (Local):**
 ```yaml
 all:
   children:
     node:
       children:
         master:
-          hosts: master1      # Change host here
+          hosts:
+            localhost:
+              ansible_connection: local
+              ansible_become: yes
+              ansible_become_method: sudo
+              ansible_python_interpreter: "{{ ansible_playbook_python }}"
+```
+
+**For Remote Hosts:**
+
+1. **SSH Key Authentication (Recommended):**
+   - Copy `inventory/remote.yaml.example` to `inventory/remote.yaml`
+   - Modify the host IPs and usernames accordingly
+   - Ensure SSH keys are properly configured
+
+2. **Password Authentication (If necessary):**
+   - Copy `inventory/password.yaml.example` to `inventory/password.yaml`
+   - Use `ansible-vault` to encrypt sensitive information
+   - Requires `sshpass` package (already installed)
+
+Example remote configuration:
+```yaml
+all:
+  children:
+    node:
+      children:
+        master:
+          hosts:
+            remote-host:
+              ansible_host: 192.168.1.100
+              ansible_user: your_username
+              ansible_ssh_private_key_file: ~/.ssh/id_rsa
         worker:
-          hosts: worker[1:2]  # Change host here
+          hosts:
+            worker1:
+              ansible_host: 192.168.1.101
+            worker2:
+              ansible_host: 192.168.1.102
 ```
 
 ### Setup Tools
 
 Setup specified tools using role-level or task-level tags:
 
+**Local execution (default):**
 ```bash
 # List all available tags (both role-level and task-level)
-rye run install -l
+uv run install -l
 
 # Install specified tools
-rye run install [tag1 tag2 ...] 
+uv run install [tag1 tag2 ...] 
 
 # Install all roles
-rye run install all    
+uv run install all    
 
 # Examples:
-rye run install zsh              # Install zsh (role-level)
-rye run install github_cli       # Install GitHub CLI (task-level)
-rye run install init,github_cli  # Install multiple components
+uv run install zsh              # Install zsh (role-level)
+uv run install github_cli       # Install GitHub CLI (task-level)
+uv run install init,github_cli  # Install multiple components
+```
+
+**Remote execution:**
+```bash
+# Using SSH key authentication
+uv run install -i inventory/remote.yaml init
+
+# Using password authentication (with vault)
+uv run install -i inventory/password.yaml --ask-vault-pass init
+
+# List tags with specific inventory
+uv run install -i inventory/remote.yaml -l
+
+# Install multiple components on remote hosts
+uv run install -i inventory/remote.yaml zsh,docker,kubernetes_tools
+```
+
+**Test connection:**
+```bash
+# Test local connection
+uv run ping
+
+# Test remote connection
+uv run ping -i inventory/remote.yaml
+
+# Test with password authentication
+uv run ping -i inventory/password.yaml
 ```
 
 #### Available Tags
@@ -77,7 +139,7 @@ Task-level tags execute specific configuration tasks:
 - git (configure git)
 - sync_time (synchronize system time)
 
-You can use `rye run install -l` to see the complete list of available tags.
+You can use `uv run install -l` to see the complete list of available tags.
 
 Supported Setup Items:
 
@@ -94,21 +156,25 @@ Supported Setup Items:
 - cloud
   - awscli
 
-Test connection
+### Development Commands
 
 ```bash
-rye run ping
-```
+# Create a new role
+uv run create [role]
 
-Create a new role
+# Run Python code linting (ruff)
+uv run lint
 
-```bash
-rye run create [role]
+# Run Ansible linting
+uv run ansible-check
+
+# Run type checking
+uv run typecheck
 ```
 
 ## Reference
 
-【[rye](https://rye.astral.sh/guide)】
+【[uv](https://docs.astral.sh/uv/)】
 
 【 [gantsign.oh-my-zsh](https://github.com/gantsign/ansible-role-oh-my-zsh) 】
 

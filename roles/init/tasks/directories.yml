@@ -1,0 +1,12 @@
+---
+- name: Create installers cache directory
+  file:
+    path: "{{ installers_cache_dir }}"
+    state: directory
+    mode: "0755"
+
+- name: Create user local bin directory
+  file:
+    path: "{{ ansible_env.HOME }}/.local/bin"
+    state: directory
+    mode: "0755"

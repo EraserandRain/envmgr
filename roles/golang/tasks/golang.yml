@@ -5,15 +5,14 @@
       - bison
 
 - name: Download gvm-installer if not exists
-  connection: local
   get_url:
     url: https://github.com/moovweb/gvm/raw/master/binscripts/gvm-installer
-    dest: "/tmp"
+    dest: "{{ installers_cache_dir }}/gvm-installer"
     mode: "0755"
     force: false
 
 - name: Install gvm by gvm-installer
-  script: /tmp/gvm-installer
+  script: "{{ installers_cache_dir }}/gvm-installer"
   args:
     executable: /bin/bash
     creates: "{{ gvm_root }}"

@@ -3,6 +3,7 @@ import os
 import shutil
 import subprocess
 from pathlib import Path
+
 import yaml
 
 
@@ -13,12 +14,21 @@ class Colors:
     RESET = "\033[0m"
 
 
-def load_tags_from_yaml(file_path):
-    role_tags = set()
-    task_tags = set()
+def load_tags_from_yaml(file_path: str) -> tuple[list[str], list[str]]:
+    """
+    Load role-level and task-level tags from YAML files.
+
+    Args:
+        file_path: Path to the entry.yaml file
+
+    Returns:
+        Tuple of (role_tags, task_tags) as sorted lists
+    """
+    role_tags: set[str] = set()
+    task_tags: set[str] = set()
 
     # Load role-level tags in entry.yaml
-    with open(file_path, "r") as file:
+    with open(file_path) as file:
         data = yaml.safe_load(file)
         for item in data:
             if "roles" in item:
@@ -31,7 +41,7 @@ def load_tags_from_yaml(file_path):
     for role_name in os.listdir(roles_dir):
         main_yml = os.path.join(roles_dir, role_name, "tasks", "main.yml")
         if os.path.exists(main_yml):
-            with open(main_yml, "r") as file:
+            with open(main_yml) as file:
                 try:
                     tasks = yaml.safe_load(file)
                     if tasks:
@@ -44,7 +54,7 @@ def load_tags_from_yaml(file_path):
     return sorted(role_tags), sorted(task_tags)
 
 
-def install():
+def install() -> None:
     """
     Install and configure the envmgr project using Ansible.
     """
@@ -62,6 +72,19 @@ def install():
     # Add an optional argument to list tags
     parser.add_argument(
         "-l", "--list-tags", action="store_true", help="List all available tags"
+    )
+
+    # Add inventory option
+    parser.add_argument(
+        "-i",
+        "--inventory",
+        default="inventory/default.yaml",
+        help="Specify inventory file (default: inventory/default.yaml)",
+    )
+
+    # Add vault password option
+    parser.add_argument(
+        "--ask-vault-pass", action="store_true", help="Ask for vault password"
     )
 
     args = parser.parse_args()
@@ -85,10 +108,10 @@ def install():
         return
 
     role_tags, task_tags = load_tags_from_yaml(yaml_file_path)
-    selected_tags = set(args.tags)
+    selected_tags: set[str] = set(args.tags)
 
     # Check if tags exist
-    all_tags = set(role_tags + task_tags)
+    all_tags: set[str] = set(role_tags + task_tags)
     invalid_tags = selected_tags - {"all"} - all_tags
     if invalid_tags:
         print(
@@ -99,6 +122,7 @@ def install():
 
     # Display execution info
     print("\nRunning Ansible playbook with:")
+    print(f"  Inventory: {args.inventory}")
     if args.tags[0].lower() == "all":
         print(f"{Colors.GREEN}  All tags will be executed{Colors.RESET}")
     else:
@@ -111,12 +135,16 @@ def install():
         print(f"{Colors.RESET}")
     print()
 
-    play = ["ansible-playbook", yaml_file_path]
+    play: list[str] = ["ansible-playbook", "-i", args.inventory, yaml_file_path]
     if args.tags[0].lower() == "all":
         command = play
     else:
         tags_str = ",".join(args.tags)
         command = play + ["-t", tags_str]
+
+    # Add vault password option if specified
+    if args.ask_vault_pass:
+        command.append("--ask-vault-pass")
 
     # Set ANSIBLE_FORCE_COLOR to force color output
     env = os.environ.copy()
@@ -129,17 +157,17 @@ def install():
 
     # Read and print output line by line
     try:
-        for line in process.stdout:
-            print(line, end="")
-        process.stdout.close()
+        if process.stdout is not None:
+            for line in process.stdout:
+                print(line, end="")
+            process.stdout.close()
         process.wait()
     except KeyboardInterrupt:
         process.terminate()
         process.wait()
-    pass
 
 
-def create():
+def create() -> None:
     """
     Create a new Ansible role by prompting the user for a role name and generating the role directory.
     """
@@ -158,15 +186,14 @@ def create():
             print(f"Role '{args.role}' generated successfully.")
     else:
         parser.print_help()
-    pass
 
 
-def generate_role(role_name):
+def generate_role(role_name: str) -> None:
     """
     Generate a new Ansible role by copying template files.
 
     Args:
-        role_name (str): The name of the role to create
+        role_name: The name of the role to create
     """
     # Define paths
     base_path = "roles"
@@ -177,7 +204,7 @@ def generate_role(role_name):
     create_dir(role_path)
 
     # Copy template files to role directory
-    for root, dirs, files in os.walk(template_path):
+    for root, _dirs, files in os.walk(template_path):
         for file in files:
             src_file = os.path.join(root, file)
             dst_file = os.path.join(
@@ -185,15 +212,166 @@ def generate_role(role_name):
             )
             create_dir(os.path.dirname(dst_file))
             shutil.copy(src_file, dst_file)
-    pass
 
 
-def create_dir(path):
+def create_dir(path: str) -> None:
     """
     Create a directory
 
     Args:
-        path (str): Path to the directory
+        path: Path to the directory
     """
     Path(path).mkdir(parents=True, exist_ok=True)
-    pass
+
+
+def ping() -> None:
+    """
+    Test connection to all hosts using ansible ping module.
+    """
+    parser = argparse.ArgumentParser(
+        description="Test connection to all hosts using ansible ping module"
+    )
+
+    # Add inventory option
+    parser.add_argument(
+        "-i",
+        "--inventory",
+        default="inventory/default.yaml",
+        help="Specify inventory file (default: inventory/default.yaml)",
+    )
+
+    args = parser.parse_args()
+
+    command: list[str] = ["ansible", "-i", args.inventory, "-m", "ping", "all"]
+
+    # Set ANSIBLE_FORCE_COLOR to force color output
+    env = os.environ.copy()
+    env["ANSIBLE_FORCE_COLOR"] = "true"
+
+    print(f"Testing connection with inventory: {args.inventory}")
+
+    try:
+        subprocess.run(command, env=env, check=True)
+    except subprocess.CalledProcessError as e:
+        print(f"Ping failed with exit code {e.returncode}")
+    except FileNotFoundError:
+        print("Error: ansible command not found. Please ensure ansible is installed.")
+
+
+def setup() -> None:
+    """
+    Setup the envmgr project by syncing dependencies, initializing logs, and installing ansible roles.
+    """
+    print("Setting up envmgr...")
+
+    # Step 1: Sync dependencies with uv
+    print("1. Syncing dependencies with uv...")
+    try:
+        subprocess.run(["uv", "sync"], check=True)
+        print("✓ Dependencies synced successfully")
+    except subprocess.CalledProcessError as e:
+        print(f"✗ Failed to sync dependencies: {e}")
+        return
+    except FileNotFoundError:
+        print("✗ Error: uv command not found. Please ensure uv is installed.")
+        return
+
+    # Step 2: Initialize logs directory
+    print("2. Initializing logs directory...")
+    try:
+        os.makedirs("log", exist_ok=True)
+        print("✓ Logs directory initialized")
+    except Exception as e:
+        print(f"✗ Failed to create logs directory: {e}")
+        return
+
+    # Step 3: Install ansible roles
+    print("3. Installing ansible roles...")
+    try:
+        subprocess.run(
+            ["ansible-galaxy", "install", "-r", "requirements.yaml"], check=True
+        )
+        print("✓ Ansible roles installed successfully")
+    except subprocess.CalledProcessError as e:
+        print(f"✗ Failed to install ansible roles: {e}")
+        return
+    except FileNotFoundError:
+        print(
+            "✗ Error: ansible-galaxy command not found. Please ensure ansible is installed."
+        )
+        return
+
+    print("🎉 Setup completed successfully!")
+
+
+def lint() -> None:
+    """
+    Run ruff linting and formatting on Python code.
+    """
+    print("Running Python code linting with ruff...")
+
+    # Run ruff check
+    check_command: list[str] = ["ruff", "check", "scripts/"]
+    print("1. Running ruff check...")
+
+    try:
+        subprocess.run(check_command, check=True)
+        print("✓ Ruff check passed")
+    except subprocess.CalledProcessError as e:
+        print(f"✗ Ruff check failed with exit code {e.returncode}")
+        return
+    except FileNotFoundError:
+        print("Error: ruff command not found. Please ensure ruff is installed.")
+        return
+
+    # Run ruff format check
+    format_command: list[str] = ["ruff", "format", "--check", "scripts/"]
+    print("2. Running ruff format check...")
+
+    try:
+        subprocess.run(format_command, check=True)
+        print("✓ Ruff format check passed")
+    except subprocess.CalledProcessError:
+        print("✗ Code formatting issues found. Run 'ruff format scripts/' to fix.")
+        return
+    except FileNotFoundError:
+        print("Error: ruff command not found. Please ensure ruff is installed.")
+        return
+
+    print("🎉 All Python linting checks passed!")
+
+
+def ansible_lint() -> None:
+    """
+    Run ansible-lint on the roles directory.
+    """
+    command: list[str] = ["ansible-lint", "./roles"]
+
+    print("Running Ansible linting...")
+
+    try:
+        subprocess.run(command, check=True)
+        print("✓ Ansible lint passed")
+    except subprocess.CalledProcessError as e:
+        print(f"✗ Ansible linting failed with exit code {e.returncode}")
+    except FileNotFoundError:
+        print(
+            "Error: ansible-lint command not found. Please ensure ansible-lint is installed."
+        )
+
+
+def typecheck() -> None:
+    """
+    Run mypy type checking on the scripts directory.
+    """
+    command: list[str] = ["mypy", "scripts/"]
+
+    print("Running type checking with mypy...")
+
+    try:
+        subprocess.run(command, check=True)
+        print("✓ Type checking passed")
+    except subprocess.CalledProcessError as e:
+        print(f"✗ Type checking failed with exit code {e.returncode}")
+    except FileNotFoundError:
+        print("Error: mypy command not found. Please ensure mypy is installed.")
