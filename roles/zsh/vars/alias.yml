@@ -21,6 +21,30 @@ zsh_alias:
   mkcgp: minikube kubectl -- get pods --show-labels
   mkcdp: minikube kubectl -- describe pod
   mkcl: minikube kubectl -- logs
+  # Kubectl
+  k: kubectl
+  kgp: kubectl get pods
+  kgs: kubectl get services
+  kgd: kubectl get deployments
+  kgn: kubectl get nodes
+  kga: kubectl get all
+  kgns: kubectl get namespaces
+  kgpv: kubectl get pv
+  kgpvc: kubectl get pvc
+  kdp: kubectl describe pod
+  kds: kubectl describe service
+  kdd: kubectl describe deployment
+  kdn: kubectl describe node
+  kaf: kubectl apply -f
+  kdf: kubectl delete -f
+  kl: kubectl logs
+  klf: kubectl logs -f
+  kex: kubectl exec -it
+  kpf: kubectl port-forward
+  kgpw: kubectl get pods -w
+  kgpall: kubectl get pods --all-namespaces
+  kctx: kubectl config current-context
+  kns: kubectl config set-context --current --namespace
   # Ansible
   a-p: ansible-playbook
   a-i: ansible-inventory
