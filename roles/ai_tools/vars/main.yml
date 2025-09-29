@@ -1,0 +1,36 @@
+---
+# Global vars file for ai_tools
+volta_root: "{{ ansible_env.HOME }}/.volta"
+
+# Try to load local configuration (contains sensitive API keys)
+# This file should be created by users and contains personal API keys
+ai_tools_local_file: "{{ playbook_dir }}/config.local.yml"
+
+# AI tools configuration
+ai_tools_config:
+  claude_code:
+    enabled: true
+    package: "@anthropic-ai/claude-code"
+    binary: "claude"
+    description: "Anthropic's Claude Code CLI"
+    # MCP Context7 configuration
+    mcp_context7:
+      enabled: true
+      method: "remote"  # "remote" or "local"
+      remote_url: "https://mcp.context7.com/mcp"
+      package: "@upstash/context7-mcp"
+  codex:
+    enabled: true
+    package: "@openai/codex"
+    binary: "codex"
+    description: "OpenAI's Codex CLI"
+    # MCP Context7 configuration
+    mcp_context7:
+      enabled: true
+      method: "local"   # Codex typically uses local MCP
+      package: "@upstash/context7-mcp"
+
+# Default MCP Context7 settings (will be overridden by config.local.yml if exists)
+ai_tools_defaults:
+  context7_api_key: ""  # Empty by default, users should set in config.local.yml
+  install_context7_mcp: true

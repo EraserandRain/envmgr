@@ -1,0 +1,176 @@
+---
+- name: Load local configuration if exists
+  include_vars:
+    file: "{{ ai_tools_local_file }}"
+    optional: true
+  no_log: true
+
+- name: Verify volta is available
+  command: volta --version
+  register: volta_version
+  changed_when: false
+  failed_when: volta_version.rc != 0
+
+- block:
+    - name: Install OpenAI Codex CLI (Latest Version)
+      shell: |
+        volta install @openai/codex@latest
+      args:
+        executable: /bin/zsh
+        creates: "{{ volta_root }}/bin/codex"
+      register: codex_install_result
+
+    - name: Verify Codex CLI binary exists
+      stat:
+        path: "{{ volta_root }}/bin/codex"
+      register: codex_binary_stat
+
+    - name: Fail if Codex CLI binary not found
+      fail:
+        msg: "Codex CLI installation failed - binary not found at {{ volta_root }}/bin/codex"
+      when: not codex_binary_stat.stat.exists
+
+  rescue:
+    - name: Handle Codex CLI installation failure
+      debug:
+        msg: "Codex CLI installation failed: {{ codex_install_result.stderr | default('Unknown error') }}"
+
+    - name: Check if Codex CLI was partially installed
+      stat:
+        path: "{{ volta_root }}/bin/codex"
+      register: codex_partial_stat
+
+    - name: Clean up failed installation
+      file:
+        path: "{{ volta_root }}/bin/codex"
+        state: absent
+      when: codex_partial_stat.stat.exists | default(false)
+
+    - name: Re-raise installation failure
+      fail:
+        msg: "Codex CLI installation failed and cleanup completed"
+
+- name: Verify Codex CLI installation and get version
+  command: codex --version
+  register: codex_version_check
+  changed_when: false
+  failed_when: false
+
+- name: Set Codex CLI installation status
+  set_fact:
+    codex_installed: "{{ codex_version_check.rc == 0 }}"
+    codex_version: "{{ codex_version_check.stdout if codex_version_check.rc == 0 else 'version check failed' }}"
+
+- block:
+    - name: Install Context7 MCP package for Codex CLI
+      shell: |
+        volta install {{ ai_tools_config.codex.mcp_context7.package }}@latest
+      args:
+        executable: /bin/zsh
+        creates: "{{ volta_root }}/bin/context7-mcp"
+      register: context7_install_result
+      changed_when: context7_install_result.rc == 0
+      when:
+        - codex_installed | default(false)
+        - ai_tools_config.codex.mcp_context7.enabled | default(true)
+        - (ai_tools_local_config.codex.install_context7_mcp | default(ai_tools_defaults.install_context7_mcp)) | default(true)
+
+    - name: Verify Context7 MCP package installation
+      stat:
+        path: "{{ volta_root }}/bin/context7-mcp"
+      register: context7_binary_stat
+      when:
+        - context7_install_result is defined
+        - context7_install_result.changed
+
+  rescue:
+    - name: Handle Context7 MCP installation failure
+      debug:
+        msg: "Context7 MCP installation failed, but Codex CLI is still functional"
+
+    - name: Set Context7 installation status
+      set_fact:
+        context7_installed: false
+        context7_error: "{{ context7_install_result.stderr | default('Unknown Context7 installation error') }}"
+
+- name: Set Context7 installation status (success)
+  set_fact:
+    context7_installed: true
+  when:
+    - context7_install_result is defined
+    - context7_install_result.rc == 0
+
+- name: Ensure .local/bin directory exists
+  file:
+    path: "{{ ansible_env.HOME }}/.local/bin"
+    state: directory
+    mode: '0755'
+
+- block:
+    - name: Create Context7 configuration for Codex
+      copy:
+        content: |
+          #!/bin/bash
+          # Context7 MCP helper for Codex CLI
+          {% set api_key = ai_tools_local_config.context7_api_key | default(ai_tools_defaults.context7_api_key) %}
+          {% if api_key and api_key != "" %}
+          export CONTEXT7_API_KEY="{{ api_key }}"
+          {% endif %}
+
+          # Run Context7 MCP server
+          {% if ai_tools_config.codex.mcp_context7.method == "local" %}
+          echo "Starting Context7 MCP server..."
+          npx {{ ai_tools_config.codex.mcp_context7.package }} ${@}
+          {% else %}
+          echo "Context7 remote server: https://mcp.context7.com/mcp"
+          echo "Use this URL in your MCP client configuration"
+          {% endif %}
+        dest: "{{ ansible_env.HOME }}/.local/bin/context7-codex"
+        mode: '0755'
+      register: context7_config_result
+      when:
+        - codex_installed | default(false)
+        - ai_tools_config.codex.mcp_context7.enabled | default(true)
+        - (ai_tools_local_config.codex.install_context7_mcp | default(ai_tools_defaults.install_context7_mcp)) | default(true)
+
+    - name: Verify context7-codex script is executable
+      command: "{{ ansible_env.HOME }}/.local/bin/context7-codex --help"
+      register: context7_script_test
+      changed_when: false
+      failed_when: false
+      when: context7_config_result is defined and context7_config_result.changed
+
+  rescue:
+    - name: Handle Context7 configuration failure
+      debug:
+        msg: "Context7 configuration script creation failed"
+
+    - name: Clean up failed Context7 script
+      file:
+        path: "{{ ansible_env.HOME }}/.local/bin/context7-codex"
+        state: absent
+      when: context7_config_result is defined
+
+- name: Display installation summary
+  debug:
+    msg:
+      - "=== Codex CLI Installation Summary ==="
+      - "Codex CLI installed: {{ codex_installed | default(false) }}"
+      - "{% if codex_installed | default(false) %}Codex version: {{ codex_version }}{% endif %}"
+      - "Context7 MCP installed: {{ context7_installed | default(false) }}"
+      - "{% if context7_error is defined %}Context7 Error: {{ context7_error }}{% endif %}"
+      - "======================================"
+
+- name: Provide usage instructions
+  debug:
+    msg:
+      - "Codex CLI Installation Complete!"
+      - ""
+      - "Next steps:"
+      - "1. Run 'codex' to start the CLI"
+      - "2. API key configuration may be required"
+      - "{% if context7_installed | default(false) %}3. Use Context7 helper: ~/.local/bin/context7-codex{% endif %}"
+      - "{% if not (context7_installed | default(false)) %}3. Context7 MCP installation failed - check logs above{% endif %}"
+      - ""
+      - "Codex CLI is now available in your PATH via volta."
+  when: codex_installed | default(false)

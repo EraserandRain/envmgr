@@ -20,3 +20,4 @@
     - { role: kubernetes_tools, tags: [kubernetes_tools, minikube] }
     - { role: cloud, tags: [cloud] }
     - { role: monitoring, tags: [monitoring] }
+    - { role: ai_tools, tags: [ai_tools] }

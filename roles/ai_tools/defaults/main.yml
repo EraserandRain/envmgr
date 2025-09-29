@@ -1,0 +1,4 @@
+---
+# Ensure local config mapping exists even when config.local.yml is absent
+# This allows tasks to safely access ai_tools_local_config.<...>
+ai_tools_local_config: {}
