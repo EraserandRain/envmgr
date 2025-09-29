@@ -1,0 +1,175 @@
+---
+- name: Pre-flight checks for AI tools installation
+  block:
+    - name: Check if volta is installed and accessible
+      command: volta --version
+      register: volta_check
+      changed_when: false
+      failed_when: volta_check.rc != 0
+
+    - name: Verify volta bin directory exists
+      stat:
+        path: "{{ volta_root }}/bin"
+      register: volta_bin_check
+
+    - name: Create volta bin directory if missing
+      file:
+        path: "{{ volta_root }}/bin"
+        state: directory
+        mode: '0755'
+      when: not volta_bin_check.stat.exists
+
+    - name: Test volta installation capability
+      shell: volta list node 2>/dev/null || echo "volta ready for installations"
+      register: volta_test
+      changed_when: false
+      failed_when: false
+
+  rescue:
+    - name: Handle pre-flight check failures
+      fail:
+        msg: "Pre-flight checks failed. Volta is not properly installed or configured."
+
+- name: Initialize global AI tools tracking
+  set_fact:
+    global_ai_tools_status:
+      installation_started: true
+      tools_attempted: []
+      tools_successful: []
+      tools_failed: []
+      rollback_needed: false
+
+- name: Install and Configure AI Tools (Basic)
+  environment:
+    VOLTA_HOME: "{{ ansible_env.HOME }}/.volta"
+    PATH: "{{ volta_root }}/bin:{{ ansible_env.PATH }}"
+  include_tasks: ai_tools.yml
+  vars:
+    current_tool: "ai_tools_basic"
+
+- name: Update global status after basic installation
+  set_fact:
+    global_ai_tools_status: "{{ global_ai_tools_status | combine({'tools_attempted': global_ai_tools_status.tools_attempted + ['ai_tools_basic'], 'tools_successful': global_ai_tools_status.tools_successful + (['ai_tools_basic'] if (ai_tools_summary.claude_code.installed or ai_tools_summary.codex.installed) else []), 'tools_failed': global_ai_tools_status.tools_failed + ([] if (ai_tools_summary.claude_code.installed or ai_tools_summary.codex.installed) else ['ai_tools_basic'])}) }}"
+
+- name: Install Claude Code (Advanced Configuration)
+  environment:
+    VOLTA_HOME: "{{ ansible_env.HOME }}/.volta"
+    PATH: "{{ volta_root }}/bin:{{ ansible_env.PATH }}"
+  include_tasks: claude_code.yml
+  vars:
+    current_tool: "claude_code"
+  tags:
+    - claude_code
+  when: ai_tools_summary.claude_code.installed | default(false)
+
+- name: Update global status after Claude Code configuration
+  set_fact:
+    global_ai_tools_status: "{{ global_ai_tools_status | combine({'tools_attempted': global_ai_tools_status.tools_attempted + ['claude_code'], 'tools_successful': global_ai_tools_status.tools_successful + (['claude_code'] if (claude_installed | default(false)) else []), 'tools_failed': global_ai_tools_status.tools_failed + ([] if (claude_installed | default(false)) else ['claude_code'])}) }}"
+  when: ai_tools_summary.claude_code.installed | default(false)
+
+- name: Install Codex CLI (Advanced Configuration)
+  environment:
+    VOLTA_HOME: "{{ ansible_env.HOME }}/.volta"
+    PATH: "{{ volta_root }}/bin:{{ ansible_env.PATH }}"
+  include_tasks: codex.yml
+  vars:
+    current_tool: "codex"
+  tags:
+    - codex
+  when: ai_tools_summary.codex.installed | default(false)
+
+- name: Update global status after Codex configuration
+  set_fact:
+    global_ai_tools_status: "{{ global_ai_tools_status | combine({'tools_attempted': global_ai_tools_status.tools_attempted + ['codex'], 'tools_successful': global_ai_tools_status.tools_successful + (['codex'] if (codex_installed | default(false)) else []), 'tools_failed': global_ai_tools_status.tools_failed + ([] if (codex_installed | default(false)) else ['codex'])}) }}"
+  when: ai_tools_summary.codex.installed | default(false)
+
+- name: Final verification and rollback check
+  block:
+    - name: Perform final verification of all AI tools
+      shell: |
+        echo "=== Final AI Tools Verification ==="
+        tools_working=0
+        tools_total=0
+
+        # Check Claude Code
+        if command -v claude >/dev/null 2>&1; then
+          if claude --version >/dev/null 2>&1; then
+            echo "✓ Claude Code: Working"
+            tools_working=$((tools_working + 1))
+          else
+            echo "⚠ Claude Code: Installed but not working"
+          fi
+          tools_total=$((tools_total + 1))
+        fi
+
+        # Check Codex CLI
+        if command -v codex >/dev/null 2>&1; then
+          if codex --version >/dev/null 2>&1; then
+            echo "✓ Codex CLI: Working"
+            tools_working=$((tools_working + 1))
+          else
+            echo "⚠ Codex CLI: Installed but not working"
+          fi
+          tools_total=$((tools_total + 1))
+        fi
+
+        echo "=============================="
+        echo "Working tools: $tools_working/$tools_total"
+
+        if [ $tools_working -eq 0 ] && [ $tools_total -gt 0 ]; then
+          echo "ERROR: No tools are working properly"
+          exit 1
+        elif [ $tools_working -eq 0 ]; then
+          echo "ERROR: No tools were installed"
+          exit 2
+        else
+          echo "SUCCESS: At least one tool is working"
+          exit 0
+        fi
+      register: final_verification
+      failed_when: final_verification.rc > 0
+      changed_when: false
+
+  rescue:
+    - name: Set rollback flag if verification fails
+      set_fact:
+        global_ai_tools_status: "{{ global_ai_tools_status | combine({'rollback_needed': true}) }}"
+
+    - name: Perform rollback of failed installations
+      when: global_ai_tools_status.rollback_needed | default(false)
+      block:
+        - name: Remove failed Claude Code installation
+          file:
+            path: "{{ volta_root }}/bin/claude"
+            state: absent
+          when: "'claude_code' in global_ai_tools_status.tools_failed"
+
+        - name: Remove failed Codex installation
+          file:
+            path: "{{ volta_root }}/bin/codex"
+            state: absent
+          when: "'codex' in global_ai_tools_status.tools_failed"
+
+        - name: Remove failed Context7 scripts
+          file:
+            path: "{{ ansible_env.HOME }}/.local/bin/context7-codex"
+            state: absent
+          when: "'codex' in global_ai_tools_status.tools_failed"
+
+        - name: Display rollback information
+          debug:
+            msg:
+              - "Rollback completed for failed installations:"
+              - "Failed tools: {{ global_ai_tools_status.tools_failed | join(', ') }}"
+              - "Successful tools: {{ global_ai_tools_status.tools_successful | join(', ') }}"
+
+- name: Display final installation summary
+  debug:
+    msg:
+      - "=== AI Tools Installation Summary ==="
+      - "Attempted: {{ global_ai_tools_status.tools_attempted | join(', ') }}"
+      - "Successful: {{ global_ai_tools_status.tools_successful | join(', ') }}"
+      - "Failed: {{ global_ai_tools_status.tools_failed | join(', ') }}"
+      - "Rollback performed: {{ global_ai_tools_status.rollback_needed | default(false) }}"
+      - "{{ final_verification.stdout_lines | default(['Final verification not completed']) | join('\n') }}"
+      - "====================================="
