@@ -1,9 +1,13 @@
 ---
 - name: Load local configuration if exists
-  include_vars:
-    file: "{{ ai_tools_local_file }}"
-    optional: true
-  no_log: true
+  block:
+    - name: Load local configuration from file
+      include_vars:
+        file: "{{ ai_tools_local_file }}"
+  rescue:
+    - name: Handle local config loading failure
+      debug:
+        msg: "Local configuration not loaded (file may not exist or be invalid), using defaults"
 
 - name: Verify volta is available
   command: volta --version
@@ -86,7 +90,6 @@
         - ai_tools_config.claude_code.mcp_context7.enabled | default(true)
         - ai_tools_config.claude_code.mcp_context7.method == "remote"
         - (ai_tools_local_config.claude_code.install_context7_mcp | default(ai_tools_defaults.install_context7_mcp)) | default(true)
-      no_log: true
 
     - name: Install Context7 MCP for Claude Code (Local Method)
       shell: |
@@ -108,7 +111,6 @@
         - ai_tools_config.claude_code.mcp_context7.enabled | default(true)
         - ai_tools_config.claude_code.mcp_context7.method == "local"
         - (ai_tools_local_config.claude_code.install_context7_mcp | default(ai_tools_defaults.install_context7_mcp)) | default(true)
-      no_log: true
 
   rescue:
     - name: Handle MCP installation failure
@@ -124,8 +126,8 @@
   set_fact:
     mcp_installed: true
   when:
-    - (mcp_remote_result is defined and mcp_remote_result.rc == 0) or
-      (mcp_local_result is defined and mcp_local_result.rc == 0)
+    - (mcp_remote_result is defined and not mcp_remote_result.skipped | default(false) and mcp_remote_result.rc == 0) or
+      (mcp_local_result is defined and not mcp_local_result.skipped | default(false) and mcp_local_result.rc == 0)
 
 - name: Display installation summary
   debug:

@@ -1,9 +1,13 @@
 ---
 - name: Load local configuration if exists
-  include_vars:
-    file: "{{ ai_tools_local_file }}"
-    optional: true
-  no_log: true
+  block:
+    - name: Load local configuration from file
+      include_vars:
+        file: "{{ ai_tools_local_file }}"
+  rescue:
+    - name: Handle local config loading failure
+      debug:
+        msg: "Local configuration not loaded (file may not exist or be invalid), using defaults"
 
 - name: Verify volta is available
   command: volta --version
@@ -98,6 +102,7 @@
     context7_installed: true
   when:
     - context7_install_result is defined
+    - not context7_install_result.skipped | default(false)
     - context7_install_result.rc == 0
 
 - name: Ensure .local/bin directory exists

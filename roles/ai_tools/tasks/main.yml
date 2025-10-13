@@ -40,10 +40,12 @@
       rollback_needed: false
 
 - name: Install and Configure AI Tools (Basic)
-  environment:
-    VOLTA_HOME: "{{ ansible_env.HOME }}/.volta"
-    PATH: "{{ volta_root }}/bin:{{ ansible_env.PATH }}"
-  include_tasks: ai_tools.yml
+  include_tasks:
+    file: ai_tools.yml
+    apply:
+      environment:
+        VOLTA_HOME: "{{ ansible_env.HOME }}/.volta"
+        PATH: "{{ volta_root }}/bin:{{ ansible_env.PATH }}"
   vars:
     current_tool: "ai_tools_basic"
 
@@ -52,10 +54,14 @@
     global_ai_tools_status: "{{ global_ai_tools_status | combine({'tools_attempted': global_ai_tools_status.tools_attempted + ['ai_tools_basic'], 'tools_successful': global_ai_tools_status.tools_successful + (['ai_tools_basic'] if (ai_tools_summary.claude_code.installed or ai_tools_summary.codex.installed) else []), 'tools_failed': global_ai_tools_status.tools_failed + ([] if (ai_tools_summary.claude_code.installed or ai_tools_summary.codex.installed) else ['ai_tools_basic'])}) }}"
 
 - name: Install Claude Code (Advanced Configuration)
-  environment:
-    VOLTA_HOME: "{{ ansible_env.HOME }}/.volta"
-    PATH: "{{ volta_root }}/bin:{{ ansible_env.PATH }}"
-  include_tasks: claude_code.yml
+  include_tasks:
+    file: claude_code.yml
+    apply:
+      environment:
+        VOLTA_HOME: "{{ ansible_env.HOME }}/.volta"
+        PATH: "{{ volta_root }}/bin:{{ ansible_env.PATH }}"
+      tags:
+        - claude_code
   vars:
     current_tool: "claude_code"
   tags:
@@ -68,10 +74,14 @@
   when: ai_tools_summary.claude_code.installed | default(false)
 
 - name: Install Codex CLI (Advanced Configuration)
-  environment:
-    VOLTA_HOME: "{{ ansible_env.HOME }}/.volta"
-    PATH: "{{ volta_root }}/bin:{{ ansible_env.PATH }}"
-  include_tasks: codex.yml
+  include_tasks:
+    file: codex.yml
+    apply:
+      environment:
+        VOLTA_HOME: "{{ ansible_env.HOME }}/.volta"
+        PATH: "{{ volta_root }}/bin:{{ ansible_env.PATH }}"
+      tags:
+        - codex
   vars:
     current_tool: "codex"
   tags:
