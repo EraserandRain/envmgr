@@ -44,49 +44,64 @@
       set_fact:
         ai_tools_errors: "{{ ai_tools_errors + ['AI tools installation failed'] }}"
 
-- name: Verify all AI tools installations
-  shell: |
-    echo "=== Installed AI Tools ==="
-    tools_found=0
+# Detect Claude Code installation and version
+- name: Check Claude Code binary
+  stat:
+    path: "{{ volta_root }}/bin/{{ ai_tools_config.claude_code.binary }}"
+  register: claude_bin
 
-    if command -v claude >/dev/null 2>&1; then
-      claude_version=$(claude --version 2>/dev/null || echo 'version check failed')
-      echo "✓ Claude Code: $claude_version"
-      tools_found=$((tools_found + 1))
-    else
-      echo "✗ Claude Code: not installed"
-    fi
-
-    if command -v codex >/dev/null 2>&1; then
-      codex_version=$(codex --version 2>/dev/null || echo 'version check failed')
-      echo "✓ Codex CLI: $codex_version"
-      tools_found=$((tools_found + 1))
-    else
-      echo "✗ Codex CLI: not installed"
-    fi
-
-    echo "==========================="
-    echo "Total tools installed: $tools_found/2"
-
-    # Exit with success if at least one tool is installed
-    if [ $tools_found -gt 0 ]; then
-      exit 0
-    else
-      exit 1
-    fi
-  args:
-    executable: /bin/zsh
-  register: ai_tools_status
+- name: Get Claude Code version
+  command: "{{ ai_tools_config.claude_code.binary }} --version"
+  register: claude_version_check
   changed_when: false
-  failed_when: ai_tools_status.rc != 0
+  failed_when: false
+  when: claude_bin.stat.exists
 
-- name: Display installation status
-  debug:
-    msg: "{{ ai_tools_status.stdout_lines }}"
-
-- name: Update AI tools summary based on verification
+- name: Update summary for Claude Code
   set_fact:
-    ai_tools_summary: "{{ ai_tools_summary | combine({'claude_code': {'installed': ('✓ Claude Code:' in ai_tools_status.stdout), 'version': (ai_tools_status.stdout | regex_search('✓ Claude Code: (.+)', '\\1') | first | default('not installed')), 'mcp_installed': false}, 'codex': {'installed': ('✓ Codex CLI:' in ai_tools_status.stdout), 'version': (ai_tools_status.stdout | regex_search('✓ Codex CLI: (.+)', '\\1') | first | default('not installed')), 'context7_installed': false}}, recursive=True) }}"
+    ai_tools_summary: "{{ ai_tools_summary | combine({'claude_code': {'installed': claude_bin.stat.exists, 'version': (claude_version_check.stdout if claude_bin.stat.exists else 'not installed'), 'mcp_installed': false}}, recursive=True) }}"
+
+# Detect Codex CLI installation and version
+- name: Check Codex CLI binary
+  stat:
+    path: "{{ volta_root }}/bin/{{ ai_tools_config.codex.binary }}"
+  register: codex_bin
+
+- name: Get Codex CLI version
+  command: "{{ ai_tools_config.codex.binary }} --version"
+  register: codex_version_check
+  changed_when: false
+  failed_when: false
+  when: codex_bin.stat.exists
+
+- name: Update summary for Codex CLI
+  set_fact:
+    ai_tools_summary: "{{ ai_tools_summary | combine({'codex': {'installed': codex_bin.stat.exists, 'version': (codex_version_check.stdout if codex_bin.stat.exists else 'not installed'), 'context7_installed': false}}, recursive=True) }}"
+
+- name: Display installation summary
+  debug:
+    msg:
+      - "=== Installed AI Tools ==="
+      - "{% if ai_tools_summary.claude_code.installed %}✓ Claude Code: {{ ai_tools_summary.claude_code.version }}{% else %}✗ Claude Code: not installed{% endif %}"
+      - "{% if ai_tools_summary.codex.installed %}✓ Codex CLI: {{ ai_tools_summary.codex.version }}{% else %}✗ Codex CLI: not installed{% endif %}"
+      - "==========================="
+
+- name: Warn if no tools were installed
+  debug:
+    msg:
+      - "WARNING: No AI tools were successfully installed!"
+      - "Please check the installation logs above for errors."
+      - "You may need to:"
+      - "  • Check your internet connection"
+      - "  • Verify volta is properly configured"
+      - "  • Run the installation again"
+  when: not (ai_tools_summary.claude_code.installed or ai_tools_summary.codex.installed)
+
+- name: Ensure at least one tool is installed
+  assert:
+    that:
+      - ai_tools_summary.claude_code.installed or ai_tools_summary.codex.installed
+    fail_msg: "No AI tools were installed or detected."
 
 - name: Provide usage instructions
   debug:
@@ -104,14 +119,3 @@
       - ""
       - "Both tools are now available in your PATH via volta."
   when: ai_tools_summary.claude_code.installed or ai_tools_summary.codex.installed
-
-- name: Warn if no tools were installed
-  debug:
-    msg:
-      - "WARNING: No AI tools were successfully installed!"
-      - "Please check the installation logs above for errors."
-      - "You may need to:"
-      - "  • Check your internet connection"
-      - "  • Verify volta is properly configured"
-      - "  • Run the installation again"
-  when: not (ai_tools_summary.claude_code.installed or ai_tools_summary.codex.installed)
