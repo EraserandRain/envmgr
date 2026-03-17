@@ -1,0 +1,19 @@
+---
+- name: Check {{ display_name }} binary
+  stat:
+    path: "{{ volta_root }}/bin/{{ binary_name }}"
+  register: summarized_tool_bin
+
+- name: Get {{ display_name }} version
+  command: "{{ binary_name }} --version"
+  register: summarized_tool_version
+  changed_when: false
+  failed_when: false
+  when: summarized_tool_bin.stat.exists
+
+- name: Update summary for {{ display_name }}
+  set_fact:
+    ai_tools_summary: "{{ ai_tools_summary | combine({summary_key: {'installed': summarized_tool_bin.stat.exists, 'version': (summarized_tool_version.stdout if summarized_tool_bin.stat.exists else 'not installed'), extra_key: extra_default}}, recursive=True) }}"
+  vars:
+    extra_key: "{{ extra_status_key | default('status_placeholder') }}"
+    extra_default: "{{ extra_status_default | default(false) }}"

@@ -66,12 +66,10 @@
     current_tool: "claude_code"
   tags:
     - claude_code
-  when: ai_tools_summary.claude_code.installed | default(false)
 
 - name: Update global status after Claude Code configuration
   set_fact:
     global_ai_tools_status: "{{ global_ai_tools_status | combine({'tools_attempted': global_ai_tools_status.tools_attempted + ['claude_code'], 'tools_successful': global_ai_tools_status.tools_successful + (['claude_code'] if (claude_installed | default(false)) else []), 'tools_failed': global_ai_tools_status.tools_failed + ([] if (claude_installed | default(false)) else ['claude_code'])}) }}"
-  when: ai_tools_summary.claude_code.installed | default(false)
 
 - name: Install Codex CLI (Advanced Configuration)
   include_tasks:
@@ -86,12 +84,10 @@
     current_tool: "codex"
   tags:
     - codex
-  when: ai_tools_summary.codex.installed | default(false)
 
 - name: Update global status after Codex configuration
   set_fact:
     global_ai_tools_status: "{{ global_ai_tools_status | combine({'tools_attempted': global_ai_tools_status.tools_attempted + ['codex'], 'tools_successful': global_ai_tools_status.tools_successful + (['codex'] if (codex_installed | default(false)) else []), 'tools_failed': global_ai_tools_status.tools_failed + ([] if (codex_installed | default(false)) else ['codex'])}) }}"
-  when: ai_tools_summary.codex.installed | default(false)
 
 - name: Final verification and rollback check
   block:

@@ -1,0 +1,49 @@
+---
+# Reusable task for checking and comparing tool versions
+# Required variables:
+#   - tool_name: Display name (e.g., "Claude Code", "Codex CLI")
+#   - binary_name: Binary command name (e.g., "claude", "codex")
+#   - package_name: NPM package name (e.g., "@anthropic-ai/claude-code")
+#
+# Sets fact variables:
+#   - {{ binary_name }}_needs_update: Boolean indicating if installation/update is needed
+#   - {{ binary_name }}_current_version: Current installed version or "not_installed"
+#   - {{ binary_name }}_latest_version: Latest available version from npm
+
+- name: Check current version for {{ tool_name }}
+  shell: |
+    set -o pipefail
+    if command -v {{ binary_name }} &> /dev/null; then
+      {{ binary_name }} --version 2>&1 | head -n1
+    else
+      echo "not_installed"
+    fi
+  args:
+    executable: /bin/zsh
+  register: current_version_result
+  changed_when: false
+
+- name: Get latest version from npm for {{ tool_name }}
+  shell: |
+    npm view {{ package_name }} version 2>&1 || echo "unknown"
+  args:
+    executable: /bin/zsh
+  register: latest_version_result
+  changed_when: false
+
+- name: Determine if update is needed for {{ tool_name }}
+  set_fact:
+    "{{ binary_name }}_needs_update": "{{
+      ('not_installed' in current_version_result.stdout or ('unknown' not in latest_version_result.stdout and current_version_result.stdout.strip() != latest_version_result.stdout.strip())) | ternary('true', 'false') | from_yaml
+    }}"
+    "{{ binary_name }}_current_version": "{{ current_version_result.stdout.strip() }}"
+    "{{ binary_name }}_latest_version": "{{ latest_version_result.stdout.strip() }}"
+
+- name: Display version information for {{ tool_name }}
+  debug:
+    msg:
+      - "=== {{ tool_name }} Version Check ==="
+      - "Current version: {{ current_version_result.stdout.strip() }}"
+      - "Latest version: {{ latest_version_result.stdout.strip() }}"
+      - "Action: {{ 'Install/Update needed' if (lookup('vars', binary_name + '_needs_update') | bool) else 'Already up-to-date, skipping' }}"
+      - "{{ '=' * (tool_name | length + 24) }}"
