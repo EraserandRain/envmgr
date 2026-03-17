@@ -5,9 +5,13 @@
   changed_when: false
   failed_when: volta_version.rc != 0
 
+- name: Cache volta version for downstream tasks
+  set_fact:
+    ai_tools_volta_version: "{{ volta_version.stdout }}"
+
 - name: Display volta version
   debug:
-    msg: "Using volta {{ volta_version.stdout }}"
+    msg: "Using volta {{ ai_tools_volta_version }}"
 
 - name: Initialize AI tools installation facts
   set_fact:
@@ -23,60 +27,46 @@
     ai_tools_errors: []
 
 - block:
-    - name: Install Claude Code (Latest Version)
-      shell: |
-        volta install @anthropic-ai/claude-code@latest
-      args:
-        executable: /bin/zsh
-        creates: "{{ volta_root }}/bin/claude"
-      register: claude_install_result
+    - name: Manage base installation for AI tools
+      include_tasks:
+        file: manage_basic_ai_tool.yml
+      vars:
+        tool_name: "{{ item.name }}"
+        binary_name: "{{ item.binary }}"
+        package_name: "{{ item.package }}"
+      loop:
+        - { name: "Claude Code", binary: "claude", package: "@anthropic-ai/claude-code" }
+        - { name: "Codex CLI", binary: "codex", package: "@openai/codex" }
+      loop_control:
+        label: "{{ item.name }}"
 
-    - name: Install OpenAI Codex CLI (Latest Version)
-      shell: |
-        volta install @openai/codex@latest
-      args:
-        executable: /bin/zsh
-        creates: "{{ volta_root }}/bin/codex"
-      register: codex_install_result
+    - name: Display combined version information
+      debug:
+        msg:
+          - "=== AI Tools Version Summary ==="
+          - "Claude Code - Current: {{ claude_current_version }}, Latest: {{ claude_latest_version }}"
+          - "Codex CLI - Current: {{ codex_current_version }}, Latest: {{ codex_latest_version }}"
+          - "================================"
 
   rescue:
     - name: Handle AI tools installation failures
       set_fact:
         ai_tools_errors: "{{ ai_tools_errors + ['AI tools installation failed'] }}"
 
-# Detect Claude Code installation and version
-- name: Check Claude Code binary
-  stat:
-    path: "{{ volta_root }}/bin/{{ ai_tools_config.claude_code.binary }}"
-  register: claude_bin
-
-- name: Get Claude Code version
-  command: "{{ ai_tools_config.claude_code.binary }} --version"
-  register: claude_version_check
-  changed_when: false
-  failed_when: false
-  when: claude_bin.stat.exists
-
-- name: Update summary for Claude Code
-  set_fact:
-    ai_tools_summary: "{{ ai_tools_summary | combine({'claude_code': {'installed': claude_bin.stat.exists, 'version': (claude_version_check.stdout if claude_bin.stat.exists else 'not installed'), 'mcp_installed': false}}, recursive=True) }}"
-
-# Detect Codex CLI installation and version
-- name: Check Codex CLI binary
-  stat:
-    path: "{{ volta_root }}/bin/{{ ai_tools_config.codex.binary }}"
-  register: codex_bin
-
-- name: Get Codex CLI version
-  command: "{{ ai_tools_config.codex.binary }} --version"
-  register: codex_version_check
-  changed_when: false
-  failed_when: false
-  when: codex_bin.stat.exists
-
-- name: Update summary for Codex CLI
-  set_fact:
-    ai_tools_summary: "{{ ai_tools_summary | combine({'codex': {'installed': codex_bin.stat.exists, 'version': (codex_version_check.stdout if codex_bin.stat.exists else 'not installed'), 'context7_installed': false}}, recursive=True) }}"
+- name: Collect AI tools summary data
+  include_tasks:
+    file: summarize_ai_tool.yml
+  vars:
+    display_name: "{{ item.display_name }}"
+    binary_name: "{{ item.binary }}"
+    summary_key: "{{ item.summary_key }}"
+    extra_status_key: "{{ item.extra_key }}"
+    extra_status_default: "{{ item.extra_default }}"
+  loop:
+    - { display_name: "Claude Code", binary: "{{ ai_tools_config.claude_code.binary }}", summary_key: "claude_code", extra_key: "mcp_installed", extra_default: false }
+    - { display_name: "Codex CLI", binary: "{{ ai_tools_config.codex.binary }}", summary_key: "codex", extra_key: "context7_installed", extra_default: false }
+  loop_control:
+    label: "{{ item.display_name }}"
 
 - name: Display installation summary
   debug:

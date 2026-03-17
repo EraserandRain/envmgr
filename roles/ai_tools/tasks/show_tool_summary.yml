@@ -1,0 +1,26 @@
+---
+- name: Display installation summary for {{ ai_tool_display_name }}
+  debug:
+    msg: "{{ summary_lines | join('\n') }}"
+  vars:
+    summary_lines: >-
+      {{
+        [ summary_header,
+          ai_tool_display_name ~ " installed: " ~ (ai_tool_installed | default(false) | string)
+        ]
+        + (
+          (ai_tool_installed | default(false))
+          | ternary([ai_tool_display_name ~ " version: " ~ ai_tool_version], [])
+        )
+        + (additional_summary_items | default([]) | reject('equalto', '') | list)
+        + [ summary_footer ]
+      }}
+    summary_header: "{{ ai_tool_summary_header | default('=== ' ~ ai_tool_display_name ~ ' Installation Summary ===') }}"
+    summary_footer: "{{ ai_tool_summary_footer | default('======================================') }}"
+
+- name: Provide {{ ai_tool_display_name }} usage instructions
+  debug:
+    msg: "{{ (usage_lines | default([])) | join('\n') }}"
+  when:
+    - ai_tool_installed | default(false)
+    - (usage_lines | default([])) | length > 0

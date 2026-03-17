@@ -1,0 +1,21 @@
+---
+- name: Gather version information for {{ tool_name }}
+  include_tasks:
+    file: check_tool_version.yml
+
+- name: Install/Update {{ tool_name }} if needed
+  shell: |
+    volta install {{ package_name }}@latest
+  args:
+    executable: /bin/zsh
+  changed_when: lookup('vars', binary_name + '_needs_update') | default(false) | bool
+  when: lookup('vars', binary_name + '_needs_update') | default(false) | bool
+  register: managed_ai_tool_install_result
+
+- name: Mark {{ tool_name }} as up-to-date after install
+  set_fact:
+    "{{ binary_name }}_needs_update": false
+  when:
+    - managed_ai_tool_install_result is defined
+    - not managed_ai_tool_install_result.skipped | default(false)
+    - managed_ai_tool_install_result.rc == 0

@@ -1,58 +1,39 @@
 ---
 - name: Load local configuration if exists
-  block:
-    - name: Load local configuration from file
-      include_vars:
-        file: "{{ ai_tools_local_file }}"
-  rescue:
-    - name: Handle local config loading failure
-      debug:
-        msg: "Local configuration not loaded (file may not exist or be invalid), using defaults"
+  include_tasks:
+    file: load_local_config.yml
+  vars:
+    ai_tool_name: "Codex CLI"
 
 - name: Verify volta is available
-  command: volta --version
-  register: volta_version
-  changed_when: false
-  failed_when: volta_version.rc != 0
+  block:
+    - name: Check volta version for Codex tasks
+      command: volta --version
+      register: volta_version
+      changed_when: false
+      failed_when: volta_version.rc != 0
 
-- block:
-    - name: Install OpenAI Codex CLI (Latest Version)
-      shell: |
-        volta install @openai/codex@latest
-      args:
-        executable: /bin/zsh
-        creates: "{{ volta_root }}/bin/codex"
-      register: codex_install_result
+    - name: Cache volta version fact for Codex tasks
+      set_fact:
+        ai_tools_volta_version: "{{ volta_version.stdout }}"
+  when: ai_tools_volta_version is not defined
 
-    - name: Verify Codex CLI binary exists
-      stat:
-        path: "{{ volta_root }}/bin/codex"
-      register: codex_binary_stat
+- name: Check Codex CLI version
+  include_tasks: check_tool_version.yml
+  vars:
+    tool_name: "Codex CLI"
+    binary_name: "codex"
+    package_name: "@openai/codex"
+  when: not (codex_needs_update is defined and codex_current_version is defined and codex_latest_version is defined)
 
-    - name: Fail if Codex CLI binary not found
-      fail:
-        msg: "Codex CLI installation failed - binary not found at {{ volta_root }}/bin/codex"
-      when: not codex_binary_stat.stat.exists
-
-  rescue:
-    - name: Handle Codex CLI installation failure
-      debug:
-        msg: "Codex CLI installation failed: {{ codex_install_result.stderr | default('Unknown error') }}"
-
-    - name: Check if Codex CLI was partially installed
-      stat:
-        path: "{{ volta_root }}/bin/codex"
-      register: codex_partial_stat
-
-    - name: Clean up failed installation
-      file:
-        path: "{{ volta_root }}/bin/codex"
-        state: absent
-      when: codex_partial_stat.stat.exists | default(false)
-
-    - name: Re-raise installation failure
-      fail:
-        msg: "Codex CLI installation failed and cleanup completed"
+- name: Ensure Codex CLI binary is installed
+  include_tasks:
+    file: install_ai_tool.yml
+  vars:
+    ai_tool_name: "Codex CLI"
+    ai_tool_install_command: "volta install @openai/codex@latest"
+    ai_tool_needs_update_var: "codex_needs_update"
+    ai_tool_binary_path: "{{ volta_root }}/bin/{{ ai_tools_config.codex.binary }}"
 
 - name: Verify Codex CLI installation and get version
   command: codex --version
@@ -71,7 +52,6 @@
         volta install {{ ai_tools_config.codex.mcp_context7.package }}@latest
       args:
         executable: /bin/zsh
-        creates: "{{ volta_root }}/bin/context7-mcp"
       register: context7_install_result
       changed_when: context7_install_result.rc == 0
       when:
@@ -156,19 +136,18 @@
         state: absent
       when: context7_config_result is defined
 
-- name: Display installation summary
-  debug:
-    msg:
-      - "=== Codex CLI Installation Summary ==="
-      - "Codex CLI installed: {{ codex_installed | default(false) }}"
-      - "{% if codex_installed | default(false) %}Codex version: {{ codex_version }}{% endif %}"
+- name: Display Codex CLI summary and usage guidance
+  include_tasks:
+    file: show_tool_summary.yml
+  vars:
+    ai_tool_display_name: "Codex CLI"
+    ai_tool_installed: "{{ codex_installed | default(false) }}"
+    ai_tool_version: "{{ codex_version }}"
+    ai_tool_summary_footer: "======================================"
+    additional_summary_items:
       - "Context7 MCP installed: {{ context7_installed | default(false) }}"
       - "{% if context7_error is defined %}Context7 Error: {{ context7_error }}{% endif %}"
-      - "======================================"
-
-- name: Provide usage instructions
-  debug:
-    msg:
+    usage_lines:
       - "Codex CLI Installation Complete!"
       - ""
       - "Next steps:"
@@ -178,4 +157,3 @@
       - "{% if not (context7_installed | default(false)) %}3. Context7 MCP installation failed - check logs above{% endif %}"
       - ""
       - "Codex CLI is now available in your PATH via volta."
-  when: codex_installed | default(false)
