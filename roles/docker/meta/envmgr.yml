@@ -1,0 +1,16 @@
+name: docker
+description: Docker engine setup
+enabled: true
+targets:
+  - workstation
+  - node
+tags:
+  - docker
+  - minikube
+depends_on: []
+task_tags: []
+vars_files: []
+playbook_roles:
+  - docker
+galaxy_roles: []
+collections: []

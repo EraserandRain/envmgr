@@ -18,7 +18,7 @@
     summary_header: "{{ ai_tool_summary_header | default('=== ' ~ ai_tool_display_name ~ ' Installation Summary ===') }}"
     summary_footer: "{{ ai_tool_summary_footer | default('======================================') }}"
 
-- name: Provide {{ ai_tool_display_name }} usage instructions
+- name: Provide usage instructions for {{ ai_tool_display_name }}
   debug:
     msg: "{{ (usage_lines | default([])) | join('\n') }}"
   when:

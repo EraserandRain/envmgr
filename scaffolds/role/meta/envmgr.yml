@@ -1,0 +1,13 @@
+name: {{ role_name }}
+description: ""
+enabled: false
+targets: []
+tags:
+  - {{ role_name }}
+depends_on: []
+task_tags: []
+vars_files: []
+playbook_roles:
+  - {{ role_name }}
+galaxy_roles: []
+collections: []

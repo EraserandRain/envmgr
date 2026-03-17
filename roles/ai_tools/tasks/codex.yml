@@ -6,6 +6,7 @@
     ai_tool_name: "Codex CLI"
 
 - name: Verify volta is available
+  when: ai_tools_volta_version is not defined
   block:
     - name: Check volta version for Codex tasks
       command: volta --version
@@ -16,7 +17,6 @@
     - name: Cache volta version fact for Codex tasks
       set_fact:
         ai_tools_volta_version: "{{ volta_version.stdout }}"
-  when: ai_tools_volta_version is not defined
 
 - name: Check Codex CLI version
   include_tasks: check_tool_version.yml

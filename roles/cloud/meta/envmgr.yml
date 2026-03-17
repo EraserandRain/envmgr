@@ -1,0 +1,17 @@
+name: cloud
+description: Terraform and HashiCorp tooling
+enabled: true
+targets:
+  - workstation
+tags:
+  - cloud
+depends_on: []
+task_tags:
+  - hashicorp
+  - terraform
+  - tf
+vars_files: []
+playbook_roles:
+  - cloud
+galaxy_roles: []
+collections: []

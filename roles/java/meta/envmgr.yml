@@ -1,0 +1,14 @@
+name: java
+description: Java runtime installation and profile setup
+enabled: true
+targets:
+  - workstation
+tags:
+  - java
+depends_on: []
+task_tags: []
+vars_files: []
+playbook_roles:
+  - java
+galaxy_roles: []
+collections: []

@@ -1,0 +1,17 @@
+name: ai_tools
+description: AI CLI tools and integrations
+enabled: true
+targets:
+  - workstation
+tags:
+  - ai_tools
+depends_on:
+  - node
+task_tags:
+  - claude_code
+  - codex
+vars_files: []
+playbook_roles:
+  - ai_tools
+galaxy_roles: []
+collections: []

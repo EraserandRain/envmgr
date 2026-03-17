@@ -1,0 +1,14 @@
+name: dotnet
+description: .NET SDK and runtime installation
+enabled: true
+targets:
+  - workstation
+tags:
+  - dotnet
+depends_on: []
+task_tags: []
+vars_files: []
+playbook_roles:
+  - dotnet
+galaxy_roles: []
+collections: []

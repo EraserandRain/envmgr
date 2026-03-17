@@ -1,0 +1,17 @@
+name: zsh
+description: Shell setup with oh-my-zsh and aliases
+enabled: true
+targets:
+  - workstation
+tags:
+  - zsh
+depends_on: []
+task_tags: []
+vars_files:
+  - roles/zsh/vars/gantsign.oh-my-zsh.yml
+playbook_roles:
+  - gantsign.oh-my-zsh
+  - zsh
+galaxy_roles:
+  - gantsign.oh-my-zsh
+collections: []

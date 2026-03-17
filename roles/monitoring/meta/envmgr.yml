@@ -1,0 +1,15 @@
+name: monitoring
+description: Kubernetes monitoring stack
+enabled: true
+targets:
+  - node
+tags:
+  - monitoring
+depends_on:
+  - kubernetes_tools
+task_tags: []
+vars_files: []
+playbook_roles:
+  - monitoring
+galaxy_roles: []
+collections: []

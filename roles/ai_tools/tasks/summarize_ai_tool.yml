@@ -1,10 +1,10 @@
 ---
-- name: Check {{ display_name }} binary
+- name: Check binary for {{ display_name }}
   stat:
     path: "{{ volta_root }}/bin/{{ binary_name }}"
   register: summarized_tool_bin
 
-- name: Get {{ display_name }} version
+- name: Get version for {{ display_name }}
   command: "{{ binary_name }} --version"
   register: summarized_tool_version
   changed_when: false
