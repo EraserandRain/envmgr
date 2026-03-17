@@ -18,15 +18,14 @@ uv sync
 # List all available tags
 uv run install -l
 
-# Install specific tools (local)
+# Install specific tools (local, auto-resolves scenario when unambiguous)
 uv run install [tag1 tag2 ...]
-uv run install init             # Base environment setup
 uv run install zsh              # Zsh with oh-my-zsh
-uv run install docker           # Docker installation
-uv run install kubernetes_tools # kubectl, helm, crictl
+uv run install kubeadm          # Node scenario
+uv run install kubernetes_tools # Requires --playbook when target is ambiguous
 
-# Install all roles
-uv run install all
+# Install all roles in a specific scenario
+uv run install --playbook playbooks/workstation.yml all
 
 # Remote installation
 uv run install -i inventory/remote.yaml [tags]
@@ -43,6 +42,8 @@ uv run ping -i inventory/remote.yaml
 uv run lint          # Python linting with ruff
 uv run typecheck     # Type checking with mypy
 uv run ansible-check # Ansible linting
+uv run validate      # Combined validation suite
+uv run smoke-test    # Lightweight integration checks
 
 # Create new role
 uv run create [role_name]
@@ -52,7 +53,7 @@ uv run create [role_name]
 
 ### Core Structure
 - **`scripts/main.py`**: Main CLI implementation with all command handlers
-- **`entry.yaml`**: Main Ansible playbook defining role execution order
+- **`playbooks/`**: Scenario playbooks defining workstation and node role order
 - **`roles/`**: Ansible roles for different tools and configurations
 - **`inventory/`**: Host configuration files (local and remote)
 - **`vars/global.yml`**: Global variables shared across roles
@@ -91,13 +92,11 @@ Roles are organized by technology:
 
 ### Adding New Roles
 1. Use `uv run create [role_name]` to generate from template
-2. Update `entry.yaml` to include the new role with appropriate tags
+2. Update the appropriate playbook under `playbooks/` to include the new role with appropriate tags
 3. Configure role-specific variables in `roles/[role_name]/vars/main.yml`
 
 ### Tag Management
-Tags are automatically discovered from:
-- Role definitions in `entry.yaml`
-- Task definitions in each role's `tasks/main.yml`
+Tags are automatically discovered from role metadata in `roles/*/meta/envmgr.yml`.
 
 ### Inventory Configuration
 - Local execution: `inventory/default.yaml` (default)

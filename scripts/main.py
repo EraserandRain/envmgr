@@ -5,7 +5,7 @@ import tempfile
 from collections.abc import Callable
 from pathlib import Path
 
-from .catalog import CatalogError, get_available_tags
+from .catalog import CatalogError, build_playbook_tag_index, get_available_tags
 from .scaffold import ScaffoldError, generate_role
 
 
@@ -14,6 +14,12 @@ class Colors:
     GREEN = "\033[32m"
     RED = "\033[31m"
     RESET = "\033[0m"
+
+
+DEFAULT_PLAYBOOKS = [
+    "playbooks/workstation.yml",
+    "playbooks/node.yml",
+]
 
 
 def run_command_step(
@@ -57,6 +63,52 @@ def load_available_tags() -> tuple[list[str], list[str]]:
         raise SystemExit(1) from error
 
 
+def get_existing_default_playbooks() -> list[str]:
+    """Return default scenario playbooks that exist in the repository."""
+    return [playbook for playbook in DEFAULT_PLAYBOOKS if Path(playbook).exists()]
+
+
+def resolve_install_playbook(
+    selected_tags: list[str],
+    *,
+    explicit_playbook: str | None,
+) -> str:
+    """Resolve a playbook for install operations based on explicit input or tag scope."""
+    if explicit_playbook:
+        return explicit_playbook
+
+    if not selected_tags:
+        raise CatalogError("no tags selected")
+
+    if selected_tags[0].lower() == "all":
+        raise CatalogError("tag 'all' requires --playbook so the scenario is explicit")
+
+    playbook_paths = get_existing_default_playbooks()
+    if not playbook_paths:
+        raise CatalogError("no scenario playbooks found under playbooks/")
+
+    playbook_tag_index = build_playbook_tag_index(playbook_paths)
+    requested_tags = set(selected_tags)
+    matching_playbooks = [
+        playbook
+        for playbook, playbook_tags in playbook_tag_index.items()
+        if requested_tags.issubset(playbook_tags)
+    ]
+
+    if len(matching_playbooks) == 1:
+        return matching_playbooks[0]
+
+    if not matching_playbooks:
+        raise CatalogError(
+            "selected tags do not map to a scenario playbook; use --playbook explicitly"
+        )
+
+    matching_names = ", ".join(matching_playbooks)
+    raise CatalogError(
+        f"selected tags are valid in multiple playbooks ({matching_names}); use --playbook explicitly"
+    )
+
+
 def install() -> None:
     """
     Install and configure the envmgr project using Ansible.
@@ -78,7 +130,7 @@ def install() -> None:
     )
     parser.add_argument(
         "--playbook",
-        help="Specify a playbook file (default: entry.yaml)",
+        help="Specify a playbook file explicitly when tags are ambiguous",
     )
 
     # Add inventory option
@@ -113,8 +165,6 @@ def install() -> None:
 
     role_tags, task_tags = load_available_tags()
     selected_tags: list[str] = list(args.tags)
-    yaml_file_path = args.playbook or "entry.yaml"
-
     if not selected_tags:
         print(f"{Colors.RED}Warning: No tags selected for execution{Colors.RESET}")
         return
@@ -129,6 +179,15 @@ def install() -> None:
             f"{Colors.RED}Warning: Unknown tags: {', '.join(invalid_tags)}{Colors.RESET}"
         )
         print("Use -l or --list-tags to see all available tags")
+        return
+
+    try:
+        yaml_file_path = resolve_install_playbook(
+            selected_tags,
+            explicit_playbook=args.playbook,
+        )
+    except CatalogError as error:
+        print(f"{Colors.RED}Warning: {error}{Colors.RESET}")
         return
 
     if not Path(yaml_file_path).exists():
@@ -487,6 +546,24 @@ def smoke_test() -> None:
             if "name: smoke-role" not in metadata_contents:
                 raise AssertionError("generated metadata did not render role name")
 
+    def check_playbook_resolution() -> None:
+        if resolve_install_playbook(["zsh"], explicit_playbook=None) != (
+            "playbooks/workstation.yml"
+        ):
+            raise AssertionError("expected zsh to resolve to workstation playbook")
+
+        if resolve_install_playbook(["kubeadm"], explicit_playbook=None) != (
+            "playbooks/node.yml"
+        ):
+            raise AssertionError("expected kubeadm to resolve to node playbook")
+
+        try:
+            resolve_install_playbook(["docker"], explicit_playbook=None)
+        except CatalogError:
+            return
+
+        raise AssertionError("expected docker to require an explicit playbook")
+
     parser = argparse.ArgumentParser(
         description="Run lightweight smoke tests for metadata, scaffolds, and playbooks"
     )
@@ -518,6 +595,7 @@ def smoke_test() -> None:
     results = [
         run_assertion_step("metadata catalog", check_metadata_catalog),
         run_assertion_step("role scaffold", check_scaffold_generation),
+        run_assertion_step("playbook resolution", check_playbook_resolution),
     ]
 
     if not playbooks:

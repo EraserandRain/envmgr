@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -112,3 +113,87 @@ def get_available_tags(roles_dir: str | Path = "roles") -> tuple[list[str], list
         task_tags.update(metadata.task_tags)
 
     return sorted(role_tags), sorted(task_tags)
+
+
+def _read_playbook_tag_list(
+    value: Any,
+    playbook_path: Path,
+    role_name: str,
+) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, list) and all(isinstance(item, str) for item in value):
+        return value
+    raise CatalogError(
+        f"{playbook_path} role '{role_name}' field 'tags' must be a string or list of strings"
+    )
+
+
+def load_playbook_tags(
+    playbook_path: str | Path,
+    roles_dir: str | Path = "roles",
+) -> set[str]:
+    path = Path(playbook_path)
+    if not path.exists():
+        raise CatalogError(f"playbook not found: {path}")
+
+    with path.open(encoding="utf-8") as file:
+        data = yaml.safe_load(file)
+
+    if not isinstance(data, list):
+        raise CatalogError(f"{path} must contain a YAML list of plays")
+
+    role_task_tags: dict[str, set[str]] = {}
+    for metadata in load_role_catalog(roles_dir):
+        if not metadata.enabled:
+            continue
+        for role_name in metadata.playbook_roles:
+            role_task_tags.setdefault(role_name, set()).update(metadata.task_tags)
+
+    playbook_tags: set[str] = set()
+
+    for play in data:
+        if not isinstance(play, dict):
+            raise CatalogError(f"{path} contains an invalid play definition")
+
+        roles = play.get("roles", [])
+        if roles is None:
+            continue
+        if not isinstance(roles, list):
+            raise CatalogError(f"{path} field 'roles' must be a list")
+
+        for role_entry in roles:
+            if isinstance(role_entry, str):
+                role_name = role_entry
+                assigned_tags: list[str] = []
+            elif isinstance(role_entry, dict):
+                role_name_value = role_entry.get("role")
+                if not isinstance(role_name_value, str) or not role_name_value.strip():
+                    raise CatalogError(
+                        f"{path} contains a role entry without a valid 'role' field"
+                    )
+                role_name = role_name_value
+                assigned_tags = _read_playbook_tag_list(
+                    role_entry.get("tags"),
+                    path,
+                    role_name,
+                )
+            else:
+                raise CatalogError(f"{path} contains an invalid role entry")
+
+            playbook_tags.update(assigned_tags)
+            playbook_tags.update(role_task_tags.get(role_name, set()))
+
+    return playbook_tags
+
+
+def build_playbook_tag_index(
+    playbook_paths: Iterable[str | Path],
+    roles_dir: str | Path = "roles",
+) -> dict[str, set[str]]:
+    return {
+        str(Path(playbook_path)): load_playbook_tags(playbook_path, roles_dir)
+        for playbook_path in playbook_paths
+    }
