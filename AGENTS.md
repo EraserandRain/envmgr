@@ -4,7 +4,7 @@ This guide helps contributors work effectively on envmgr (Ansible-driven environ
 
 ## Project Structure & Module Organization
 
-- `entry.yaml` — main playbook (tags map to roles/tasks).
+- `playbooks/` — scenario playbooks (`workstation.yml`, `node.yml`).
 - `roles/` — one folder per tool (`tasks/main.yml`, `vars/`, etc.).
 - `inventory/` — inventories (`default.yaml` for local, `*.example` for remote/password).
 - `scripts/` — Python CLI entrypoints used by `uv`.
@@ -13,11 +13,12 @@ This guide helps contributors work effectively on envmgr (Ansible-driven environ
 ## Build, Test, and Development Commands
 
 - `uv run setup` — sync deps, init logs, install Galaxy roles.
-- `uv run install -l` — list tags; `uv run install <tag ...>` — apply tags; add `-i <inventory>` or `--ask-vault-pass` as needed.
+- `uv run install -l` — list tags; `uv run install <tag ...>` — apply tags; add `--playbook <path>` when tags are ambiguous, plus `-i <inventory>` or `--ask-vault-pass` as needed.
 - `uv run ping [-i inventory/remote.yaml]` — connectivity check.
 - `uv run lint` — Ruff lint + format check for `scripts/`.
 - `uv run ansible-check` — `ansible-lint` on `roles/`.
 - `uv run typecheck` — mypy type checks.
+- `uv run validate` / `uv run smoke-test` — combined checks and lightweight integration coverage.
 
 ## Coding Style & Naming Conventions
 
@@ -27,8 +28,8 @@ This guide helps contributors work effectively on envmgr (Ansible-driven environ
 
 ## Testing Guidelines
 
-- Run `uv run lint`, `uv run ansible-check`, and `uv run typecheck` before PRs.
-- Validate changes with a dry run: `ansible-playbook -i inventory/default.yaml entry.yaml -C -t <tags>`.
+- Run `uv run validate` and `uv run smoke-test` before PRs.
+- Validate changes with a dry run against a scenario playbook, for example: `ansible-playbook -i inventory/default.yaml playbooks/workstation.yml -C -t <tags>`.
 - Ensure tasks are idempotent (second run reports no changes) and scoping via tags works as expected.
 
 ## Commit & Pull Request Guidelines

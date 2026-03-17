@@ -41,7 +41,7 @@ all:
               ansible_python_interpreter: "{{ ansible_playbook_python }}"
 ```
 
-> **Note:** `uv run install <tags>` still defaults to the legacy compatibility playbook `entry.yaml`. Use `--playbook playbooks/workstation.yml` or `--playbook playbooks/node.yml` to select a scenario-specific entrypoint.
+> **Note:** `uv run install <tags>` now resolves the scenario playbook from the selected tags. If the tags are valid in more than one scenario, pass `--playbook playbooks/workstation.yml` or `--playbook playbooks/node.yml` explicitly.
 
 **For Remote Hosts:**
 
@@ -86,21 +86,21 @@ Setup specified tools using role-level or task-level tags:
 # List all available tags
 uv run install -l
 
-# Install specified tools with the legacy compatibility playbook
+# Install specified tools
 uv run install [tag1 tag2 ...] 
 
-# Install all roles
-uv run install all    
+# Install all roles in one scenario
+uv run install --playbook playbooks/workstation.yml all
 
 # Examples:
-uv run install init             # Setup base environment and directories
 uv run install zsh              # Install zsh with oh-my-zsh and aliases
+uv run install kubeadm          # Install kubeadm on node targets
 uv run install github_cli       # Install GitHub CLI (task-level)
 uv run install golang dotnet    # Install multiple tools (space-separated)
 uv run install kubernetes_tools # Install kubectl, helm, crictl, CNI plugins
 uv run install ai_tools         # Install AI development tools (Claude Code, Codex)
 
-# Use scenario-specific playbooks
+# Use an explicit scenario playbook for ambiguous tags or full-scenario runs
 uv run install --playbook playbooks/workstation.yml zsh node ai_tools
 uv run install --playbook playbooks/node.yml init docker kubeadm
 
@@ -113,13 +113,13 @@ uv run install --playbook playbooks/workstation.yml init docker kubernetes_tools
 
 ```bash
 # Using SSH key authentication
-uv run install -i inventory/remote.yaml init
+uv run install -i inventory/remote.yaml zsh
 
 # Use a scenario-specific playbook on remote hosts
 uv run install -i inventory/remote.yaml --playbook playbooks/node.yml init docker kubeadm
 
 # Using password authentication (with vault)
-uv run install -i inventory/password.yaml --ask-vault-pass init
+uv run install -i inventory/password.yaml --playbook playbooks/node.yml --ask-vault-pass init docker kubeadm
 
 # List tags with specific inventory
 uv run install -i inventory/remote.yaml -l
