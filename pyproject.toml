@@ -3,7 +3,7 @@ name = "envmgr"
 version = "0.1.0"
 description = "Quick deployment to install and configure packages with ansible."
 dependencies = [
-    "ansible>=9.6.0",
+    "ansible>=10.0.0",
     "kubernetes>=31.0.0",
 ]
 readme = "README.md"
