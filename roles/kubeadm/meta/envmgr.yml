@@ -1,0 +1,14 @@
+name: kubeadm
+description: kubeadm and kubelet installation
+enabled: true
+targets:
+  - node
+tags:
+  - kubeadm
+depends_on: []
+task_tags: []
+vars_files: []
+playbook_roles:
+  - kubeadm
+galaxy_roles: []
+collections: []

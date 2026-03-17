@@ -1,0 +1,12 @@
+name: python
+description: Experimental conda-based Python tooling role
+enabled: false
+targets: []
+tags: []
+depends_on: []
+task_tags: []
+vars_files: []
+playbook_roles:
+  - python
+galaxy_roles: []
+collections: []

@@ -1,0 +1,14 @@
+name: golang
+description: Go toolchain installation
+enabled: true
+targets:
+  - workstation
+tags:
+  - golang
+depends_on: []
+task_tags: []
+vars_files: []
+playbook_roles:
+  - golang
+galaxy_roles: []
+collections: []

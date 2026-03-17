@@ -3,7 +3,7 @@
   include_tasks:
     file: check_tool_version.yml
 
-- name: Install/Update {{ tool_name }} if needed
+- name: Install or update if needed for {{ tool_name }}
   shell: |
     volta install {{ package_name }}@latest
   args:
@@ -12,7 +12,7 @@
   when: lookup('vars', binary_name + '_needs_update') | default(false) | bool
   register: managed_ai_tool_install_result
 
-- name: Mark {{ tool_name }} as up-to-date after install
+- name: Mark as up-to-date after install for {{ tool_name }}
   set_fact:
     "{{ binary_name }}_needs_update": false
   when:

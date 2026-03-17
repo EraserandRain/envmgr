@@ -3,6 +3,15 @@
 
 all:
   children:
+    workstation:
+      hosts:
+        devbox:
+          ansible_host: 192.168.1.50
+          ansible_user: your_username
+          ansible_ssh_private_key_file: ~/.ssh/id_rsa
+          ansible_become: yes
+          ansible_become_method: sudo
+          ansible_python_interpreter: /usr/bin/python3
     node:
       children:
         master:

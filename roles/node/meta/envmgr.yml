@@ -1,0 +1,14 @@
+name: node
+description: Node.js and Volta installation
+enabled: true
+targets:
+  - workstation
+tags:
+  - node
+depends_on: []
+task_tags: []
+vars_files: []
+playbook_roles:
+  - node
+galaxy_roles: []
+collections: []

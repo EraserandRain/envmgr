@@ -1,0 +1,16 @@
+name: minikube
+description: Local Kubernetes cluster setup
+enabled: true
+targets:
+  - workstation
+tags:
+  - minikube
+depends_on:
+  - docker
+  - kubernetes_tools
+task_tags: []
+vars_files: []
+playbook_roles:
+  - minikube
+galaxy_roles: []
+collections: []

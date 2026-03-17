@@ -1,6 +1,6 @@
 ---
 - block:
-    - name: Install/Update {{ ai_tool_name }} if needed
+    - name: Install or update if needed for {{ ai_tool_name }}
       shell: |
         {{ ai_tool_install_command }}
       args:
@@ -9,32 +9,32 @@
       when: lookup('vars', ai_tool_needs_update_var) | default(false) | bool
       register: ai_tool_install_result
 
-    - name: Verify {{ ai_tool_name }} binary exists
+    - name: Verify binary exists for {{ ai_tool_name }}
       stat:
         path: "{{ ai_tool_binary_path }}"
       register: ai_tool_binary_stat
 
-    - name: Fail if {{ ai_tool_name }} binary not found
+    - name: Fail if binary is not found for {{ ai_tool_name }}
       fail:
         msg: "{{ ai_tool_name }} installation failed - binary not found at {{ ai_tool_binary_path }}"
       when: not ai_tool_binary_stat.stat.exists
 
   rescue:
-    - name: Handle {{ ai_tool_name }} installation failure
+    - name: Handle installation failure for {{ ai_tool_name }}
       debug:
         msg: "{{ ai_tool_name }} installation failed: {{ ai_tool_install_result.stderr | default('Unknown error') }}"
 
-    - name: Check if {{ ai_tool_name }} was partially installed
+    - name: Check for partial installation of {{ ai_tool_name }}
       stat:
         path: "{{ ai_tool_binary_path }}"
       register: ai_tool_partial_stat
 
-    - name: Clean up failed {{ ai_tool_name }} installation
+    - name: Clean up failed installation for {{ ai_tool_name }}
       file:
         path: "{{ ai_tool_binary_path }}"
         state: absent
       when: ai_tool_partial_stat.stat.exists | default(false)
 
-    - name: Re-raise {{ ai_tool_name }} installation failure
+    - name: Re-raise installation failure for {{ ai_tool_name }}
       fail:
         msg: "{{ ai_tool_name }} installation failed and cleanup completed"

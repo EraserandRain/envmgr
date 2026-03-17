@@ -1,0 +1,16 @@
+name: kubernetes_tools
+description: kubectl, helm, and Kubernetes helper tools
+enabled: true
+targets:
+  - workstation
+  - node
+tags:
+  - kubernetes_tools
+  - minikube
+depends_on: []
+task_tags: []
+vars_files: []
+playbook_roles:
+  - kubernetes_tools
+galaxy_roles: []
+collections: []

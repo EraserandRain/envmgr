@@ -1,34 +1,28 @@
-import os
-import shutil
+from __future__ import annotations
+
+if __package__:
+    from .scaffold import ScaffoldError, generate_role
+else:  # pragma: no cover - compatibility when run as a script
+    import sys
+    from pathlib import Path
+
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+    from scripts.scaffold import ScaffoldError, generate_role
 
 
-def generate_role(role_name: str) -> None:
-    """
-    Generate a new Ansible role by copying template files.
+def main() -> None:
+    role_name = input("Enter role name: ").strip()
+    try:
+        generate_role(role_name)
+    except FileExistsError:
+        print(f"Role '{role_name}' already exists.")
+        return
+    except (FileNotFoundError, ScaffoldError) as error:
+        print(error)
+        return
 
-    Args:
-        role_name: The name of the role to create
-    """
-    # Define paths
-    base_path = "roles"
-    template_path = os.path.join(base_path, "templates")
-    role_path = os.path.join(base_path, role_name)
-
-    # Create role directory
-    os.makedirs(role_path, exist_ok=True)
-
-    # Copy template files to role directory
-    for root, _dirs, files in os.walk(template_path):
-        for file in files:
-            src_file = os.path.join(root, file)
-            dst_file = os.path.join(
-                role_path, root.replace(template_path, "").lstrip(os.path.sep), file
-            )
-            os.makedirs(os.path.dirname(dst_file), exist_ok=True)
-            shutil.copy(src_file, dst_file)
+    print(f"Role '{role_name}' generated successfully.")
 
 
 if __name__ == "__main__":
-    role_name = input("Enter role name: ")
-    generate_role(role_name)
-    print(f"Role '{role_name}' generated successfully.")
+    main()

@@ -1,0 +1,11 @@
+---
+- name: Install and Configure Node Tools
+  hosts: node
+  vars_files:
+    - ../vars/global.yml
+  roles:
+    - { role: init, tags: [init] }
+    - { role: docker, tags: [docker] }
+    - { role: kubeadm, tags: [kubeadm] }
+    - { role: kubernetes_tools, tags: [kubernetes_tools] }
+    - { role: monitoring, tags: [monitoring] }
