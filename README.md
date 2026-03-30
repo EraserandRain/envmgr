@@ -14,15 +14,53 @@ Please install `uv` first 【[uv installation](https://docs.astral.sh/uv/getting
 # Install uv
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# Setup envmgr
+# Setup envmgr and initialize ~/.envmgr/
 uv run setup            
 ```
 
 ### Host Settings
 
-Host configuration is saved in `inventory/default.yaml`. By default, it is configured for local execution and exposes both `workstation` and `node` groups so the scenario-specific playbooks under `playbooks/` can be used directly.
+Runtime configuration is saved under `~/.envmgr/`. By default, `uv run setup` creates:
 
-**Default Configuration (Local):**
+- `~/.envmgr/config.toml`
+- `~/.envmgr/inventory/default.yaml`
+- `~/.envmgr/inventory/remote.yaml`
+- `~/.envmgr/inventory/password.yaml`
+- `~/.envmgr/log/`
+- `~/.envmgr/cache/`
+
+For `uv run` commands, envmgr now uses these runtime paths consistently:
+
+- Ansible logs are written to `~/.envmgr/log/ansible.log`
+- Galaxy roles are installed to `~/.envmgr/cache/galaxy/roles`
+- Galaxy collections are installed to `~/.envmgr/cache/galaxy/collections`
+- Temporary Ansible files use `~/.envmgr/cache/tmp`
+
+Repository-local files still keep their original purpose:
+
+- `roles/` stays the source of first-party envmgr roles in this repo
+- `playbooks/` stays the source of scenario playbooks in this repo
+- `ansible.cfg` remains repository metadata used by envmgr internals and project checks
+
+`uv run ...` is the supported command surface for envmgr. Direct `ansible-playbook` or `ansible-galaxy` usage from the repository is not a supported interface.
+
+Commands that accept `-i/--inventory` now resolve inventory aliases from `~/.envmgr/config.toml` first, then fall back to an explicit path if you pass one directly.
+
+**Default Configuration (`~/.envmgr/config.toml`):**
+
+```toml
+[default]
+inventory = "default"
+playbook = "workstation"
+ask_vault_pass = false
+
+[inventory]
+default = "inventory/default.yaml"
+remote = "inventory/remote.yaml"
+password = "inventory/password.yaml"
+```
+
+**Default Local Inventory (`~/.envmgr/inventory/default.yaml`):**
 
 ```yaml
 all:
@@ -42,16 +80,18 @@ all:
 ```
 
 > **Note:** `uv run install <tags>` now resolves the scenario playbook from the selected tags. If the tags are valid in more than one scenario, pass `--playbook playbooks/workstation.yml` or `--playbook playbooks/node.yml` explicitly.
+> `uv run install all` uses the `playbook` value from `~/.envmgr/config.toml` by default.
 
 **For Remote Hosts:**
 
 1. **SSH Key Authentication (Recommended):**
-   - Copy `inventory/remote.yaml.example` to `inventory/remote.yaml`
-   - Modify the host IPs and usernames accordingly
+   - Edit `~/.envmgr/inventory/remote.yaml`
+   - Modify the host IPs, usernames, and SSH key paths accordingly
    - Ensure SSH keys are properly configured
 
 2. **Password Authentication (If necessary):**
-   - Copy `inventory/password.yaml.example` to `inventory/password.yaml`
+   - Edit `~/.envmgr/inventory/password.yaml`
+   - Put sensitive variables in `~/.envmgr/inventory/group_vars/all/vault.yml`
    - Use `ansible-vault` to encrypt sensitive information
    - Requires `sshpass` package (already installed)
 
@@ -90,7 +130,7 @@ uv run install -l
 uv run install [tag1 tag2 ...] 
 
 # Install all roles in one scenario
-uv run install --playbook playbooks/workstation.yml all
+uv run install all
 
 # Examples:
 uv run install zsh              # Install zsh with oh-my-zsh and aliases
@@ -113,19 +153,19 @@ uv run install --playbook playbooks/workstation.yml init docker kubernetes_tools
 
 ```bash
 # Using SSH key authentication
-uv run install -i inventory/remote.yaml zsh
+uv run install -i remote zsh
 
 # Use a scenario-specific playbook on remote hosts
-uv run install -i inventory/remote.yaml --playbook playbooks/node.yml init docker kubeadm
+uv run install -i remote --playbook playbooks/node.yml init docker kubeadm
 
 # Using password authentication (with vault)
-uv run install -i inventory/password.yaml --playbook playbooks/node.yml --ask-vault-pass init docker kubeadm
+uv run install -i password --playbook playbooks/node.yml --ask-vault-pass init docker kubeadm
 
-# List tags with specific inventory
-uv run install -i inventory/remote.yaml -l
+# List tags (inventory-independent)
+uv run install -l
 
 # Install multiple components on remote hosts
-uv run install -i inventory/remote.yaml zsh docker kubernetes_tools
+uv run install -i remote zsh docker kubernetes_tools
 ```
 
 **Test connection:**
@@ -135,10 +175,10 @@ uv run install -i inventory/remote.yaml zsh docker kubernetes_tools
 uv run ping
 
 # Test remote connection
-uv run ping -i inventory/remote.yaml
+uv run ping -i remote
 
 # Test with password authentication
-uv run ping -i inventory/password.yaml
+uv run ping -i password
 ```
 
 #### Available Tags
@@ -264,7 +304,7 @@ uv run smoke-test
 
 # Validate specific playbooks
 uv run validate --playbook playbooks/workstation.yml
-uv run validate --playbook playbooks/node.yml -i inventory/remote.yaml
+uv run validate --playbook playbooks/node.yml -i remote
 
 # Smoke-test a specific playbook inventory combination
 uv run smoke-test --playbook playbooks/workstation.yml

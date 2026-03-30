@@ -6,6 +6,14 @@ from collections.abc import Callable
 from pathlib import Path
 
 from .catalog import CatalogError, build_playbook_tag_index, get_available_tags
+from .runtime_config import (
+    ConfigError,
+    RuntimeConfig,
+    RuntimePaths,
+    ensure_runtime_layout,
+    load_runtime_config,
+    resolve_inventory_reference,
+)
 from .scaffold import ScaffoldError, generate_role
 
 
@@ -49,7 +57,13 @@ def run_assertion_step(step_name: str, check: Callable[[], None]) -> bool:
         check()
         print(f"✓ {step_name} passed")
         return True
-    except (AssertionError, CatalogError, FileNotFoundError, ScaffoldError) as error:
+    except (
+        AssertionError,
+        CatalogError,
+        ConfigError,
+        FileNotFoundError,
+        ScaffoldError,
+    ) as error:
         print(f"✗ {step_name} failed: {error}")
         return False
 
@@ -61,6 +75,70 @@ def load_available_tags() -> tuple[list[str], list[str]]:
     except CatalogError as error:
         print(f"{Colors.RED}Metadata error: {error}{Colors.RESET}")
         raise SystemExit(1) from error
+
+
+def resolve_inventory_option(selected_inventory: str | None) -> tuple[Path, str]:
+    """Resolve an inventory alias from ~/.envmgr/config.toml or an explicit path."""
+    try:
+        return resolve_inventory_reference(selected_inventory)
+    except ConfigError as error:
+        print(f"{Colors.RED}Configuration error: {error}{Colors.RESET}")
+        raise SystemExit(1) from error
+
+
+def load_runtime_config_option() -> RuntimeConfig:
+    """Load ~/.envmgr/config.toml and surface a user-friendly configuration error."""
+    try:
+        return load_runtime_config()
+    except ConfigError as error:
+        print(f"{Colors.RED}Configuration error: {error}{Colors.RESET}")
+        raise SystemExit(1) from error
+
+
+def resolve_default_playbook_path(config: RuntimeConfig) -> str:
+    """Resolve the configured default playbook name into a repository playbook path."""
+    configured_playbook = Path(config.default_playbook)
+    if configured_playbook.suffix in {".yml", ".yaml"}:
+        return str(configured_playbook)
+    return str(Path("playbooks") / f"{config.default_playbook}.yml")
+
+
+def merge_path_entries(entries: list[str]) -> str:
+    """Merge search-path entries while preserving order and removing duplicates."""
+    unique_entries: list[str] = []
+    seen_entries: set[str] = set()
+    for entry in entries:
+        if not entry or entry in seen_entries:
+            continue
+        seen_entries.add(entry)
+        unique_entries.append(entry)
+    return os.pathsep.join(unique_entries)
+
+
+def build_ansible_runtime_env(paths: RuntimePaths) -> dict[str, str]:
+    """Build a consistent Ansible runtime environment rooted in ~/.envmgr."""
+    env = os.environ.copy()
+    legacy_roles_dir = str(Path(".ansible/roles").resolve())
+    legacy_collections_dir = str(Path(".ansible/collections").resolve())
+    env["ANSIBLE_FORCE_COLOR"] = "true"
+    env["ANSIBLE_LOG_PATH"] = str(paths.ansible_log_file)
+    env["ANSIBLE_ROLES_PATH"] = merge_path_entries(
+        [
+            str(Path("roles").resolve()),
+            str(paths.galaxy_roles_dir),
+            legacy_roles_dir,
+            env.get("ANSIBLE_ROLES_PATH", ""),
+        ]
+    )
+    env["ANSIBLE_COLLECTIONS_PATH"] = merge_path_entries(
+        [
+            str(paths.galaxy_collections_dir),
+            legacy_collections_dir,
+            env.get("ANSIBLE_COLLECTIONS_PATH", ""),
+        ]
+    )
+    env["ANSIBLE_LOCAL_TEMP"] = str(paths.tmp_dir)
+    return env
 
 
 def get_existing_default_playbooks() -> list[str]:
@@ -137,8 +215,7 @@ def install() -> None:
     parser.add_argument(
         "-i",
         "--inventory",
-        default="inventory/default.yaml",
-        help="Specify inventory file (default: inventory/default.yaml)",
+        help="Specify an inventory alias from ~/.envmgr/config.toml or an explicit inventory path",
     )
 
     # Add vault password option
@@ -164,6 +241,23 @@ def install() -> None:
         return
 
     role_tags, task_tags = load_available_tags()
+    runtime_paths = ensure_runtime_layout()
+    runtime_config: RuntimeConfig | None = None
+
+    def require_runtime_config() -> RuntimeConfig:
+        nonlocal runtime_config
+        if runtime_config is None:
+            runtime_config = load_runtime_config_option()
+        return runtime_config
+
+    def load_default_ask_vault_pass() -> bool:
+        if runtime_config is not None:
+            return runtime_config.default_ask_vault_pass
+        try:
+            return load_runtime_config().default_ask_vault_pass
+        except ConfigError:
+            return False
+
     selected_tags: list[str] = list(args.tags)
     if not selected_tags:
         print(f"{Colors.RED}Warning: No tags selected for execution{Colors.RESET}")
@@ -184,7 +278,14 @@ def install() -> None:
     try:
         yaml_file_path = resolve_install_playbook(
             selected_tags,
-            explicit_playbook=args.playbook,
+            explicit_playbook=(
+                args.playbook
+                or (
+                    resolve_default_playbook_path(require_runtime_config())
+                    if selected_tags[0].lower() == "all"
+                    else None
+                )
+            ),
         )
     except CatalogError as error:
         print(f"{Colors.RED}Warning: {error}{Colors.RESET}")
@@ -196,10 +297,12 @@ def install() -> None:
         )
         return
 
+    inventory_path, inventory_label = resolve_inventory_option(args.inventory)
+
     # Display execution info
     print("\nRunning Ansible playbook with:")
     print(f"  Playbook: {yaml_file_path}")
-    print(f"  Inventory: {args.inventory}")
+    print(f"  Inventory: {inventory_label} -> {inventory_path}")
     if selected_tags[0].lower() == "all":
         print(f"{Colors.GREEN}  All tags will be executed{Colors.RESET}")
     else:
@@ -212,7 +315,7 @@ def install() -> None:
         print(f"{Colors.RESET}")
     print()
 
-    play: list[str] = ["ansible-playbook", "-i", args.inventory, yaml_file_path]
+    play: list[str] = ["ansible-playbook", "-i", str(inventory_path), yaml_file_path]
     if selected_tags[0].lower() == "all":
         command = play
     else:
@@ -220,12 +323,13 @@ def install() -> None:
         command = play + ["-t", tags_str]
 
     # Add vault password option if specified
-    if args.ask_vault_pass:
+    default_ask_vault_pass = (
+        load_default_ask_vault_pass() if not args.ask_vault_pass else False
+    )
+    if args.ask_vault_pass or default_ask_vault_pass:
         command.append("--ask-vault-pass")
 
-    # Set ANSIBLE_FORCE_COLOR to force color output
-    env = os.environ.copy()
-    env["ANSIBLE_FORCE_COLOR"] = "true"
+    env = build_ansible_runtime_env(runtime_paths)
 
     # Use Popen for real-time output
     process = subprocess.Popen(
@@ -282,19 +386,17 @@ def ping() -> None:
     parser.add_argument(
         "-i",
         "--inventory",
-        default="inventory/default.yaml",
-        help="Specify inventory file (default: inventory/default.yaml)",
+        help="Specify an inventory alias from ~/.envmgr/config.toml or an explicit inventory path",
     )
 
     args = parser.parse_args()
 
-    command: list[str] = ["ansible", "-i", args.inventory, "-m", "ping", "all"]
+    inventory_path, inventory_label = resolve_inventory_option(args.inventory)
+    command: list[str] = ["ansible", "-i", str(inventory_path), "-m", "ping", "all"]
 
-    # Set ANSIBLE_FORCE_COLOR to force color output
-    env = os.environ.copy()
-    env["ANSIBLE_FORCE_COLOR"] = "true"
+    env = build_ansible_runtime_env(ensure_runtime_layout())
 
-    print(f"Testing connection with inventory: {args.inventory}")
+    print(f"Testing connection with inventory: {inventory_label} -> {inventory_path}")
 
     try:
         subprocess.run(command, env=env, check=True)
@@ -322,8 +424,23 @@ def setup() -> None:
         print("✗ Error: uv command not found. Please ensure uv is installed.")
         return
 
-    # Step 2: Initialize logs directory
-    print("2. Initializing logs directory...")
+    # Step 2: Initialize the user-level envmgr runtime directory
+    print("2. Initializing ~/.envmgr...")
+    try:
+        runtime_paths = ensure_runtime_layout()
+        print(f"✓ Runtime config initialized at {runtime_paths.config_file}")
+        print(f"  - Ansible log: {runtime_paths.ansible_log_file}")
+        print(f"  - Galaxy roles cache: {runtime_paths.galaxy_roles_dir}")
+        print(f"  - Galaxy collections cache: {runtime_paths.galaxy_collections_dir}")
+    except ConfigError as error:
+        print(f"✗ Failed to initialize ~/.envmgr: {error}")
+        return
+    except OSError as error:
+        print(f"✗ Failed to initialize ~/.envmgr: {error}")
+        return
+
+    # Step 3: Initialize repository logs directory
+    print("3. Initializing logs directory...")
     try:
         os.makedirs("log", exist_ok=True)
         print("✓ Logs directory initialized")
@@ -331,8 +448,9 @@ def setup() -> None:
         print(f"✗ Failed to create logs directory: {e}")
         return
 
-    # Step 3: Install ansible roles and collections
-    print("3. Installing ansible roles and collections...")
+    # Step 4: Install ansible roles and collections
+    print("4. Installing ansible roles and collections...")
+    env = build_ansible_runtime_env(runtime_paths)
     try:
         subprocess.run(
             [
@@ -340,15 +458,25 @@ def setup() -> None:
                 "role",
                 "install",
                 "-p",
-                "./.ansible/roles",
+                str(runtime_paths.galaxy_roles_dir),
                 "-r",
                 "requirements.yaml",
             ],
             check=True,
+            env=env,
         )
         subprocess.run(
-            ["ansible-galaxy", "collection", "install", "-r", "requirements.yaml"],
+            [
+                "ansible-galaxy",
+                "collection",
+                "install",
+                "-p",
+                str(runtime_paths.galaxy_collections_dir),
+                "-r",
+                "requirements.yaml",
+            ],
             check=True,
+            env=env,
         )
         print("✓ Ansible roles and collections installed successfully")
     except subprocess.CalledProcessError as e:
@@ -446,8 +574,7 @@ def validate() -> None:
     parser.add_argument(
         "-i",
         "--inventory",
-        default="inventory/default.yaml",
-        help="Specify inventory file for playbook syntax checks",
+        help="Specify an inventory alias from ~/.envmgr/config.toml or an explicit inventory path",
     )
     parser.add_argument(
         "--playbook",
@@ -462,9 +589,9 @@ def validate() -> None:
         for playbook in ["playbooks/workstation.yml", "playbooks/node.yml"]
         if Path(playbook).exists()
     ]
+    inventory_path, _inventory_label = resolve_inventory_option(args.inventory)
 
-    env = os.environ.copy()
-    env["ANSIBLE_FORCE_COLOR"] = "true"
+    env = build_ansible_runtime_env(ensure_runtime_layout())
 
     print("Running project validation...")
 
@@ -486,7 +613,13 @@ def validate() -> None:
         results.append(
             run_command_step(
                 f"syntax-check {playbook}",
-                ["ansible-playbook", "-i", args.inventory, playbook, "--syntax-check"],
+                [
+                    "ansible-playbook",
+                    "-i",
+                    str(inventory_path),
+                    playbook,
+                    "--syntax-check",
+                ],
                 env=env,
             )
         )
@@ -564,14 +697,77 @@ def smoke_test() -> None:
 
         raise AssertionError("expected docker to require an explicit playbook")
 
+    def check_runtime_config_bootstrap() -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            envmgr_home = Path(temp_dir) / ".envmgr"
+            config = load_runtime_config(envmgr_home)
+
+            if config.default_inventory != "default":
+                raise AssertionError("expected default inventory alias to be 'default'")
+
+            if config.default_playbook != "workstation":
+                raise AssertionError("expected default playbook to be 'workstation'")
+
+            default_inventory_path = config.inventories.get("default")
+            if default_inventory_path is None or not default_inventory_path.exists():
+                raise AssertionError("expected bootstrap default inventory to exist")
+
+            if not config.paths.config_file.exists():
+                raise AssertionError("expected bootstrap config.toml to exist")
+
+    def check_inventory_path_fallback_with_invalid_config() -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            envmgr_home = temp_path / ".envmgr"
+            runtime_paths = ensure_runtime_layout(envmgr_home)
+            runtime_paths.config_file.write_text(
+                '[default]\ninventory = "default"\ninvalid = [\n',
+                encoding="utf-8",
+            )
+
+            worktree = temp_path / "worktree"
+            explicit_inventory = worktree / "inventory" / "default.yaml"
+            explicit_inventory.parent.mkdir(parents=True, exist_ok=True)
+            explicit_inventory.write_text("all:\n  hosts: {}\n", encoding="utf-8")
+
+            resolved_path, resolved_label = resolve_inventory_reference(
+                "inventory/default.yaml",
+                envmgr_home=envmgr_home,
+                cwd=worktree,
+            )
+
+            if resolved_path != explicit_inventory.resolve():
+                raise AssertionError("expected explicit inventory path fallback to win")
+            if resolved_label != str(explicit_inventory.resolve()):
+                raise AssertionError("expected explicit inventory label to be the path")
+
+    def check_invalid_toml_surfaces_config_error() -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            envmgr_home = Path(temp_dir) / ".envmgr"
+            runtime_paths = ensure_runtime_layout(envmgr_home)
+            runtime_paths.config_file.write_text(
+                '[default]\ninventory = "default"\ninvalid = [\n',
+                encoding="utf-8",
+            )
+
+            try:
+                load_runtime_config(envmgr_home)
+            except ConfigError as error:
+                if "contains invalid TOML" not in str(error):
+                    raise AssertionError(
+                        "expected invalid TOML errors to be wrapped in ConfigError"
+                    ) from error
+                return
+
+            raise AssertionError("expected invalid TOML to raise ConfigError")
+
     parser = argparse.ArgumentParser(
         description="Run lightweight smoke tests for metadata, scaffolds, and playbooks"
     )
     parser.add_argument(
         "-i",
         "--inventory",
-        default="inventory/default.yaml",
-        help="Specify inventory file for playbook smoke checks",
+        help="Specify an inventory alias from ~/.envmgr/config.toml or an explicit inventory path",
     )
     parser.add_argument(
         "--playbook",
@@ -586,9 +782,9 @@ def smoke_test() -> None:
         for playbook in ["playbooks/workstation.yml", "playbooks/node.yml"]
         if Path(playbook).exists()
     ]
+    inventory_path, _inventory_label = resolve_inventory_option(args.inventory)
 
-    env = os.environ.copy()
-    env["ANSIBLE_FORCE_COLOR"] = "true"
+    env = build_ansible_runtime_env(ensure_runtime_layout())
 
     print("Running smoke tests...")
 
@@ -596,6 +792,15 @@ def smoke_test() -> None:
         run_assertion_step("metadata catalog", check_metadata_catalog),
         run_assertion_step("role scaffold", check_scaffold_generation),
         run_assertion_step("playbook resolution", check_playbook_resolution),
+        run_assertion_step("runtime config bootstrap", check_runtime_config_bootstrap),
+        run_assertion_step(
+            "inventory path fallback with invalid config",
+            check_inventory_path_fallback_with_invalid_config,
+        ),
+        run_assertion_step(
+            "invalid TOML surfaces config error",
+            check_invalid_toml_surfaces_config_error,
+        ),
     ]
 
     if not playbooks:
@@ -609,7 +814,13 @@ def smoke_test() -> None:
         results.append(
             run_command_step(
                 f"list-tags {playbook}",
-                ["ansible-playbook", "-i", args.inventory, playbook, "--list-tags"],
+                [
+                    "ansible-playbook",
+                    "-i",
+                    str(inventory_path),
+                    playbook,
+                    "--list-tags",
+                ],
                 env=env,
             )
         )
