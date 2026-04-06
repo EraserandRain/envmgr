@@ -25,15 +25,15 @@ uv run install kubeadm          # Node scenario
 uv run install kubernetes_tools # Requires --playbook when target is ambiguous
 
 # Install all roles in a specific scenario
-uv run install --playbook playbooks/workstation.yml all
+uv run install all
 
 # Remote installation
-uv run install -i inventory/remote.yaml [tags]
-uv run install -i inventory/password.yaml --ask-vault-pass [tags]
+uv run install -i remote [tags]
+uv run install -i password --ask-vault-pass [tags]
 
 # Test connections
 uv run ping
-uv run ping -i inventory/remote.yaml
+uv run ping -i remote
 ```
 
 ### Development Commands
@@ -53,9 +53,9 @@ uv run create [role_name]
 
 ### Core Structure
 - **`scripts/main.py`**: Main CLI implementation with all command handlers
+- **`scripts/runtime_config.py`**: Runtime configuration and `~/.envmgr` path management
 - **`playbooks/`**: Scenario playbooks defining workstation and node role order
 - **`roles/`**: Ansible roles for different tools and configurations
-- **`inventory/`**: Host configuration files (local and remote)
 - **`vars/global.yml`**: Global variables shared across roles
 
 ### Python CLI Architecture
@@ -70,12 +70,13 @@ The project uses a unified CLI approach in `scripts/main.py` with separate funct
 - **Tag System**: Two-level tagging (role-level and task-level tags)
   - Role tags: Complete functional modules (zsh, docker, kubernetes_tools)
   - Task tags: Specific configuration tasks (github_cli, git, sync_time)
-- **Inventory Management**: Supports local, remote SSH key, and password authentication
+- **Inventory Management**: Uses aliases from `~/.envmgr/config.toml` for local, remote SSH key, and password authentication
 - **Role Structure**: Standard Ansible role layout with tasks, handlers, vars, and templates
 
 ### Key Configuration Files
 - **`pyproject.toml`**: Python project configuration, dependencies, and tool settings
 - **`ansible.cfg`**: Ansible configuration with optimized settings
+- **`~/.envmgr/config.toml`**: Runtime defaults for inventories, playbook, and vault prompts
 - **`requirements.yaml`**: External Ansible Galaxy roles
 
 ### Role Organization
@@ -99,6 +100,6 @@ Roles are organized by technology:
 Tags are automatically discovered from role metadata in `roles/*/meta/envmgr.yml`.
 
 ### Inventory Configuration
-- Local execution: `inventory/default.yaml` (default)
-- Remote SSH: `inventory/remote.yaml` (copy from example)
-- Password auth: `inventory/password.yaml` with ansible-vault encryption
+- Local execution: `default` -> `~/.envmgr/inventory/default.yaml`
+- Remote SSH: `remote` -> `~/.envmgr/inventory/remote.yaml`
+- Password auth: `password` -> `~/.envmgr/inventory/password.yaml`

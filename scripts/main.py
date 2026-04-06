@@ -78,7 +78,7 @@ def load_available_tags() -> tuple[list[str], list[str]]:
 
 
 def resolve_inventory_option(selected_inventory: str | None) -> tuple[Path, str]:
-    """Resolve an inventory alias from ~/.envmgr/config.toml or an explicit path."""
+    """Resolve an inventory alias from ~/.envmgr/config.toml."""
     try:
         return resolve_inventory_reference(selected_inventory)
     except ConfigError as error:
@@ -118,23 +118,17 @@ def merge_path_entries(entries: list[str]) -> str:
 def build_ansible_runtime_env(paths: RuntimePaths) -> dict[str, str]:
     """Build a consistent Ansible runtime environment rooted in ~/.envmgr."""
     env = os.environ.copy()
-    legacy_roles_dir = str(Path(".ansible/roles").resolve())
-    legacy_collections_dir = str(Path(".ansible/collections").resolve())
     env["ANSIBLE_FORCE_COLOR"] = "true"
     env["ANSIBLE_LOG_PATH"] = str(paths.ansible_log_file)
     env["ANSIBLE_ROLES_PATH"] = merge_path_entries(
         [
             str(Path("roles").resolve()),
             str(paths.galaxy_roles_dir),
-            legacy_roles_dir,
-            env.get("ANSIBLE_ROLES_PATH", ""),
         ]
     )
     env["ANSIBLE_COLLECTIONS_PATH"] = merge_path_entries(
         [
             str(paths.galaxy_collections_dir),
-            legacy_collections_dir,
-            env.get("ANSIBLE_COLLECTIONS_PATH", ""),
         ]
     )
     env["ANSIBLE_LOCAL_TEMP"] = str(paths.tmp_dir)
@@ -215,7 +209,7 @@ def install() -> None:
     parser.add_argument(
         "-i",
         "--inventory",
-        help="Specify an inventory alias from ~/.envmgr/config.toml or an explicit inventory path",
+        help="Specify an inventory alias from ~/.envmgr/config.toml",
     )
 
     # Add vault password option
@@ -386,7 +380,7 @@ def ping() -> None:
     parser.add_argument(
         "-i",
         "--inventory",
-        help="Specify an inventory alias from ~/.envmgr/config.toml or an explicit inventory path",
+        help="Specify an inventory alias from ~/.envmgr/config.toml",
     )
 
     args = parser.parse_args()
@@ -408,7 +402,7 @@ def ping() -> None:
 
 def setup() -> None:
     """
-    Setup the envmgr project by syncing dependencies, initializing logs, and installing ansible roles.
+    Setup the envmgr project by syncing dependencies, initializing ~/.envmgr, and installing ansible content.
     """
     print("Setting up envmgr...")
 
@@ -439,17 +433,8 @@ def setup() -> None:
         print(f"✗ Failed to initialize ~/.envmgr: {error}")
         return
 
-    # Step 3: Initialize repository logs directory
-    print("3. Initializing logs directory...")
-    try:
-        os.makedirs("log", exist_ok=True)
-        print("✓ Logs directory initialized")
-    except Exception as e:
-        print(f"✗ Failed to create logs directory: {e}")
-        return
-
-    # Step 4: Install ansible roles and collections
-    print("4. Installing ansible roles and collections...")
+    # Step 3: Install ansible roles and collections
+    print("3. Installing ansible roles and collections...")
     env = build_ansible_runtime_env(runtime_paths)
     try:
         subprocess.run(
@@ -574,7 +559,7 @@ def validate() -> None:
     parser.add_argument(
         "-i",
         "--inventory",
-        help="Specify an inventory alias from ~/.envmgr/config.toml or an explicit inventory path",
+        help="Specify an inventory alias from ~/.envmgr/config.toml",
     )
     parser.add_argument(
         "--playbook",
@@ -715,31 +700,90 @@ def smoke_test() -> None:
             if not config.paths.config_file.exists():
                 raise AssertionError("expected bootstrap config.toml to exist")
 
-    def check_inventory_path_fallback_with_invalid_config() -> None:
+    def check_unknown_inventory_alias_is_rejected() -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
-            temp_path = Path(temp_dir)
-            envmgr_home = temp_path / ".envmgr"
+            envmgr_home = Path(temp_dir) / ".envmgr"
+            ensure_runtime_layout(envmgr_home)
+
+            try:
+                resolve_inventory_reference(
+                    "inventory/default.yaml",
+                    envmgr_home=envmgr_home,
+                )
+            except ConfigError as error:
+                message = str(error)
+                if (
+                    "inventory alias 'inventory/default.yaml' is not defined"
+                    not in message
+                ):
+                    raise AssertionError(
+                        "expected unknown inventory inputs to be rejected as aliases"
+                    ) from error
+                return
+
+            raise AssertionError(
+                "expected unknown inventory aliases to raise ConfigError"
+            )
+
+    def check_runtime_env_uses_runtime_paths_only() -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            runtime_paths = ensure_runtime_layout(Path(temp_dir) / ".envmgr")
+            original_roles_path = os.environ.get("ANSIBLE_ROLES_PATH")
+            original_collections_path = os.environ.get("ANSIBLE_COLLECTIONS_PATH")
+            os.environ["ANSIBLE_ROLES_PATH"] = str(
+                Path(temp_dir) / "legacy-roles" / ".ansible" / "roles"
+            )
+            os.environ["ANSIBLE_COLLECTIONS_PATH"] = str(
+                Path(temp_dir) / "legacy-collections" / ".ansible" / "collections"
+            )
+            try:
+                env = build_ansible_runtime_env(runtime_paths)
+            finally:
+                if original_roles_path is not None:
+                    os.environ["ANSIBLE_ROLES_PATH"] = original_roles_path
+                else:
+                    os.environ.pop("ANSIBLE_ROLES_PATH", None)
+                if original_collections_path is not None:
+                    os.environ["ANSIBLE_COLLECTIONS_PATH"] = original_collections_path
+                else:
+                    os.environ.pop("ANSIBLE_COLLECTIONS_PATH", None)
+
+            if ".ansible/roles" in env["ANSIBLE_ROLES_PATH"]:
+                raise AssertionError(
+                    "expected runtime roles path to exclude .ansible/roles"
+                )
+            if ".ansible/collections" in env["ANSIBLE_COLLECTIONS_PATH"]:
+                raise AssertionError(
+                    "expected runtime collections path to exclude .ansible/collections"
+                )
+            if env["ANSIBLE_LOG_PATH"] != str(runtime_paths.ansible_log_file):
+                raise AssertionError("expected ansible log path to point to ~/.envmgr")
+
+    def check_inventory_aliases_stay_under_runtime_inventory_dir() -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            envmgr_home = Path(temp_dir) / ".envmgr"
             runtime_paths = ensure_runtime_layout(envmgr_home)
             runtime_paths.config_file.write_text(
-                '[default]\ninventory = "default"\ninvalid = [\n',
+                """
+[default]
+inventory = "default"
+
+[inventory]
+default = "../outside/default.yaml"
+""".lstrip(),
                 encoding="utf-8",
             )
 
-            worktree = temp_path / "worktree"
-            explicit_inventory = worktree / "inventory" / "default.yaml"
-            explicit_inventory.parent.mkdir(parents=True, exist_ok=True)
-            explicit_inventory.write_text("all:\n  hosts: {}\n", encoding="utf-8")
+            try:
+                load_runtime_config(envmgr_home)
+            except ConfigError as error:
+                if "must stay under" not in str(error):
+                    raise AssertionError(
+                        "expected inventory aliases outside ~/.envmgr/inventory to fail"
+                    ) from error
+                return
 
-            resolved_path, resolved_label = resolve_inventory_reference(
-                "inventory/default.yaml",
-                envmgr_home=envmgr_home,
-                cwd=worktree,
-            )
-
-            if resolved_path != explicit_inventory.resolve():
-                raise AssertionError("expected explicit inventory path fallback to win")
-            if resolved_label != str(explicit_inventory.resolve()):
-                raise AssertionError("expected explicit inventory label to be the path")
+            raise AssertionError("expected out-of-tree inventory aliases to fail")
 
     def check_invalid_toml_surfaces_config_error() -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -761,13 +805,35 @@ def smoke_test() -> None:
 
             raise AssertionError("expected invalid TOML to raise ConfigError")
 
+    def check_missing_runtime_inventory_file_is_recreated() -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            envmgr_home = Path(temp_dir) / ".envmgr"
+            runtime_paths = ensure_runtime_layout(envmgr_home)
+            runtime_paths.default_inventory_file.unlink()
+
+            resolved_path, resolved_label = resolve_inventory_reference(
+                None, envmgr_home=envmgr_home
+            )
+            if resolved_label != "default":
+                raise AssertionError(
+                    "expected recreated runtime inventory to keep alias"
+                )
+            if resolved_path != runtime_paths.default_inventory_file.resolve():
+                raise AssertionError(
+                    "expected recreated runtime inventory path to match ~/.envmgr"
+                )
+            if not runtime_paths.default_inventory_file.exists():
+                raise AssertionError(
+                    "expected missing runtime inventory file to be recreated"
+                )
+
     parser = argparse.ArgumentParser(
         description="Run lightweight smoke tests for metadata, scaffolds, and playbooks"
     )
     parser.add_argument(
         "-i",
         "--inventory",
-        help="Specify an inventory alias from ~/.envmgr/config.toml or an explicit inventory path",
+        help="Specify an inventory alias from ~/.envmgr/config.toml",
     )
     parser.add_argument(
         "--playbook",
@@ -794,12 +860,24 @@ def smoke_test() -> None:
         run_assertion_step("playbook resolution", check_playbook_resolution),
         run_assertion_step("runtime config bootstrap", check_runtime_config_bootstrap),
         run_assertion_step(
-            "inventory path fallback with invalid config",
-            check_inventory_path_fallback_with_invalid_config,
+            "unknown inventory aliases are rejected",
+            check_unknown_inventory_alias_is_rejected,
+        ),
+        run_assertion_step(
+            "runtime env uses ~/.envmgr paths only",
+            check_runtime_env_uses_runtime_paths_only,
+        ),
+        run_assertion_step(
+            "inventory aliases stay under ~/.envmgr/inventory",
+            check_inventory_aliases_stay_under_runtime_inventory_dir,
         ),
         run_assertion_step(
             "invalid TOML surfaces config error",
             check_invalid_toml_surfaces_config_error,
+        ),
+        run_assertion_step(
+            "missing runtime inventory file is recreated",
+            check_missing_runtime_inventory_file_is_recreated,
         ),
     ]
 

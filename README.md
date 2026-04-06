@@ -44,7 +44,8 @@ Repository-local files still keep their original purpose:
 
 `uv run ...` is the supported command surface for envmgr. Direct `ansible-playbook` or `ansible-galaxy` usage from the repository is not a supported interface.
 
-Commands that accept `-i/--inventory` now resolve inventory aliases from `~/.envmgr/config.toml` first, then fall back to an explicit path if you pass one directly.
+Commands that accept `-i/--inventory` only accept inventory aliases defined in `~/.envmgr/config.toml`. envmgr no longer falls back to repository-local inventory files or `./.ansible` caches.
+Inventory alias targets must stay under `~/.envmgr/inventory/`.
 
 **Default Configuration (`~/.envmgr/config.toml`):**
 

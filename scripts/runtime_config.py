@@ -82,7 +82,7 @@ all:
               ansible_python_interpreter: /usr/bin/python3
 """
 PASSWORD_INVENTORY_TEXT = """# Password authentication configuration example (requires sshpass)
-# It is recommended to keep the real passwords in inventory/group_vars/all/vault.yml
+# It is recommended to keep the real passwords in ~/.envmgr/inventory/group_vars/all/vault.yml
 # and encrypt that file with ansible-vault.
 
 all:
@@ -258,16 +258,20 @@ def _resolve_config_path(raw_path: str, root: Path) -> Path:
     return (root / path).resolve()
 
 
-def _resolve_explicit_inventory_path(
-    reference: str,
+def _require_runtime_inventory_path(
+    inventory_path: Path,
     *,
-    cwd: str | Path | None = None,
+    alias_name: str,
+    paths: RuntimePaths,
 ) -> Path:
-    base_dir = Path(cwd).resolve() if cwd is not None else Path.cwd()
-    inventory_path = Path(reference).expanduser()
-    if not inventory_path.is_absolute():
-        return (base_dir / inventory_path).resolve()
-    return inventory_path.resolve()
+    try:
+        inventory_path.relative_to(paths.inventory_dir)
+    except ValueError as error:
+        raise ConfigError(
+            f"{paths.config_file} inventory alias '{alias_name}' must stay under "
+            f"{paths.inventory_dir}: {inventory_path}"
+        ) from error
+    return inventory_path
 
 
 def load_runtime_config(envmgr_home: str | Path | None = None) -> RuntimeConfig:
@@ -318,9 +322,13 @@ def load_runtime_config(envmgr_home: str | Path | None = None) -> RuntimeConfig:
             raise ConfigError(
                 f"{paths.config_file} contains an invalid inventory alias"
             )
-        inventories[name] = _resolve_config_path(
-            _read_string(raw_path, f"inventory.{name}", paths.config_file),
-            paths.home,
+        inventories[name] = _require_runtime_inventory_path(
+            _resolve_config_path(
+                _read_string(raw_path, f"inventory.{name}", paths.config_file),
+                paths.home,
+            ),
+            alias_name=name,
+            paths=paths,
         )
 
     if default_inventory not in inventories:
@@ -341,33 +349,22 @@ def resolve_inventory_reference(
     reference: str | None,
     *,
     envmgr_home: str | Path | None = None,
-    cwd: str | Path | None = None,
 ) -> tuple[Path, str]:
-    if reference is None:
-        config = load_runtime_config(envmgr_home)
-        selected = config.default_inventory
-        inventory_path = config.inventories[selected]
-        inventory_label = selected
-    else:
-        selected = reference
-        try:
-            config = load_runtime_config(envmgr_home)
-        except ConfigError as error:
-            inventory_path = _resolve_explicit_inventory_path(selected, cwd=cwd)
-            if inventory_path.exists():
-                return inventory_path, str(inventory_path)
-            raise ConfigError(
-                f"{error}; explicit inventory path was not found: {inventory_path}"
-            ) from error
+    config = load_runtime_config(envmgr_home)
+    selected = config.default_inventory if reference is None else reference
 
-        if selected in config.inventories:
-            inventory_path = config.inventories[selected]
-            inventory_label = selected
-        else:
-            inventory_path = _resolve_explicit_inventory_path(selected, cwd=cwd)
-            inventory_label = str(inventory_path)
+    if selected not in config.inventories:
+        available_aliases = ", ".join(sorted(config.inventories))
+        raise ConfigError(
+            f"{config.paths.config_file} inventory alias '{selected}' is not defined under [inventory]; "
+            f"available aliases: {available_aliases}"
+        )
+
+    inventory_path = config.inventories[selected]
 
     if not inventory_path.exists():
-        raise ConfigError(f"inventory not found: {inventory_path}")
+        raise ConfigError(
+            f"{config.paths.config_file} inventory alias '{selected}' points to a missing file: {inventory_path}"
+        )
 
-    return inventory_path, inventory_label
+    return inventory_path, selected

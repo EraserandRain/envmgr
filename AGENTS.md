@@ -6,15 +6,14 @@ This guide helps contributors work effectively on envmgr (Ansible-driven environ
 
 - `playbooks/` — scenario playbooks (`workstation.yml`, `node.yml`).
 - `roles/` — one folder per tool (`tasks/main.yml`, `vars/`, etc.).
-- `inventory/` — inventories (`default.yaml` for local, `*.example` for remote/password).
 - `scripts/` — Python CLI entrypoints used by `uv`.
-- `vars/` — shared variables; `ansible.cfg` — Ansible defaults; `log/` — runtime logs.
+- `vars/` — shared variables; `ansible.cfg` — repository Ansible defaults; runtime state lives under `~/.envmgr/`.
 
 ## Build, Test, and Development Commands
 
-- `uv run setup` — sync deps, init logs, install Galaxy roles.
-- `uv run install -l` — list tags; `uv run install <tag ...>` — apply tags; add `--playbook <path>` when tags are ambiguous, plus `-i <inventory>` or `--ask-vault-pass` as needed.
-- `uv run ping [-i inventory/remote.yaml]` — connectivity check.
+- `uv run setup` — sync deps, initialize `~/.envmgr/`, install Galaxy roles.
+- `uv run install -l` — list tags; `uv run install <tag ...>` — apply tags; add `--playbook <path>` when tags are ambiguous, plus `-i <alias>` or `--ask-vault-pass` as needed.
+- `uv run ping [-i remote]` — connectivity check.
 - `uv run lint` — Ruff lint + format check for `scripts/`.
 - `uv run ansible-check` — `ansible-lint` on `roles/`.
 - `uv run typecheck` — mypy type checks.
@@ -29,7 +28,7 @@ This guide helps contributors work effectively on envmgr (Ansible-driven environ
 ## Testing Guidelines
 
 - Run `uv run validate` and `uv run smoke-test` before PRs.
-- Validate changes with a dry run against a scenario playbook, for example: `ansible-playbook -i inventory/default.yaml playbooks/workstation.yml -C -t <tags>`.
+- Use `uv run validate --playbook <path>` and `uv run smoke-test --playbook <path>` for scenario-level checks against the runtime inventory managed under `~/.envmgr/`.
 - Ensure tasks are idempotent (second run reports no changes) and scoping via tags works as expected.
 
 ## Commit & Pull Request Guidelines
@@ -40,5 +39,5 @@ This guide helps contributors work effectively on envmgr (Ansible-driven environ
 
 ## Security & Configuration Tips
 
-- Do not commit secrets. Use `inventory/password.yaml.example` + `ansible-vault` for sensitive data.
+- Do not commit secrets. Use `~/.envmgr/inventory/group_vars/all/vault.yml` + `ansible-vault` for sensitive data.
 - Default playbooks run as the current user; only set `become: true` where necessary.
