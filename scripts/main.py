@@ -1,4 +1,5 @@
 import argparse
+import io
 import json
 import os
 import subprocess
@@ -21,11 +22,15 @@ from .catalog import (
     load_role_catalog,
 )
 from .runtime_config import (
+    SETUP_SCHEMA_VERSION,
     ConfigError,
     RuntimeConfig,
     RuntimePaths,
     ensure_runtime_layout,
+    get_runtime_paths,
+    is_runtime_setup_complete,
     load_runtime_config,
+    mark_runtime_setup_complete,
     resolve_inventory_reference,
 )
 from .scaffold import ScaffoldError, generate_role
@@ -121,6 +126,24 @@ def load_runtime_config_option() -> RuntimeConfig:
     except ConfigError as error:
         print(f"{Colors.RED}Configuration error: {error}{Colors.RESET}")
         raise SystemExit(1) from error
+
+
+def require_setup_completed(
+    command_name: str,
+    *,
+    envmgr_home: str | Path | None = None,
+) -> None:
+    """Exit with setup guidance when the runtime has not been bootstrapped yet."""
+    runtime_paths = get_runtime_paths(envmgr_home)
+    if is_runtime_setup_complete(runtime_paths):
+        return
+
+    print(
+        f"{Colors.RED}Setup required: '{command_name}' needs a bootstrapped envmgr "
+        f"runtime at {runtime_paths.home}. Please run `uv run setup` first."
+        f"{Colors.RESET}"
+    )
+    raise SystemExit(1)
 
 
 def resolve_default_playbook_path(config: RuntimeConfig) -> str:
@@ -781,6 +804,8 @@ def install() -> None:
         parser.print_help()
         return
 
+    require_setup_completed("install")
+
     role_tags, task_tags = load_available_tags()
     runtime_paths = ensure_runtime_layout()
     runtime_config: RuntimeConfig | None = None
@@ -1016,6 +1041,8 @@ def ping() -> None:
 
     args = parser.parse_args()
 
+    require_setup_completed("ping")
+
     inventory_path, inventory_label = resolve_inventory_option(args.inventory)
     command: list[str] = ["ansible", "-i", str(inventory_path), "-m", "ping", "all"]
 
@@ -1094,6 +1121,7 @@ def setup() -> None:
             check=True,
             env=env,
         )
+        mark_runtime_setup_complete(runtime_paths)
         print("✓ Ansible roles and collections installed successfully")
     except subprocess.CalledProcessError as e:
         print(f"✗ Failed to install ansible roles or collections: {e}")
@@ -1199,6 +1227,8 @@ def validate() -> None:
     )
 
     args = parser.parse_args()
+
+    require_setup_completed("validate")
 
     playbooks = args.playbook or [
         playbook
@@ -1411,6 +1441,74 @@ def smoke_test() -> None:
             if not config.paths.config_file.exists():
                 raise AssertionError("expected bootstrap config.toml to exist")
 
+    def check_setup_marker_is_written_after_setup() -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            runtime_paths = ensure_runtime_layout(Path(temp_dir) / ".envmgr")
+
+            if is_runtime_setup_complete(runtime_paths):
+                raise AssertionError(
+                    "expected setup marker to be absent before setup completes"
+                )
+
+            (runtime_paths.galaxy_roles_dir / "gantsign.oh-my-zsh").mkdir()
+            (runtime_paths.galaxy_collections_dir / "community").mkdir()
+            mark_runtime_setup_complete(runtime_paths)
+
+            if not is_runtime_setup_complete(runtime_paths):
+                raise AssertionError(
+                    "expected setup marker to mark the runtime as bootstrapped"
+                )
+            marker_contents = runtime_paths.setup_marker_file.read_text(
+                encoding="utf-8"
+            )
+            if f"schema_version = {SETUP_SCHEMA_VERSION}" not in marker_contents:
+                raise AssertionError(
+                    "expected setup marker to persist the setup schema version"
+                )
+            if 'completed_at = "' not in marker_contents:
+                raise AssertionError(
+                    "expected setup marker to persist the completion timestamp"
+                )
+
+    def check_unbootstrapped_runtime_surfaces_setup_guidance() -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            envmgr_home = Path(temp_dir) / ".envmgr"
+            ensure_runtime_layout(envmgr_home)
+            captured_output = io.StringIO()
+
+            with patch("sys.stdout", new=captured_output):
+                try:
+                    require_setup_completed("ping", envmgr_home=envmgr_home)
+                except SystemExit as error:
+                    if error.code != 1:
+                        raise AssertionError(
+                            "expected unbootstrapped runtime to exit with code 1"
+                        ) from error
+                else:
+                    raise AssertionError(
+                        "expected unbootstrapped runtime to require uv run setup"
+                    )
+
+            if "`uv run setup`" not in captured_output.getvalue():
+                raise AssertionError(
+                    "expected setup guidance to mention `uv run setup`"
+                )
+
+    def check_outdated_setup_stamp_requires_setup() -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            runtime_paths = ensure_runtime_layout(Path(temp_dir) / ".envmgr")
+            (runtime_paths.galaxy_roles_dir / "gantsign.oh-my-zsh").mkdir()
+            (runtime_paths.galaxy_collections_dir / "community").mkdir()
+            runtime_paths.setup_marker_file.write_text(
+                'schema_version = 0\ncompleted_at = "2026-04-15T00:00:00Z"\n',
+                encoding="utf-8",
+            )
+
+            if is_runtime_setup_complete(runtime_paths):
+                raise AssertionError(
+                    "expected outdated setup schema versions to require re-running setup"
+                )
+
     def check_ai_tools_install_option_resolution() -> None:
         options = resolve_ai_tools_install_options(
             ["ai_tools"],
@@ -1621,6 +1719,8 @@ default = "../outside/default.yaml"
 
     args = parser.parse_args()
 
+    require_setup_completed("smoke-test")
+
     playbooks = args.playbook or [
         playbook
         for playbook in ["playbooks/workstation.yml", "playbooks/node.yml"]
@@ -1641,6 +1741,18 @@ default = "../outside/default.yaml"
             check_execution_playbook_generation,
         ),
         run_assertion_step("runtime config bootstrap", check_runtime_config_bootstrap),
+        run_assertion_step(
+            "setup marker is written after setup",
+            check_setup_marker_is_written_after_setup,
+        ),
+        run_assertion_step(
+            "unbootstrapped runtime surfaces setup guidance",
+            check_unbootstrapped_runtime_surfaces_setup_guidance,
+        ),
+        run_assertion_step(
+            "outdated setup stamp requires setup",
+            check_outdated_setup_stamp_requires_setup,
+        ),
         run_assertion_step(
             "AI tools install options resolve correctly",
             check_ai_tools_install_option_resolution,

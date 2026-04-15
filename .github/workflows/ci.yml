@@ -7,6 +7,8 @@ on:
 jobs:
   validate:
     runs-on: ubuntu-latest
+    env:
+      ENVMGR_HOME: ${{ runner.temp }}/.envmgr
 
     steps:
       - name: Check out repository
@@ -22,8 +24,13 @@ jobs:
           curl -LsSf https://astral.sh/uv/install.sh | sh
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
-      - name: Set up project dependencies
+      - name: Bootstrap envmgr runtime
         run: uv run setup
+
+      - name: Verify first-run command surface
+        run: |
+          uv run ping
+          uv run install -l
 
       - name: Run validation suite
         run: uv run validate
