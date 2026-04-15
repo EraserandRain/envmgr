@@ -26,6 +26,19 @@
         context7_installed: false
     ai_tools_errors: []
 
+- name: Resolve requested AI tool base installation list
+  set_fact:
+    ai_tools_requested_basic_tools: >-
+      {{
+        ([] if not (ai_tools_manage_claude_code | default(false)) else [
+          {'name': 'Claude Code', 'binary': 'claude', 'package': '@anthropic-ai/claude-code'}
+        ])
+        +
+        ([] if not (ai_tools_manage_codex | default(false)) else [
+          {'name': 'Codex CLI', 'binary': 'codex', 'package': '@openai/codex'}
+        ])
+      }}
+
 - block:
     - name: Manage base installation for AI tools
       include_tasks:
@@ -34,19 +47,29 @@
         tool_name: "{{ item.name }}"
         binary_name: "{{ item.binary }}"
         package_name: "{{ item.package }}"
-      loop:
-        - { name: "Claude Code", binary: "claude", package: "@anthropic-ai/claude-code" }
-        - { name: "Codex CLI", binary: "codex", package: "@openai/codex" }
+      loop: "{{ ai_tools_requested_basic_tools }}"
       loop_control:
         label: "{{ item.name }}"
 
     - name: Display combined version information
       debug:
-        msg:
-          - "=== AI Tools Version Summary ==="
-          - "Claude Code - Current: {{ claude_current_version }}, Latest: {{ claude_latest_version }}"
-          - "Codex CLI - Current: {{ codex_current_version }}, Latest: {{ codex_latest_version }}"
-          - "================================"
+        msg: "{{ ai_tools_version_summary_lines }}"
+      vars:
+        ai_tools_version_summary_lines: >-
+          {{
+            ['=== AI Tools Version Summary ===']
+            + (
+              ['Claude Code - Current: ' ~ claude_current_version ~ ', Latest: ' ~ claude_latest_version]
+              if (ai_tools_manage_claude_code | default(false))
+              else []
+            )
+            + (
+              ['Codex CLI - Current: ' ~ codex_current_version ~ ', Latest: ' ~ codex_latest_version]
+              if (ai_tools_manage_codex | default(false))
+              else []
+            )
+            + ['================================']
+          }}
 
   rescue:
     - name: Handle AI tools installation failures
@@ -62,19 +85,46 @@
     summary_key: "{{ item.summary_key }}"
     extra_status_key: "{{ item.extra_key }}"
     extra_status_default: "{{ item.extra_default }}"
-  loop:
-    - { display_name: "Claude Code", binary: "{{ ai_tools_config.claude_code.binary }}", summary_key: "claude_code", extra_key: "mcp_installed", extra_default: false }
-    - { display_name: "Codex CLI", binary: "{{ ai_tools_config.codex.binary }}", summary_key: "codex", extra_key: "context7_installed", extra_default: false }
+  loop: >-
+    {{
+      ([] if not (ai_tools_manage_claude_code | default(false)) else [
+        {'display_name': 'Claude Code', 'binary': ai_tools_config.claude_code.binary, 'summary_key': 'claude_code', 'extra_key': 'mcp_installed', 'extra_default': false}
+      ])
+      +
+      ([] if not (ai_tools_manage_codex | default(false)) else [
+        {'display_name': 'Codex CLI', 'binary': ai_tools_config.codex.binary, 'summary_key': 'codex', 'extra_key': 'context7_installed', 'extra_default': false}
+      ])
+    }}
   loop_control:
     label: "{{ item.display_name }}"
 
 - name: Display installation summary
   debug:
-    msg:
-      - "=== Installed AI Tools ==="
-      - "{% if ai_tools_summary.claude_code.installed %}✓ Claude Code: {{ ai_tools_summary.claude_code.version }}{% else %}✗ Claude Code: not installed{% endif %}"
-      - "{% if ai_tools_summary.codex.installed %}✓ Codex CLI: {{ ai_tools_summary.codex.version }}{% else %}✗ Codex CLI: not installed{% endif %}"
-      - "==========================="
+    msg: "{{ ai_tools_installation_summary_lines }}"
+  vars:
+    ai_tools_installation_summary_lines: >-
+      {{
+        ['=== Installed AI Tools ===']
+        + (
+          [
+            (
+              '✓ Claude Code: ' ~ ai_tools_summary.claude_code.version
+            ) if ai_tools_summary.claude_code.installed else '✗ Claude Code: not installed'
+          ]
+          if (ai_tools_manage_claude_code | default(false))
+          else []
+        )
+        + (
+          [
+            (
+              '✓ Codex CLI: ' ~ ai_tools_summary.codex.version
+            ) if ai_tools_summary.codex.installed else '✗ Codex CLI: not installed'
+          ]
+          if (ai_tools_manage_codex | default(false))
+          else []
+        )
+        + ['===========================']
+      }}
 
 - name: Warn if no tools were installed
   debug:
@@ -85,27 +135,49 @@
       - "  • Check your internet connection"
       - "  • Verify volta is properly configured"
       - "  • Run the installation again"
-  when: not (ai_tools_summary.claude_code.installed or ai_tools_summary.codex.installed)
+  when: not ((ai_tools_manage_claude_code | default(false) and ai_tools_summary.claude_code.installed) or (ai_tools_manage_codex | default(false) and ai_tools_summary.codex.installed))
 
 - name: Ensure at least one tool is installed
   assert:
     that:
-      - ai_tools_summary.claude_code.installed or ai_tools_summary.codex.installed
-    fail_msg: "No AI tools were installed or detected."
+      - (ai_tools_manage_claude_code | default(false) and ai_tools_summary.claude_code.installed) or (ai_tools_manage_codex | default(false) and ai_tools_summary.codex.installed)
+    fail_msg: "No requested AI tools were installed or detected."
 
 - name: Provide usage instructions
   debug:
-    msg:
-      - "AI Tools Installation Complete!"
-      - ""
-      - "Installed tools:"
-      - "{% if ai_tools_summary.claude_code.installed %}  • Claude Code ({{ ai_tools_summary.claude_code.version }}){% endif %}"
-      - "{% if ai_tools_summary.codex.installed %}  • Codex CLI ({{ ai_tools_summary.codex.version }}){% endif %}"
-      - ""
-      - "Next steps:"
-      - "{% if ai_tools_summary.claude_code.installed %}  • Run 'claude' to start Claude Code CLI{% endif %}"
-      - "{% if ai_tools_summary.codex.installed %}  • Run 'codex' to start Codex CLI{% endif %}"
-      - "  • Authentication and configuration may be required"
-      - ""
-      - "Both tools are now available in your PATH via volta."
-  when: ai_tools_summary.claude_code.installed or ai_tools_summary.codex.installed
+    msg: "{{ ai_tools_usage_lines }}"
+  vars:
+    ai_tools_usage_lines: >-
+      {{
+        ['AI Tools Installation Complete!', '', 'Installed tools:']
+        + (
+          ['  • Claude Code (' ~ ai_tools_summary.claude_code.version ~ ')']
+          if (ai_tools_manage_claude_code | default(false) and ai_tools_summary.claude_code.installed)
+          else []
+        )
+        + (
+          ['  • Codex CLI (' ~ ai_tools_summary.codex.version ~ ')']
+          if (ai_tools_manage_codex | default(false) and ai_tools_summary.codex.installed)
+          else []
+        )
+        + [
+          '',
+          'Next steps:',
+        ]
+        + (
+          ["  • Run 'claude' to start Claude Code CLI"]
+          if (ai_tools_manage_claude_code | default(false) and ai_tools_summary.claude_code.installed)
+          else []
+        )
+        + (
+          ["  • Run 'codex' to start Codex CLI"]
+          if (ai_tools_manage_codex | default(false) and ai_tools_summary.codex.installed)
+          else []
+        )
+        + [
+          '  • Authentication and configuration may be required',
+          '',
+          'Requested tools are now available in your PATH via volta.',
+        ]
+      }}
+  when: (ai_tools_manage_claude_code | default(false) and ai_tools_summary.claude_code.installed) or (ai_tools_manage_codex | default(false) and ai_tools_summary.codex.installed)
