@@ -4,12 +4,23 @@
     pkg:
       - bison
 
+- name: Ensure installers cache directory exists
+  file:
+    path: "{{ installers_cache_dir }}"
+    state: directory
+    mode: "0755"
+
 - name: Download gvm-installer if not exists
   get_url:
     url: https://github.com/moovweb/gvm/raw/master/binscripts/gvm-installer
     dest: "{{ installers_cache_dir }}/gvm-installer"
     mode: "0755"
     force: false
+    timeout: 30
+  register: gvm_installer_download
+  retries: 3
+  delay: 5
+  until: gvm_installer_download is succeeded
 
 - name: Install gvm by gvm-installer
   script: "{{ installers_cache_dir }}/gvm-installer"
@@ -23,9 +34,9 @@
     block: |
       [[ -s "$HOME/.gvm/scripts/gvm" ]] && source "$HOME/.gvm/scripts/gvm"
   loop:
-    - "{{ ansible_env.HOME }}/.bashrc"
-    - "{{ ansible_env.HOME }}/.zshrc"
-    - "{{ ansible_env.HOME }}/.profile"
+    - "{{ ansible_facts['env']['HOME'] }}/.bashrc"
+    - "{{ ansible_facts['env']['HOME'] }}/.zshrc"
+    - "{{ ansible_facts['env']['HOME'] }}/.profile"
 
 - name: Install golang (Default Version is {{ golang_default_version }})
   shell: |

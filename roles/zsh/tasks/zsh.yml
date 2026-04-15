@@ -17,13 +17,13 @@
 
 - name: Add alias to zshrc
   lineinfile:
-    dest: "{{ ansible_env.HOME }}/.zshrc"
+    dest: "{{ ansible_facts['env']['HOME'] }}/.zshrc"
     line: "alias {{ item.key }}='{{ item.value }}' "
   with_dict: "{{ zsh_alias }}"
 
 - name: Customize Lines
   blockinfile:
-    path: "{{ ansible_env.HOME }}/.zshrc"
+    path: "{{ ansible_facts['env']['HOME'] }}/.zshrc"
     block: |
       # Settings java
       export JAVA_HOME="{{ java_home }}"
@@ -44,6 +44,6 @@
 
 - name: Create ~/.zprofile if not exists
   file:
-    path: "{{ ansible_env.HOME }}/.zprofile"
+    path: "{{ ansible_facts['env']['HOME'] }}/.zprofile"
     state: touch
     mode: "0664"

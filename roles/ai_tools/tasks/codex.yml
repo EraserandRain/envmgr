@@ -81,7 +81,7 @@
 
 - name: Ensure .local/bin directory exists
   file:
-    path: "{{ ansible_env.HOME }}/.local/bin"
+    path: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
     state: directory
     mode: '0755'
 
@@ -104,7 +104,7 @@
           echo "Context7 remote server: https://mcp.context7.com/mcp"
           echo "Use this URL in your MCP client configuration"
           {% endif %}
-        dest: "{{ ansible_env.HOME }}/.local/bin/context7-codex"
+        dest: "{{ ansible_facts['env']['HOME'] }}/.local/bin/context7-codex"
         mode: '0755'
       register: context7_config_result
       when:
@@ -113,7 +113,7 @@
         - ai_tools_context7_enabled | bool
 
     - name: Verify context7-codex script is executable
-      command: "{{ ansible_env.HOME }}/.local/bin/context7-codex --help"
+      command: "{{ ansible_facts['env']['HOME'] }}/.local/bin/context7-codex --help"
       register: context7_script_test
       changed_when: false
       failed_when: false
@@ -126,7 +126,7 @@
 
     - name: Clean up failed Context7 script
       file:
-        path: "{{ ansible_env.HOME }}/.local/bin/context7-codex"
+        path: "{{ ansible_facts['env']['HOME'] }}/.local/bin/context7-codex"
         state: absent
       when: context7_config_result is defined
 

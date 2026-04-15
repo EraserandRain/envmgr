@@ -75,8 +75,8 @@
     file: ai_tools.yml
     apply:
       environment:
-        VOLTA_HOME: "{{ ansible_env.HOME }}/.volta"
-        PATH: "{{ volta_root }}/bin:{{ ansible_env.PATH }}"
+        VOLTA_HOME: "{{ ansible_facts['env']['HOME'] }}/.volta"
+        PATH: "{{ volta_root }}/bin:{{ ansible_facts['env']['PATH'] }}"
   vars:
     current_tool: "ai_tools_basic"
   when: ai_tools_manage_claude_code or ai_tools_manage_codex
@@ -91,8 +91,8 @@
     file: claude_code.yml
     apply:
       environment:
-        VOLTA_HOME: "{{ ansible_env.HOME }}/.volta"
-        PATH: "{{ volta_root }}/bin:{{ ansible_env.PATH }}"
+        VOLTA_HOME: "{{ ansible_facts['env']['HOME'] }}/.volta"
+        PATH: "{{ volta_root }}/bin:{{ ansible_facts['env']['PATH'] }}"
       tags:
         - claude_code
   vars:
@@ -111,8 +111,8 @@
     file: codex.yml
     apply:
       environment:
-        VOLTA_HOME: "{{ ansible_env.HOME }}/.volta"
-        PATH: "{{ volta_root }}/bin:{{ ansible_env.PATH }}"
+        VOLTA_HOME: "{{ ansible_facts['env']['HOME'] }}/.volta"
+        PATH: "{{ volta_root }}/bin:{{ ansible_facts['env']['PATH'] }}"
       tags:
         - codex
   vars:
@@ -201,7 +201,7 @@
 
         - name: Remove failed Context7 scripts
           file:
-            path: "{{ ansible_env.HOME }}/.local/bin/context7-codex"
+            path: "{{ ansible_facts['env']['HOME'] }}/.local/bin/context7-codex"
             state: absent
           when: "'codex' in global_ai_tools_status.tools_failed"
 
