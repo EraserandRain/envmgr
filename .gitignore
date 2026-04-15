@@ -176,6 +176,5 @@ roles/test
 *.retry
 .ansible/
 
-# AI Tools local configuration (contains sensitive API keys)
-config.local.yml
+# Claude local configuration
 CLAUDE.local.md

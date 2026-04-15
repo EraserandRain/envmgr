@@ -139,8 +139,8 @@ uv run install kubeadm          # Install kubeadm on node targets
 uv run install github_cli       # Install GitHub CLI (task-level)
 uv run install golang dotnet    # Install multiple tools (space-separated)
 uv run install kubernetes_tools # Install kubectl, helm, crictl, CNI plugins
-uv run install ai_tools         # Install default AI tools (Claude Code)
-uv run install ai_tools codex   # Install default AI tools and explicitly manage Codex CLI
+uv run install ai_tools         # Launch the interactive AI Tools Setup wizard in a TTY
+uv run install ai_tools --codex # Install default AI tools and explicitly manage Codex CLI
 
 # Use an explicit scenario playbook for ambiguous tags or full-scenario runs
 uv run install --playbook playbooks/workstation.yml zsh node ai_tools
@@ -253,18 +253,24 @@ The AI tools role installs Claude Code and Codex CLI tools with optional Context
 - Node.js (will be installed via the `node` role if not present)
 - Volta package manager (will be installed via the `node` role)
 
-**Optional Configuration:**
-Create a `config.local.yml` file in the project root to customize AI tools settings:
+When you run `uv run install ai_tools` in a TTY without AI-tools flags, envmgr launches an `AI Tools Setup` wizard that:
 
-```yaml
-# config.local.yml (optional)
-ai_tools_local_config:
-  claude_code:
-    install_context7_mcp: true
-  codex:
-    install_context7_mcp: true
-  context7_api_key: "your-context7-api-key-here"  # Optional, for enhanced features
+- lets you choose Claude Code and/or Codex CLI
+- asks whether to enable Context7 integration
+- explains the Context7 connection modes before you choose one
+- shows a summary and asks for confirmation before installation starts
+- can be cancelled at any time with `Ctrl+C`
+
+You can also skip the wizard and drive the same choices with CLI flags:
+
+```bash
+uv run install ai_tools --codex
+uv run install ai_tools --no-context7
+uv run install ai_tools --codex --codex-context7-method remote
+uv run install ai_tools --claude-code --codex --claude-context7-method local
 ```
+
+If your Context7 setup needs an API key, export `CONTEXT7_API_KEY` before running `uv run install ...`.
 
 **Installation:**
 
@@ -274,6 +280,12 @@ uv run install node ai_tools
 
 # Or install everything at once
 uv run install init node ai_tools
+
+# Install Claude Code and Codex together
+uv run install ai_tools --codex
+
+# Install Codex only, without Context7
+uv run install ai_tools --no-claude-code --codex --no-context7
 ```
 
 ### Development Commands

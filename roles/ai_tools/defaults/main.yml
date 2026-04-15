@@ -1,4 +1,6 @@
 ---
-# Ensure local config mapping exists even when config.local.yml is absent
-# This allows tasks to safely access ai_tools_local_config.<...>
-ai_tools_local_config: {}
+ai_tools_manage_claude_code_override:
+ai_tools_manage_codex_override:
+ai_tools_context7_enabled: true
+ai_tools_claude_context7_method: "remote"
+ai_tools_codex_context7_method: "remote"

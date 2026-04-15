@@ -1,10 +1,4 @@
 ---
-- name: Load local configuration if exists
-  include_tasks:
-    file: load_local_config.yml
-  vars:
-    ai_tool_name: "Codex CLI"
-
 - name: Verify volta is available
   when: ai_tools_volta_version is not defined
   block:
@@ -57,7 +51,7 @@
       when:
         - codex_installed | default(false)
         - ai_tools_config.codex.mcp_context7.enabled | default(true)
-        - (ai_tools_local_config.codex.install_context7_mcp | default(ai_tools_defaults.install_context7_mcp)) | default(true)
+        - ai_tools_context7_enabled | bool
 
     - name: Verify Context7 MCP package installation
       stat:
@@ -97,13 +91,13 @@
         content: |
           #!/bin/bash
           # Context7 MCP helper for Codex CLI
-          {% set api_key = ai_tools_local_config.context7_api_key | default(ai_tools_defaults.context7_api_key) %}
+          {% set api_key = ai_tools_context7_api_key %}
           {% if api_key and api_key != "" %}
           export CONTEXT7_API_KEY="{{ api_key }}"
           {% endif %}
 
           # Run Context7 MCP server
-          {% if ai_tools_config.codex.mcp_context7.method == "local" %}
+          {% if ai_tools_codex_context7_method == "local" %}
           echo "Starting Context7 MCP server..."
           npx {{ ai_tools_config.codex.mcp_context7.package }} ${@}
           {% else %}
@@ -116,7 +110,7 @@
       when:
         - codex_installed | default(false)
         - ai_tools_config.codex.mcp_context7.enabled | default(true)
-        - (ai_tools_local_config.codex.install_context7_mcp | default(ai_tools_defaults.install_context7_mcp)) | default(true)
+        - ai_tools_context7_enabled | bool
 
     - name: Verify context7-codex script is executable
       command: "{{ ansible_env.HOME }}/.local/bin/context7-codex --help"
