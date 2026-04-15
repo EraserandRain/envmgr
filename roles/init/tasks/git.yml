@@ -1,8 +1,20 @@
 ---
-- name: Add git PPA
+- name: Install git repository prerequisites on Ubuntu
+  become: true
+  apt:
+    pkg:
+      - gnupg
+      - software-properties-common
+    state: present
+    update_cache: true
+    cache_valid_time: 86400
+  when: ansible_facts["distribution"] == "Ubuntu"
+
+- name: Add git PPA on Ubuntu
   become: true
   apt_repository:
     repo: ppa:git-core/ppa
+  when: ansible_facts["distribution"] == "Ubuntu"
 
 - name: Upgrade git
   become: true

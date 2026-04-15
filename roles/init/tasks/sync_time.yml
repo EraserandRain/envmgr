@@ -1,13 +1,40 @@
 ---
-- name: Install dependencies
+- name: Install systemd-timesyncd on Debian hosts with systemd
   become: true
   apt:
-    pkg:
-      - ntp
-      - ntpdate
+    name: systemd-timesyncd
     state: present
+    update_cache: true
+    cache_valid_time: 86400
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - ansible_facts["service_mgr"] == "systemd"
+
+- name: Install hwclock provider on Ubuntu 24.04+ and Debian 13+ hosts
+  become: true
+  apt:
+    name: util-linux-extra
+    state: present
+    update_cache: true
+    cache_valid_time: 86400
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - ansible_facts["service_mgr"] == "systemd"
+    - >
+      (
+        ansible_facts["distribution"] == "Ubuntu"
+        and ansible_facts["distribution_major_version"] | int >= 24
+      )
+      or
+      (
+        ansible_facts["distribution"] == "Debian"
+        and ansible_facts["distribution_major_version"] | int >= 13
+      )
 
 - name: Set CST timezone
   become: true
   community.general.timezone:
     name: Asia/Shanghai
+  when:
+    - ansible_facts["os_family"] == "Debian"
+    - ansible_facts["service_mgr"] == "systemd"
