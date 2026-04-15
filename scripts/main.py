@@ -3,9 +3,19 @@ import os
 import subprocess
 import tempfile
 from collections.abc import Callable
+from copy import deepcopy
 from pathlib import Path
+from typing import Any
 
-from .catalog import CatalogError, build_playbook_tag_index, get_available_tags
+import yaml
+
+from .catalog import (
+    CatalogError,
+    RoleMetadata,
+    build_playbook_tag_index,
+    get_available_tags,
+    load_role_catalog,
+)
 from .runtime_config import (
     ConfigError,
     RuntimeConfig,
@@ -138,6 +148,171 @@ def build_ansible_runtime_env(paths: RuntimePaths) -> dict[str, str]:
 def get_existing_default_playbooks() -> list[str]:
     """Return default scenario playbooks that exist in the repository."""
     return [playbook for playbook in DEFAULT_PLAYBOOKS if Path(playbook).exists()]
+
+
+def resolve_selected_role_metadata(
+    selected_tags: list[str],
+    roles_dir: str | Path = "roles",
+) -> dict[str, RoleMetadata]:
+    """Resolve selected tags into a role closure that includes declared dependencies."""
+    catalog = [
+        metadata for metadata in load_role_catalog(roles_dir) if metadata.enabled
+    ]
+    metadata_by_name = {metadata.name: metadata for metadata in catalog}
+    resolved_metadata: dict[str, RoleMetadata] = {}
+
+    def add_metadata(metadata: RoleMetadata) -> None:
+        if metadata.name in resolved_metadata:
+            return
+        resolved_metadata[metadata.name] = metadata
+        for dependency_name in metadata.depends_on:
+            dependency = metadata_by_name.get(dependency_name)
+            if dependency is None:
+                raise CatalogError(
+                    f"role '{metadata.name}' depends on unknown role '{dependency_name}'"
+                )
+            add_metadata(dependency)
+
+    for selected_tag in selected_tags:
+        matched_metadata = [
+            metadata
+            for metadata in catalog
+            if selected_tag in metadata.tags or selected_tag in metadata.task_tags
+        ]
+        if not matched_metadata:
+            raise CatalogError(
+                f"selected tag '{selected_tag}' does not map to a catalog role"
+            )
+
+        for metadata in matched_metadata:
+            add_metadata(metadata)
+
+    return resolved_metadata
+
+
+def read_playbook_role_name(role_entry: Any, playbook_path: Path) -> str:
+    """Read a role name from a playbook role entry."""
+    if isinstance(role_entry, str):
+        return role_entry
+
+    if isinstance(role_entry, dict):
+        role_name = role_entry.get("role")
+        if isinstance(role_name, str) and role_name.strip():
+            return role_name
+
+    raise CatalogError(f"{playbook_path} contains an invalid role entry")
+
+
+def read_playbook_role_tags(
+    role_entry: dict[str, Any], playbook_path: Path
+) -> list[str]:
+    """Normalize a playbook role tag list."""
+    value = role_entry.get("tags")
+    role_name = role_entry.get("role", "<unknown>")
+    if value is None:
+        return []
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, list) and all(isinstance(item, str) for item in value):
+        return value
+    raise CatalogError(
+        f"{playbook_path} role '{role_name}' field 'tags' must be a string or list of strings"
+    )
+
+
+def build_execution_playbook(
+    source_playbook: str,
+    selected_tags: list[str],
+    roles_dir: str | Path = "roles",
+) -> str:
+    """Build a minimal temporary playbook for the selected tags."""
+    playbook_path = Path(source_playbook)
+    if not playbook_path.exists():
+        raise CatalogError(f"playbook not found: {playbook_path}")
+
+    selected_metadata = resolve_selected_role_metadata(selected_tags, roles_dir)
+    selected_tag_set = set(selected_tags)
+    required_playbook_roles: dict[str, str] = {}
+    roles_requiring_selected_tags: set[str] = set()
+
+    for metadata in selected_metadata.values():
+        for playbook_role in metadata.playbook_roles:
+            required_playbook_roles[playbook_role] = metadata.name
+        if set(metadata.tags).isdisjoint(selected_tag_set):
+            roles_requiring_selected_tags.add(metadata.name)
+
+    with playbook_path.open(encoding="utf-8") as file:
+        playbook_data = yaml.safe_load(file)
+
+    if not isinstance(playbook_data, list):
+        raise CatalogError(f"{playbook_path} must contain a YAML list of plays")
+
+    generated_playbook: list[dict[str, Any]] = []
+    selected_tag_list = list(dict.fromkeys(selected_tags))
+
+    for play in playbook_data:
+        if not isinstance(play, dict):
+            raise CatalogError(f"{playbook_path} contains an invalid play definition")
+
+        roles = play.get("roles", [])
+        if roles is None:
+            filtered_roles: list[Any] = []
+        else:
+            if not isinstance(roles, list):
+                raise CatalogError(f"{playbook_path} field 'roles' must be a list")
+
+            filtered_roles = []
+            for role_entry in roles:
+                role_name = read_playbook_role_name(role_entry, playbook_path)
+                metadata_name = required_playbook_roles.get(role_name)
+                if metadata_name is None:
+                    continue
+
+                if isinstance(role_entry, dict):
+                    filtered_role_entry: Any = deepcopy(role_entry)
+                else:
+                    filtered_role_entry = role_entry
+
+                if metadata_name in roles_requiring_selected_tags:
+                    if isinstance(filtered_role_entry, str):
+                        filtered_role_entry = {
+                            "role": filtered_role_entry,
+                            "tags": selected_tag_list,
+                        }
+                    else:
+                        existing_tags = read_playbook_role_tags(
+                            filtered_role_entry, playbook_path
+                        )
+                        merged_tags = list(
+                            dict.fromkeys(existing_tags + selected_tag_list)
+                        )
+                        filtered_role_entry["tags"] = merged_tags
+
+                filtered_roles.append(filtered_role_entry)
+
+        filtered_play = deepcopy(play)
+        filtered_play["roles"] = filtered_roles
+        generated_playbook.append(filtered_play)
+
+    if not any(play.get("roles") for play in generated_playbook):
+        raise CatalogError("selected tags did not resolve to any playbook roles")
+
+    temp_file = tempfile.NamedTemporaryFile(
+        mode="w",
+        encoding="utf-8",
+        suffix=".yml",
+        prefix=f".envmgr-{playbook_path.stem}-",
+        dir=playbook_path.parent,
+        delete=False,
+    )
+    try:
+        with temp_file:
+            yaml.safe_dump(generated_playbook, temp_file, sort_keys=False)
+    except Exception:
+        Path(temp_file.name).unlink(missing_ok=True)
+        raise
+
+    return temp_file.name
 
 
 def resolve_install_playbook(
@@ -292,10 +467,22 @@ def install() -> None:
         return
 
     inventory_path, inventory_label = resolve_inventory_option(args.inventory)
+    execution_playbook_path = yaml_file_path
+    if selected_tags[0].lower() != "all":
+        try:
+            execution_playbook_path = build_execution_playbook(
+                yaml_file_path,
+                selected_tags,
+            )
+        except CatalogError as error:
+            print(f"{Colors.RED}Warning: {error}{Colors.RESET}")
+            return
 
     # Display execution info
     print("\nRunning Ansible playbook with:")
     print(f"  Playbook: {yaml_file_path}")
+    if execution_playbook_path != yaml_file_path:
+        print(f"  Execution playbook: {execution_playbook_path}")
     print(f"  Inventory: {inventory_label} -> {inventory_path}")
     if selected_tags[0].lower() == "all":
         print(f"{Colors.GREEN}  All tags will be executed{Colors.RESET}")
@@ -309,7 +496,12 @@ def install() -> None:
         print(f"{Colors.RESET}")
     print()
 
-    play: list[str] = ["ansible-playbook", "-i", str(inventory_path), yaml_file_path]
+    play: list[str] = [
+        "ansible-playbook",
+        "-i",
+        str(inventory_path),
+        execution_playbook_path,
+    ]
     if selected_tags[0].lower() == "all":
         command = play
     else:
@@ -326,12 +518,16 @@ def install() -> None:
     env = build_ansible_runtime_env(runtime_paths)
 
     # Use Popen for real-time output
-    process = subprocess.Popen(
-        command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, env=env
-    )
-
-    # Read and print output line by line
     try:
+        process = subprocess.Popen(
+            command,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            env=env,
+        )
+
+        # Read and print output line by line
         if process.stdout is not None:
             for line in process.stdout:
                 print(line, end="")
@@ -340,6 +536,9 @@ def install() -> None:
     except KeyboardInterrupt:
         process.terminate()
         process.wait()
+    finally:
+        if execution_playbook_path != yaml_file_path:
+            Path(execution_playbook_path).unlink(missing_ok=True)
 
 
 def create() -> None:
@@ -682,6 +881,86 @@ def smoke_test() -> None:
 
         raise AssertionError("expected docker to require an explicit playbook")
 
+    def check_execution_playbook_generation() -> None:
+        generated_ai_tools_playbook = build_execution_playbook(
+            "playbooks/workstation.yml",
+            ["ai_tools"],
+        )
+        generated_codex_playbook = build_execution_playbook(
+            "playbooks/workstation.yml",
+            ["codex"],
+        )
+
+        try:
+            with Path(generated_ai_tools_playbook).open(encoding="utf-8") as file:
+                ai_tools_data = yaml.safe_load(file)
+            with Path(generated_codex_playbook).open(encoding="utf-8") as file:
+                codex_data = yaml.safe_load(file)
+
+            if not isinstance(ai_tools_data, list) or not ai_tools_data:
+                raise AssertionError(
+                    "expected generated ai_tools playbook to contain a play"
+                )
+            if not isinstance(codex_data, list) or not codex_data:
+                raise AssertionError(
+                    "expected generated codex playbook to contain a play"
+                )
+
+            ai_tools_roles = ai_tools_data[0].get("roles", [])
+            codex_roles = codex_data[0].get("roles", [])
+            if not isinstance(ai_tools_roles, list) or not isinstance(
+                codex_roles, list
+            ):
+                raise AssertionError("expected generated playbook roles to be a list")
+
+            ai_tools_role_names = [
+                read_playbook_role_name(role_entry, Path(generated_ai_tools_playbook))
+                for role_entry in ai_tools_roles
+            ]
+            codex_role_names = [
+                read_playbook_role_name(role_entry, Path(generated_codex_playbook))
+                for role_entry in codex_roles
+            ]
+
+            if ai_tools_role_names != ["node", "ai_tools"]:
+                raise AssertionError(
+                    f"expected ai_tools execution roles to be ['node', 'ai_tools'], got {ai_tools_role_names}"
+                )
+            if "gantsign.oh-my-zsh" in ai_tools_role_names:
+                raise AssertionError(
+                    "expected ai_tools execution playbook to exclude oh-my-zsh"
+                )
+
+            if codex_role_names != ["node", "ai_tools"]:
+                raise AssertionError(
+                    f"expected codex execution roles to be ['node', 'ai_tools'], got {codex_role_names}"
+                )
+
+            node_entry = ai_tools_roles[0]
+            if not isinstance(node_entry, dict):
+                raise AssertionError("expected dependency role entry to include tags")
+            if "ai_tools" not in read_playbook_role_tags(
+                node_entry,
+                Path(generated_ai_tools_playbook),
+            ):
+                raise AssertionError(
+                    "expected node dependency role to inherit the ai_tools tag"
+                )
+
+            codex_ai_tools_entry = codex_roles[1]
+            if not isinstance(codex_ai_tools_entry, dict):
+                raise AssertionError("expected codex role entry to include tags")
+            if "codex" not in read_playbook_role_tags(
+                codex_ai_tools_entry,
+                Path(generated_codex_playbook),
+            ):
+                raise AssertionError(
+                    "expected ai_tools role to inherit the codex tag for task-level runs"
+                )
+        finally:
+            Path(generated_ai_tools_playbook).unlink(missing_ok=True)
+            Path(generated_codex_playbook).unlink(missing_ok=True)
+
     def check_runtime_config_bootstrap() -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             envmgr_home = Path(temp_dir) / ".envmgr"
@@ -858,6 +1137,10 @@ default = "../outside/default.yaml"
         run_assertion_step("metadata catalog", check_metadata_catalog),
         run_assertion_step("role scaffold", check_scaffold_generation),
         run_assertion_step("playbook resolution", check_playbook_resolution),
+        run_assertion_step(
+            "execution playbook generation",
+            check_execution_playbook_generation,
+        ),
         run_assertion_step("runtime config bootstrap", check_runtime_config_bootstrap),
         run_assertion_step(
             "unknown inventory aliases are rejected",

@@ -139,7 +139,8 @@ uv run install kubeadm          # Install kubeadm on node targets
 uv run install github_cli       # Install GitHub CLI (task-level)
 uv run install golang dotnet    # Install multiple tools (space-separated)
 uv run install kubernetes_tools # Install kubectl, helm, crictl, CNI plugins
-uv run install ai_tools         # Install AI development tools (Claude Code, Codex)
+uv run install ai_tools         # Install default AI tools (Claude Code)
+uv run install ai_tools codex   # Install default AI tools and explicitly manage Codex CLI
 
 # Use an explicit scenario playbook for ambiguous tags or full-scenario runs
 uv run install --playbook playbooks/workstation.yml zsh node ai_tools
@@ -208,7 +209,7 @@ Role-level tags install complete functional modules:
 Task-level tags execute specific configuration tasks:
 
 - claude_code (configure Claude Code)
-- codex (configure Codex CLI)
+- codex (install or update Codex CLI explicitly)
 - git (configure git)
 - github_cli (install GitHub CLI)
 - hashicorp (install HashiCorp repository tooling)
@@ -222,8 +223,10 @@ Supported Setup Items:
 
 - ai_tools:
   - Claude Code (Anthropic's AI development CLI)
+  - Context7 MCP integration for Claude Code
+- codex:
   - Codex (OpenAI's coding assistant CLI)
-  - Context7 MCP integration for both tools
+  - Context7 MCP integration for Codex
 - cloud
   - terraform
 - zsh
