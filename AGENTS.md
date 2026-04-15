@@ -40,4 +40,5 @@ This guide helps contributors work effectively on envmgr (Ansible-driven environ
 ## Security & Configuration Tips
 
 - Do not commit secrets. Use `~/.envmgr/inventory/group_vars/all/vault.yml` + `ansible-vault` for sensitive data.
+- For AI tools, prefer install-time CLI choices and pass `CONTEXT7_API_KEY` via the environment when needed.
 - Default playbooks run as the current user; only set `become: true` where necessary.

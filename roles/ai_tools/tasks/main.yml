@@ -3,8 +3,32 @@
   vars:
     requested_tags: "{{ ansible_run_tags | default(['all']) }}"
   set_fact:
-    ai_tools_manage_claude_code: "{{ 'all' in requested_tags or 'ai_tools' in requested_tags or 'claude_code' in requested_tags }}"
-    ai_tools_manage_codex: "{{ 'all' in requested_tags or 'codex' in requested_tags }}"
+    ai_tools_manage_claude_code: >-
+      {{
+        (
+          ai_tools_manage_claude_code_override
+          if ai_tools_manage_claude_code_override is not none
+          else (
+            'all' in requested_tags
+            or 'ai_tools' in requested_tags
+            or 'claude_code' in requested_tags
+          )
+        ) | bool
+      }}
+    ai_tools_manage_codex: >-
+      {{
+        (
+          ai_tools_manage_codex_override
+          if ai_tools_manage_codex_override is not none
+          else ('all' in requested_tags or 'codex' in requested_tags)
+        ) | bool
+      }}
+
+- name: Ensure at least one AI tool is selected
+  assert:
+    that:
+      - ai_tools_manage_claude_code or ai_tools_manage_codex
+    fail_msg: "AI tools role was selected but both Claude Code and Codex CLI were disabled."
 
 - name: Pre-flight checks for AI tools installation
   block:
