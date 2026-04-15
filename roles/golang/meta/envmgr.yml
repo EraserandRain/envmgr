@@ -5,7 +5,8 @@ targets:
   - workstation
 tags:
   - golang
-depends_on: []
+depends_on:
+  - init
 task_tags: []
 vars_files: []
 playbook_roles:

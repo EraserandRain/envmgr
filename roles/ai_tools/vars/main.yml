@@ -1,6 +1,6 @@
 ---
 # Global vars file for ai_tools
-volta_root: "{{ ansible_env.HOME }}/.volta"
+volta_root: "{{ ansible_facts['env']['HOME'] }}/.volta"
 ai_tools_context7_api_key: "{{ lookup('env', 'CONTEXT7_API_KEY') | default('', true) }}"
 
 # AI tools configuration

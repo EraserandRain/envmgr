@@ -1384,21 +1384,34 @@ def smoke_test() -> None:
                 for role_entry in codex_roles
             ]
 
-            if ai_tools_role_names != ["node", "ai_tools"]:
+            if ai_tools_role_names != ["init", "node", "ai_tools"]:
                 raise AssertionError(
-                    f"expected ai_tools execution roles to be ['node', 'ai_tools'], got {ai_tools_role_names}"
+                    f"expected ai_tools execution roles to be ['init', 'node', 'ai_tools'], got {ai_tools_role_names}"
                 )
             if "gantsign.oh-my-zsh" in ai_tools_role_names:
                 raise AssertionError(
                     "expected ai_tools execution playbook to exclude oh-my-zsh"
                 )
 
-            if codex_role_names != ["node", "ai_tools"]:
+            if codex_role_names != ["init", "node", "ai_tools"]:
                 raise AssertionError(
-                    f"expected codex execution roles to be ['node', 'ai_tools'], got {codex_role_names}"
+                    f"expected codex execution roles to be ['init', 'node', 'ai_tools'], got {codex_role_names}"
                 )
 
-            node_entry = ai_tools_roles[0]
+            init_entry = ai_tools_roles[0]
+            if not isinstance(init_entry, dict):
+                raise AssertionError(
+                    "expected transitive dependency role entry to include tags"
+                )
+            if "ai_tools" not in read_playbook_role_tags(
+                init_entry,
+                Path(generated_ai_tools_playbook),
+            ):
+                raise AssertionError(
+                    "expected init dependency role to inherit the ai_tools tag"
+                )
+
+            node_entry = ai_tools_roles[1]
             if not isinstance(node_entry, dict):
                 raise AssertionError("expected dependency role entry to include tags")
             if "ai_tools" not in read_playbook_role_tags(
@@ -1409,7 +1422,7 @@ def smoke_test() -> None:
                     "expected node dependency role to inherit the ai_tools tag"
                 )
 
-            codex_ai_tools_entry = codex_roles[1]
+            codex_ai_tools_entry = codex_roles[2]
             if not isinstance(codex_ai_tools_entry, dict):
                 raise AssertionError("expected codex role entry to include tags")
             if "codex" not in read_playbook_role_tags(

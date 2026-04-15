@@ -1,10 +1,21 @@
 ---
+- name: Ensure installers cache directory exists
+  file:
+    path: "{{ installers_cache_dir }}"
+    state: directory
+    mode: "0755"
+
 - name: Download volta installer if not exists
   get_url:
     url: https://get.volta.sh
     dest: "{{ installers_cache_dir }}/volta-installer"
     mode: "0755"
     force: false
+    timeout: 30
+  register: volta_installer_download
+  retries: 3
+  delay: 5
+  until: volta_installer_download is succeeded
 
 - name: Install volta by volta installer
   script: "{{ installers_cache_dir }}/volta-installer"

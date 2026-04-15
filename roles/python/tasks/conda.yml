@@ -18,6 +18,6 @@
     block: |
       export PATH="{{ conda_bin }}:$PATH"
   loop:
-    - "{{ ansible_env.HOME }}/.bashrc"
-    - "{{ ansible_env.HOME }}/.zshrc"
-    - "{{ ansible_env.HOME }}/.profile"
+    - "{{ ansible_facts['env']['HOME'] }}/.bashrc"
+    - "{{ ansible_facts['env']['HOME'] }}/.zshrc"
+    - "{{ ansible_facts['env']['HOME'] }}/.profile"
