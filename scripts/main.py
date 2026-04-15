@@ -989,7 +989,9 @@ def install() -> None:
             for line in process.stdout:
                 print(line, end="")
             process.stdout.close()
-        process.wait()
+        return_code = process.wait()
+        if return_code != 0:
+            raise SystemExit(return_code)
     except KeyboardInterrupt:
         process.terminate()
         process.wait()
