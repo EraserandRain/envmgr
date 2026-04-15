@@ -45,7 +45,7 @@
       shell: |
         volta install {{ ai_tools_config.codex.mcp_context7.package }}@latest
       args:
-        executable: /bin/zsh
+        executable: /bin/bash
       register: context7_install_result
       changed_when: context7_install_result.rc == 0
       when:

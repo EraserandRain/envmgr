@@ -338,7 +338,12 @@ uv run typecheck
 uv run validate
 
 # Run the lightweight smoke test suite
+# (includes a CI-safe multi-node topology check with 1 master + 2 workers)
 uv run smoke-test
+
+# GitHub Actions also runs a containerized 1 master + 2 workers e2e that
+# drives `uv run install zsh` and `uv run install ai_tools --codex` from the
+# master node against the full workstation group.
 
 # Validate specific playbooks
 uv run validate --playbook playbooks/workstation.yml

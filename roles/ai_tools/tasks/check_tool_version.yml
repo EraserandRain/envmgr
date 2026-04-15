@@ -19,7 +19,7 @@
       echo "not_installed"
     fi
   args:
-    executable: /bin/zsh
+    executable: /bin/bash
   register: current_version_result
   changed_when: false
 
@@ -27,7 +27,7 @@
   shell: |
     npm view {{ package_name }} version 2>&1 || echo "unknown"
   args:
-    executable: /bin/zsh
+    executable: /bin/bash
   register: latest_version_result
   changed_when: false
 

@@ -1703,6 +1703,147 @@ default = "../outside/default.yaml"
                     "expected missing runtime inventory file to be recreated"
                 )
 
+    def check_multi_node_inventory_topology() -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            envmgr_home = Path(temp_dir) / ".envmgr"
+            runtime_paths = ensure_runtime_layout(envmgr_home)
+            runtime_paths.config_file.write_text(
+                """
+[default]
+inventory = "ci_cluster"
+playbook = "node"
+ask_vault_pass = false
+
+[inventory]
+default = "inventory/default.yaml"
+remote = "inventory/remote.yaml"
+password = "inventory/password.yaml"
+ci_cluster = "inventory/ci-cluster.yaml"
+""".lstrip(),
+                encoding="utf-8",
+            )
+
+            ci_inventory_path = runtime_paths.inventory_dir / "ci-cluster.yaml"
+            ci_inventory_path.write_text(
+                """
+all:
+  children:
+    node:
+      children:
+        master:
+          hosts:
+            master-ci:
+              ansible_connection: local
+              ansible_python_interpreter: "{{ ansible_playbook_python }}"
+        worker:
+          hosts:
+            worker-ci-1:
+              ansible_connection: local
+              ansible_python_interpreter: "{{ ansible_playbook_python }}"
+            worker-ci-2:
+              ansible_connection: local
+              ansible_python_interpreter: "{{ ansible_playbook_python }}"
+""".lstrip(),
+                encoding="utf-8",
+            )
+
+            inventory_path, inventory_label = resolve_inventory_reference(
+                "ci_cluster",
+                envmgr_home=envmgr_home,
+            )
+            if inventory_label != "ci_cluster":
+                raise AssertionError("expected ci_cluster inventory alias to resolve")
+
+            env = build_ansible_runtime_env(runtime_paths)
+
+            try:
+                list_hosts_result = subprocess.run(
+                    [
+                        "ansible-playbook",
+                        "-i",
+                        str(inventory_path),
+                        "playbooks/node.yml",
+                        "--list-hosts",
+                    ],
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                    env=env,
+                )
+            except subprocess.CalledProcessError as error:
+                output = (error.stdout or error.stderr or "").strip()
+                raise AssertionError(
+                    "expected node playbook to list hosts for ci_cluster inventory"
+                    + (f": {output}" if output else "")
+                ) from error
+
+            list_hosts_output = list_hosts_result.stdout
+            for host_name in ("master-ci", "worker-ci-1", "worker-ci-2"):
+                if host_name not in list_hosts_output:
+                    raise AssertionError(
+                        f"expected node playbook to target {host_name}"
+                    )
+
+            topology_playbook_path = Path(temp_dir) / "ci-cluster-topology.yml"
+            topology_playbook_path.write_text(
+                """
+- name: Verify master topology
+  hosts: master
+  gather_facts: false
+  tasks:
+    - name: Assert master inventory wiring
+      ansible.builtin.assert:
+        that:
+          - inventory_hostname == 'master-ci'
+          - groups['master'] | length == 1
+          - groups['worker'] | length == 2
+          - groups['node'] | sort | join(',') == 'master-ci,worker-ci-1,worker-ci-2'
+          - "'master' in group_names"
+          - "'worker' not in group_names"
+
+- name: Verify worker topology
+  hosts: worker
+  gather_facts: false
+  tasks:
+    - name: Assert worker inventory wiring
+      ansible.builtin.assert:
+        that:
+          - inventory_hostname in groups['worker']
+          - groups['master'][0] == 'master-ci'
+          - groups['worker'] | sort | join(',') == 'worker-ci-1,worker-ci-2'
+          - "'worker' in group_names"
+          - "'master' not in group_names"
+""".lstrip(),
+                encoding="utf-8",
+            )
+
+            try:
+                subprocess.run(
+                    [
+                        "ansible-playbook",
+                        "-i",
+                        str(inventory_path),
+                        str(topology_playbook_path),
+                    ],
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                    env=env,
+                )
+            except subprocess.CalledProcessError as error:
+                output = "\n".join(
+                    part
+                    for part in (
+                        (error.stdout or "").strip(),
+                        (error.stderr or "").strip(),
+                    )
+                    if part
+                )
+                raise AssertionError(
+                    "expected ci_cluster topology playbook to validate master and "
+                    "worker group wiring" + (f": {output}" if output else "")
+                ) from error
+
     parser = argparse.ArgumentParser(
         description="Run lightweight smoke tests for metadata, scaffolds, and playbooks"
     )
@@ -1780,6 +1921,10 @@ default = "../outside/default.yaml"
         run_assertion_step(
             "missing runtime inventory file is recreated",
             check_missing_runtime_inventory_file_is_recreated,
+        ),
+        run_assertion_step(
+            "multi-node inventory topology",
+            check_multi_node_inventory_topology,
         ),
     ]
 

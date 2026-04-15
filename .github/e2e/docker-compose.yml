@@ -1,0 +1,21 @@
+services:
+  master:
+    build:
+      context: ./ssh-node
+    hostname: master
+    environment:
+      AUTHORIZED_KEYS: "${E2E_AUTHORIZED_KEYS}"
+
+  worker1:
+    build:
+      context: ./ssh-node
+    hostname: worker1
+    environment:
+      AUTHORIZED_KEYS: "${E2E_AUTHORIZED_KEYS}"
+
+  worker2:
+    build:
+      context: ./ssh-node
+    hostname: worker2
+    environment:
+      AUTHORIZED_KEYS: "${E2E_AUTHORIZED_KEYS}"
