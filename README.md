@@ -10,17 +10,32 @@ Envmgr requires Python 3.10 or later and the uv package.
 
 Please install `uv` first 【[uv installation](https://docs.astral.sh/uv/getting-started/installation/)】.
 
+### First-Time Setup
+
+`uv run setup` is the required bootstrap step on a new machine. It syncs Python
+dependencies, initializes `~/.envmgr/`, and installs the Galaxy roles and
+collections that envmgr playbooks expect.
+
 ```bash
 # Install uv
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# Setup envmgr and initialize ~/.envmgr/
-uv run setup            
+# Bootstrap envmgr on this machine
+uv run setup
+
+# Verify the bootstrap completed successfully
+uv run ping
+uv run install -l
 ```
+
+Run `uv run setup` before `uv run install`, `uv run ping`, `uv run validate`,
+or `uv run smoke-test` on a fresh machine or a fresh `ENVMGR_HOME`. The command
+is safe to re-run and does not overwrite existing runtime config files.
 
 ### Host Settings
 
-Runtime configuration is saved under `~/.envmgr/`. By default, `uv run setup` creates:
+Runtime configuration is saved under `~/.envmgr/`. By default, `uv run setup`
+creates:
 
 - `~/.envmgr/config.toml`
 - `~/.envmgr/inventory/default.yaml`
@@ -120,6 +135,9 @@ all:
 ### Setup Tools
 
 Setup specified tools using role-level or task-level tags:
+
+Run `uv run setup` first on a new machine so the runtime inventory, Galaxy
+dependencies, and cache directories already exist.
 
 **Local execution (default):**
 
@@ -289,6 +307,10 @@ uv run install ai_tools --no-claude-code --codex --no-context7
 ```
 
 ### Development Commands
+
+Run `uv run setup` before `uv run validate` or `uv run smoke-test` on a fresh
+machine. Those commands execute playbook checks that rely on the runtime
+inventory and Galaxy content installed during bootstrap.
 
 ```bash
 # Create a new role

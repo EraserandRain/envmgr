@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import sys
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -14,6 +15,7 @@ else:  # pragma: no cover - Python 3.10 fallback
 
 ENVMGR_HOME_ENV_VAR = "ENVMGR_HOME"
 DEFAULT_PLAYBOOK = "workstation"
+SETUP_SCHEMA_VERSION = 1
 DEFAULT_CONFIG_TEXT = """[default]
 inventory = "default"
 playbook = "workstation"
@@ -120,6 +122,7 @@ class ConfigError(ValueError):
 class RuntimePaths:
     home: Path
     config_file: Path
+    setup_marker_file: Path
     inventory_dir: Path
     default_inventory_file: Path
     remote_inventory_file: Path
@@ -163,6 +166,7 @@ def get_runtime_paths(envmgr_home: str | Path | None = None) -> RuntimePaths:
     return RuntimePaths(
         home=home,
         config_file=home / "config.toml",
+        setup_marker_file=home / ".setup-complete",
         inventory_dir=inventory_dir,
         default_inventory_file=inventory_dir / "default.yaml",
         remote_inventory_file=inventory_dir / "remote.yaml",
@@ -209,6 +213,63 @@ def ensure_runtime_layout(envmgr_home: str | Path | None = None) -> RuntimePaths
     _write_file_if_missing(paths.password_inventory_file, PASSWORD_INVENTORY_TEXT)
 
     return paths
+
+
+def mark_runtime_setup_complete(paths: RuntimePaths) -> None:
+    """Persist a marker showing that `uv run setup` completed successfully."""
+    completed_at = (
+        datetime.now(timezone.utc)
+        .replace(microsecond=0)
+        .isoformat()
+        .replace("+00:00", "Z")
+    )
+    paths.setup_marker_file.write_text(
+        (f'schema_version = {SETUP_SCHEMA_VERSION}\ncompleted_at = "{completed_at}"\n'),
+        encoding="utf-8",
+    )
+
+
+def _load_runtime_setup_stamp(paths: RuntimePaths) -> dict[str, Any] | None:
+    if not paths.setup_marker_file.exists():
+        return None
+
+    try:
+        with paths.setup_marker_file.open("rb") as file:
+            data = tomllib.load(file)
+    except (OSError, tomllib.TOMLDecodeError):
+        return None
+
+    schema_version = data.get("schema_version")
+    if not isinstance(schema_version, int):
+        return None
+
+    completed_at = data.get("completed_at")
+    if completed_at is not None and not isinstance(completed_at, str):
+        return None
+
+    return data
+
+
+def is_runtime_setup_complete(paths: RuntimePaths) -> bool:
+    """Return whether setup installed the runtime assets required by envmgr."""
+    setup_stamp = _load_runtime_setup_stamp(paths)
+    if setup_stamp is None:
+        return False
+
+    if setup_stamp["schema_version"] < SETUP_SCHEMA_VERSION:
+        return False
+
+    try:
+        galaxy_roles_ready = paths.galaxy_roles_dir.exists() and any(
+            paths.galaxy_roles_dir.iterdir()
+        )
+        galaxy_collections_ready = paths.galaxy_collections_dir.exists() and any(
+            paths.galaxy_collections_dir.iterdir()
+        )
+    except OSError:
+        return False
+
+    return galaxy_roles_ready and galaxy_collections_ready
 
 
 def _require_mapping(value: Any, field_name: str, config_path: Path) -> dict[str, Any]:
