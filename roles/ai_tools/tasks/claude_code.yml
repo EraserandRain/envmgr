@@ -54,7 +54,7 @@
         claude mcp add --transport http context7 {{ ai_tools_config.claude_code.mcp_context7.remote_url }}
         {% endif %}
       args:
-        executable: /bin/zsh
+        executable: /bin/bash
       register: mcp_remote_result
       changed_when: mcp_remote_result.rc == 0
       failed_when:
@@ -75,7 +75,7 @@
         claude mcp add context7 -- npx -y {{ ai_tools_config.claude_code.mcp_context7.package }}
         {% endif %}
       args:
-        executable: /bin/zsh
+        executable: /bin/bash
       register: mcp_local_result
       changed_when: mcp_local_result.rc == 0
       failed_when:

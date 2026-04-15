@@ -4,18 +4,23 @@ on:
   push:
   pull_request:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   validate:
+    name: Validate
     runs-on: ubuntu-latest
     env:
-      ENVMGR_HOME: ${{ runner.temp }}/.envmgr
+      ENVMGR_HOME: /tmp/.envmgr
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
@@ -35,5 +40,43 @@ jobs:
       - name: Run validation suite
         run: uv run validate
 
-      - name: Run smoke tests
+  smoke:
+    name: Smoke Tests
+    runs-on: ubuntu-latest
+    env:
+      ENVMGR_HOME: /tmp/.envmgr
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Bootstrap envmgr runtime
+        run: uv run setup
+
+      - name: Run smoke tests with multi-node topology checks
         run: uv run smoke-test
+
+  master_worker_e2e:
+    name: Master/Worker E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Sanity-check E2E Docker Compose
+        run: bash .github/scripts/check-e2e-compose.sh
+
+      - name: Run master-to-workers multi-node e2e
+        run: .github/scripts/run-master-worker-e2e.sh

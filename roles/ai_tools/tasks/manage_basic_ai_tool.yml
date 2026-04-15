@@ -7,7 +7,7 @@
   shell: |
     volta install {{ package_name }}@latest
   args:
-    executable: /bin/zsh
+    executable: /bin/bash
   changed_when: lookup('vars', binary_name + '_needs_update') | default(false) | bool
   when: lookup('vars', binary_name + '_needs_update') | default(false) | bool
   register: managed_ai_tool_install_result

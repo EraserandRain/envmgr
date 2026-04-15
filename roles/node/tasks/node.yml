@@ -16,12 +16,12 @@
   shell: |
     volta install node@lts
   args:
-    executable: /bin/zsh
+    executable: /bin/bash
     creates: "{{ volta_root }}/bin/node"
 
 - name: Install pnpm
   shell: |
     volta install pnpm@latest
   args:
-    executable: /bin/zsh
+    executable: /bin/bash
     creates: "{{ volta_root }}/bin/pnpm"

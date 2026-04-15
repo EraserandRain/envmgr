@@ -4,7 +4,7 @@
       shell: |
         {{ ai_tool_install_command }}
       args:
-        executable: /bin/zsh
+        executable: /bin/bash
       changed_when: lookup('vars', ai_tool_needs_update_var) | default(false) | bool
       when: lookup('vars', ai_tool_needs_update_var) | default(false) | bool
       register: ai_tool_install_result
