@@ -17,16 +17,26 @@
     executable: /bin/bash
     creates: "{{ volta_root }}"
 
+- name: Check whether Node.js is already available through Volta
+  command: node --version
+  register: node_version_check
+  changed_when: false
+  failed_when: false
+
 - name: Install node (Latest Version)
-  shell: |
-    volta install node@lts
-  args:
-    executable: /bin/bash
-    creates: "{{ volta_root }}/bin/node"
+  command: volta install node@lts
+  register: node_install_result
+  changed_when: node_install_result.rc == 0
+  when: node_version_check.rc != 0
+
+- name: Check whether pnpm is already available through Volta
+  command: pnpm --version
+  register: pnpm_version_check
+  changed_when: false
+  failed_when: false
 
 - name: Install pnpm
-  shell: |
-    volta install pnpm@latest
-  args:
-    executable: /bin/bash
-    creates: "{{ volta_root }}/bin/pnpm"
+  command: volta install pnpm@latest
+  register: pnpm_install_result
+  changed_when: pnpm_install_result.rc == 0
+  when: pnpm_version_check.rc != 0
