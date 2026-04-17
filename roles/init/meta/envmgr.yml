@@ -1,16 +1,13 @@
 name: init
-description: Base directories and host bootstrap tasks
+description: Baseline workstation bootstrap bundle
 enabled: true
 targets:
   - workstation
-  - node
 tags:
   - init
-depends_on: []
-task_tags:
-  - sync_time
-  - git
-  - github_cli
+depends_on:
+  - init_core
+task_tags: []
 vars_files: []
 playbook_roles:
   - init

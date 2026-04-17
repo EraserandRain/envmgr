@@ -19,6 +19,7 @@ from .catalog import (
     RoleMetadata,
     build_playbook_tag_index,
     get_available_tags,
+    load_playbook_tags,
     load_role_catalog,
 )
 from .runtime_config import (
@@ -662,6 +663,14 @@ def resolve_install_playbook(
 ) -> str:
     """Resolve a playbook for install operations based on explicit input or tag scope."""
     if explicit_playbook:
+        if selected_tags and selected_tags[0].lower() != "all":
+            playbook_tags = load_playbook_tags(explicit_playbook)
+            requested_tags = set(selected_tags)
+            if not requested_tags.issubset(playbook_tags):
+                raise CatalogError(
+                    f"selected tags are not valid in {explicit_playbook}; "
+                    "choose a matching playbook"
+                )
         return explicit_playbook
 
     if not selected_tags:
@@ -1288,8 +1297,12 @@ def smoke_test() -> None:
 
         if "init" not in role_tags:
             raise AssertionError("expected role tag 'init' to be present")
-        if "git" not in task_tags:
-            raise AssertionError("expected task tag 'git' to be present")
+        if "init_core" in role_tags:
+            raise AssertionError("expected init_core to stay hidden from role tags")
+        if "git" in task_tags:
+            raise AssertionError("expected git task tag to stay hidden")
+        if "codex" not in task_tags:
+            raise AssertionError("expected task tag 'codex' to be present")
 
     def check_scaffold_generation() -> None:
         required_files = [
@@ -1341,9 +1354,24 @@ def smoke_test() -> None:
         try:
             resolve_install_playbook(["docker"], explicit_playbook=None)
         except CatalogError:
+            pass
+        else:
+            raise AssertionError("expected docker to require an explicit playbook")
+
+        if (
+            resolve_install_playbook(
+                ["init"], explicit_playbook="playbooks/workstation.yml"
+            )
+            != "playbooks/workstation.yml"
+        ):
+            raise AssertionError("expected init to stay valid on workstation playbook")
+
+        try:
+            resolve_install_playbook(["init"], explicit_playbook="playbooks/node.yml")
+        except CatalogError:
             return
 
-        raise AssertionError("expected docker to require an explicit playbook")
+        raise AssertionError("expected init to be rejected on node playbook")
 
     def check_execution_playbook_generation() -> None:
         generated_ai_tools_playbook = build_execution_playbook(
@@ -1354,12 +1382,24 @@ def smoke_test() -> None:
             "playbooks/workstation.yml",
             ["codex"],
         )
+        generated_init_playbook = build_execution_playbook(
+            "playbooks/workstation.yml",
+            ["init"],
+        )
+        generated_monitoring_playbook = build_execution_playbook(
+            "playbooks/node.yml",
+            ["monitoring"],
+        )
 
         try:
             with Path(generated_ai_tools_playbook).open(encoding="utf-8") as file:
                 ai_tools_data = yaml.safe_load(file)
             with Path(generated_codex_playbook).open(encoding="utf-8") as file:
                 codex_data = yaml.safe_load(file)
+            with Path(generated_init_playbook).open(encoding="utf-8") as file:
+                init_data = yaml.safe_load(file)
+            with Path(generated_monitoring_playbook).open(encoding="utf-8") as file:
+                monitoring_data = yaml.safe_load(file)
 
             if not isinstance(ai_tools_data, list) or not ai_tools_data:
                 raise AssertionError(
@@ -1369,11 +1409,26 @@ def smoke_test() -> None:
                 raise AssertionError(
                     "expected generated codex playbook to contain a play"
                 )
+            if not isinstance(init_data, list) or not init_data:
+                raise AssertionError(
+                    "expected generated init playbook to contain a play"
+                )
+            if not isinstance(monitoring_data, list) or len(monitoring_data) != 2:
+                raise AssertionError(
+                    "expected generated monitoring playbook to preserve both node plays"
+                )
 
             ai_tools_roles = ai_tools_data[0].get("roles", [])
             codex_roles = codex_data[0].get("roles", [])
-            if not isinstance(ai_tools_roles, list) or not isinstance(
-                codex_roles, list
+            init_roles = init_data[0].get("roles", [])
+            monitoring_node_roles = monitoring_data[0].get("roles", [])
+            monitoring_master_roles = monitoring_data[1].get("roles", [])
+            if (
+                not isinstance(ai_tools_roles, list)
+                or not isinstance(codex_roles, list)
+                or not isinstance(init_roles, list)
+                or not isinstance(monitoring_node_roles, list)
+                or not isinstance(monitoring_master_roles, list)
             ):
                 raise AssertionError("expected generated playbook roles to be a list")
 
@@ -1385,32 +1440,56 @@ def smoke_test() -> None:
                 read_playbook_role_name(role_entry, Path(generated_codex_playbook))
                 for role_entry in codex_roles
             ]
+            init_role_names = [
+                read_playbook_role_name(role_entry, Path(generated_init_playbook))
+                for role_entry in init_roles
+            ]
+            monitoring_master_role_names = [
+                read_playbook_role_name(role_entry, Path(generated_monitoring_playbook))
+                for role_entry in monitoring_master_roles
+            ]
 
-            if ai_tools_role_names != ["init", "node", "ai_tools"]:
+            if ai_tools_role_names != ["init_core", "node", "ai_tools"]:
                 raise AssertionError(
-                    f"expected ai_tools execution roles to be ['init', 'node', 'ai_tools'], got {ai_tools_role_names}"
+                    "expected ai_tools execution roles to be "
+                    f"['init_core', 'node', 'ai_tools'], got {ai_tools_role_names}"
                 )
             if "gantsign.oh-my-zsh" in ai_tools_role_names:
                 raise AssertionError(
                     "expected ai_tools execution playbook to exclude oh-my-zsh"
                 )
 
-            if codex_role_names != ["init", "node", "ai_tools"]:
+            if codex_role_names != ["init_core", "node", "ai_tools"]:
                 raise AssertionError(
-                    f"expected codex execution roles to be ['init', 'node', 'ai_tools'], got {codex_role_names}"
+                    "expected codex execution roles to be "
+                    f"['init_core', 'node', 'ai_tools'], got {codex_role_names}"
+                )
+            if init_role_names != ["init_core", "init"]:
+                raise AssertionError(
+                    "expected init execution roles to be "
+                    f"['init_core', 'init'], got {init_role_names}"
+                )
+            if monitoring_node_roles:
+                raise AssertionError(
+                    "expected monitoring execution playbook to skip the all-node play"
+                )
+            if monitoring_master_role_names != ["kubernetes_tools", "monitoring"]:
+                raise AssertionError(
+                    "expected monitoring execution roles to be "
+                    f"['kubernetes_tools', 'monitoring'], got {monitoring_master_role_names}"
                 )
 
-            init_entry = ai_tools_roles[0]
-            if not isinstance(init_entry, dict):
+            init_core_entry = ai_tools_roles[0]
+            if not isinstance(init_core_entry, dict):
                 raise AssertionError(
                     "expected transitive dependency role entry to include tags"
                 )
             if "ai_tools" not in read_playbook_role_tags(
-                init_entry,
+                init_core_entry,
                 Path(generated_ai_tools_playbook),
             ):
                 raise AssertionError(
-                    "expected init dependency role to inherit the ai_tools tag"
+                    "expected init_core dependency role to inherit the ai_tools tag"
                 )
 
             node_entry = ai_tools_roles[1]
@@ -1437,6 +1516,8 @@ def smoke_test() -> None:
         finally:
             Path(generated_ai_tools_playbook).unlink(missing_ok=True)
             Path(generated_codex_playbook).unlink(missing_ok=True)
+            Path(generated_init_playbook).unlink(missing_ok=True)
+            Path(generated_monitoring_playbook).unlink(missing_ok=True)
 
     def check_runtime_config_bootstrap() -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

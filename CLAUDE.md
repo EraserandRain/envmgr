@@ -1,10 +1,11 @@
-## Project Overview
+# Project Overview
 
 Envmgr is an Ansible-based environment management tool for quick deployment and configuration of development tools and environments. The project uses Python with uv for dependency management and provides a CLI interface for managing Ansible playbooks.
 
 ## Common Commands
 
 ### Setup and Dependencies
+
 ```bash
 # Setup envmgr and install dependencies
 uv run setup
@@ -14,6 +15,7 @@ uv sync
 ```
 
 ### Installation and Configuration
+
 ```bash
 # List all available tags
 uv run install -l
@@ -37,6 +39,7 @@ uv run ping -i remote
 ```
 
 ### Development Commands
+
 ```bash
 # Code quality checks
 uv run lint          # Python linting with ruff
@@ -52,6 +55,7 @@ uv run create [role_name]
 ## Code Architecture
 
 ### Core Structure
+
 - **`scripts/main.py`**: Main CLI implementation with all command handlers
 - **`scripts/runtime_config.py`**: Runtime configuration and `~/.envmgr` path management
 - **`playbooks/`**: Scenario playbooks defining workstation and node role order
@@ -59,7 +63,9 @@ uv run create [role_name]
 - **`vars/global.yml`**: Global variables shared across roles
 
 ### Python CLI Architecture
+
 The project uses a unified CLI approach in `scripts/main.py` with separate functions for each command:
+
 - `install()`: Main installation command with tag support
 - `create()`: Role generation from templates
 - `ping()`: Connection testing
@@ -67,20 +73,24 @@ The project uses a unified CLI approach in `scripts/main.py` with separate funct
 - `lint()`, `ansible_lint()`, `typecheck()`: Code quality tools
 
 ### Ansible Architecture
+
 - **Tag System**: Two-level tagging (role-level and task-level tags)
   - Role tags: Complete functional modules (zsh, docker, kubernetes_tools)
-  - Task tags: Specific configuration tasks (github_cli, git, sync_time)
+  - Task tags: Focused sub-selections within public roles (claude_code, codex, terraform)
 - **Inventory Management**: Uses aliases from `~/.envmgr/config.toml` for local, remote SSH key, and password authentication
 - **Role Structure**: Standard Ansible role layout with tasks, handlers, vars, and templates
 
 ### Key Configuration Files
+
 - **`pyproject.toml`**: Python project configuration, dependencies, and tool settings
 - **`ansible.cfg`**: Ansible configuration with optimized settings
 - **`~/.envmgr/config.toml`**: Runtime defaults for inventories, playbook, and vault prompts
 - **`requirements.yaml`**: External Ansible Galaxy roles
 
 ### Role Organization
+
 Roles are organized by technology:
+
 - **init**: Base environment setup
 - **zsh**: Shell configuration with aliases and oh-my-zsh
 - **docker/minikube**: Container platforms
@@ -92,14 +102,17 @@ Roles are organized by technology:
 ## Development Notes
 
 ### Adding New Roles
+
 1. Use `uv run create [role_name]` to generate from template
 2. Update the appropriate playbook under `playbooks/` to include the new role with appropriate tags
 3. Configure role-specific variables in `roles/[role_name]/vars/main.yml`
 
 ### Tag Management
+
 Tags are automatically discovered from role metadata in `roles/*/meta/envmgr.yml`.
 
 ### Inventory Configuration
+
 - Local execution: `default` -> `~/.envmgr/inventory/default.yaml`
 - Remote SSH: `remote` -> `~/.envmgr/inventory/remote.yaml`
 - Password auth: `password` -> `~/.envmgr/inventory/password.yaml`

@@ -6,6 +6,7 @@
     - ../roles/zsh/vars/gantsign.oh-my-zsh.yml
     - ../roles/ruby/vars/rvm.ruby.yml
   roles:
+    - { role: init_core }
     - { role: init, tags: [init] }
     - { role: gantsign.oh-my-zsh, tags: [zsh] }
     - { role: zsh, tags: [zsh] }

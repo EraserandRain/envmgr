@@ -1,11 +1,17 @@
 ---
-- name: Install and Configure Node Tools
+- name: Install shared Kubernetes node prerequisites
   hosts: node
   vars_files:
     - ../vars/global.yml
   roles:
-    - { role: init, tags: [init] }
+    - { role: init_core }
     - { role: docker, tags: [docker] }
     - { role: kubeadm, tags: [kubeadm] }
+
+- name: Install master-only Kubernetes tooling
+  hosts: master
+  vars_files:
+    - ../vars/global.yml
+  roles:
     - { role: kubernetes_tools, tags: [kubernetes_tools] }
     - { role: monitoring, tags: [monitoring] }
