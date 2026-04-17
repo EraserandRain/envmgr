@@ -32,6 +32,7 @@ packages = ["scripts"]
 install = "scripts:install"
 create = "scripts:create"
 ping = "scripts:ping"
+doctor = "scripts:doctor"
 setup = "scripts:setup"
 lint = "scripts:lint"
 ansible-check = "scripts:ansible_lint"

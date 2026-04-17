@@ -2,9 +2,11 @@ import argparse
 import io
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
+import textwrap
 from collections.abc import Callable
 from copy import deepcopy
 from dataclasses import dataclass
@@ -29,6 +31,7 @@ from .runtime_config import (
     RuntimePaths,
     ensure_runtime_layout,
     get_runtime_paths,
+    get_runtime_setup_status,
     is_runtime_setup_complete,
     load_runtime_config,
     mark_runtime_setup_complete,
@@ -40,6 +43,7 @@ from .scaffold import ScaffoldError, generate_role
 # ANSI color codes
 class Colors:
     GREEN = "\033[32m"
+    YELLOW = "\033[33m"
     RED = "\033[31m"
     RESET = "\033[0m"
 
@@ -49,6 +53,7 @@ DEFAULT_PLAYBOOKS = [
     "playbooks/node.yml",
 ]
 AI_TOOLS_CONTEXT7_METHODS = ("remote", "local")
+DOCTOR_COMMANDS = ("uv", "ansible", "ansible-playbook", "ansible-galaxy")
 
 
 @dataclass(frozen=True)
@@ -63,6 +68,36 @@ class AiToolsInstallOptions:
 
 class WizardCancelled(RuntimeError):
     """Raised when the interactive setup wizard is cancelled by the user."""
+
+
+@dataclass(frozen=True)
+class DoctorCheck:
+    name: str
+    status: str
+    detail: str
+
+
+@dataclass(frozen=True)
+class DoctorReport:
+    paths: RuntimePaths
+    default_inventory: str | None
+    default_playbook_path: str | None
+    checks: list[DoctorCheck]
+
+
+DOCTOR_OK = "ok"
+DOCTOR_WARN = "warn"
+DOCTOR_FAIL = "fail"
+REQUIRED_RUNTIME_DIRECTORIES = (
+    "inventory_dir",
+    "group_vars_all_dir",
+    "log_dir",
+    "runs_log_dir",
+    "cache_dir",
+    "galaxy_roles_dir",
+    "galaxy_collections_dir",
+    "tmp_dir",
+)
 
 
 def run_command_step(
@@ -186,6 +221,268 @@ def build_ansible_runtime_env(paths: RuntimePaths) -> dict[str, str]:
     )
     env["ANSIBLE_LOCAL_TEMP"] = str(paths.tmp_dir)
     return env
+
+
+def build_doctor_report(envmgr_home: str | Path | None = None) -> DoctorReport:
+    """Collect a read-only health report for the envmgr runtime."""
+    paths = get_runtime_paths(envmgr_home)
+    checks: list[DoctorCheck] = []
+    default_inventory: str | None = None
+    default_playbook_path: str | None = None
+
+    def add_check(name: str, status: str, detail: str) -> None:
+        checks.append(DoctorCheck(name=name, status=status, detail=detail))
+
+    missing_commands = [
+        command_name
+        for command_name in DOCTOR_COMMANDS
+        if shutil.which(command_name) is None
+    ]
+    if missing_commands:
+        add_check(
+            "commands",
+            DOCTOR_FAIL,
+            "missing: " + ", ".join(missing_commands),
+        )
+    else:
+        add_check(
+            "commands",
+            DOCTOR_OK,
+            ", ".join(DOCTOR_COMMANDS),
+        )
+
+    if not paths.home.exists():
+        add_check(
+            "runtime home",
+            DOCTOR_FAIL,
+            f"missing: {paths.home}; run `uv run setup` first",
+        )
+
+    missing_runtime_directories = [
+        str(getattr(paths, attribute_name))
+        for attribute_name in REQUIRED_RUNTIME_DIRECTORIES
+        if not getattr(paths, attribute_name).exists()
+    ]
+    if missing_runtime_directories:
+        add_check(
+            "runtime directories",
+            DOCTOR_FAIL,
+            "missing " + ", ".join(missing_runtime_directories),
+        )
+
+    if not paths.config_file.exists():
+        add_check(
+            "runtime config",
+            DOCTOR_FAIL,
+            f"missing {paths.config_file}; run `uv run setup` first",
+        )
+    else:
+        try:
+            config = load_runtime_config(envmgr_home, ensure_layout=False)
+        except ConfigError as error:
+            add_check("runtime config", DOCTOR_FAIL, str(error))
+        else:
+            default_inventory = config.default_inventory
+            default_playbook_path = resolve_default_playbook_path(config)
+            if not Path(default_playbook_path).exists():
+                add_check(
+                    "runtime config",
+                    DOCTOR_FAIL,
+                    "inventory="
+                    f"{config.default_inventory} playbook={config.default_playbook} "
+                    f"(missing playbook: {default_playbook_path})",
+                )
+
+            default_inventory_path = config.inventories.get(config.default_inventory)
+            if default_inventory_path is None:
+                add_check(
+                    "runtime config",
+                    DOCTOR_FAIL,
+                    f"default inventory alias '{config.default_inventory}' is missing from config",
+                )
+            elif default_inventory_path.exists():
+                add_check(
+                    f"inventory alias `{config.default_inventory}`",
+                    DOCTOR_OK,
+                    str(default_inventory_path),
+                )
+            else:
+                add_check(
+                    f"inventory alias `{config.default_inventory}`",
+                    DOCTOR_FAIL,
+                    f"missing: {default_inventory_path}",
+                )
+
+    setup_is_complete, setup_detail = get_runtime_setup_status(paths)
+    add_check(
+        "setup state",
+        DOCTOR_OK if setup_is_complete else DOCTOR_FAIL,
+        setup_detail,
+    )
+
+    return DoctorReport(
+        paths=paths,
+        default_inventory=default_inventory,
+        default_playbook_path=default_playbook_path,
+        checks=checks,
+    )
+
+
+def render_doctor_status_text(status: str) -> str:
+    """Render a colored uppercase doctor status label."""
+    text = status.upper()
+    if status == DOCTOR_OK:
+        return f"{Colors.GREEN}{text}{Colors.RESET}"
+    if status == DOCTOR_WARN:
+        return f"{Colors.YELLOW}{text}{Colors.RESET}"
+    return f"{Colors.RED}{text}{Colors.RESET}"
+
+
+def summarize_doctor_report(report: DoctorReport) -> tuple[int, int, int]:
+    """Count ok, warn, and fail checks for a doctor report."""
+    ok_count = sum(1 for check in report.checks if check.status == DOCTOR_OK)
+    warn_count = sum(1 for check in report.checks if check.status == DOCTOR_WARN)
+    fail_count = sum(1 for check in report.checks if check.status == DOCTOR_FAIL)
+    return ok_count, warn_count, fail_count
+
+
+def get_doctor_overall_status(report: DoctorReport) -> str:
+    """Return the overall doctor status derived from its checks."""
+    _ok_count, warn_count, fail_count = summarize_doctor_report(report)
+    if fail_count:
+        return DOCTOR_FAIL
+    if warn_count:
+        return DOCTOR_WARN
+    return DOCTOR_OK
+
+
+def build_doctor_json_payload(
+    report: DoctorReport,
+    *,
+    configured_home: str | None,
+) -> dict[str, Any]:
+    """Serialize a doctor report into a machine-readable payload."""
+    ok_count, warn_count, fail_count = summarize_doctor_report(report)
+    resolved_configured_home = None
+    if configured_home:
+        resolved_configured_home = str(Path(configured_home).expanduser().resolve())
+
+    return {
+        "status": get_doctor_overall_status(report),
+        "summary": {
+            "ok": ok_count,
+            "warn": warn_count,
+            "fail": fail_count,
+            "total": len(report.checks),
+        },
+        "runtime": {
+            "home": str(report.paths.home),
+            "configured_home": resolved_configured_home,
+            "config_file": str(report.paths.config_file),
+        },
+        "defaults": {
+            "inventory": report.default_inventory,
+            "playbook": report.default_playbook_path,
+        },
+        "checks": [
+            {
+                "name": check.name,
+                "status": check.status,
+                "detail": check.detail,
+            }
+            for check in report.checks
+        ],
+    }
+
+
+def get_doctor_check_label(name: str) -> str:
+    """Return a compact label for a doctor check."""
+    if name.startswith("command `") and name.endswith("`"):
+        return name[len("command `") : -1]
+    if name.startswith("inventory alias `") and name.endswith("`"):
+        return "inventory " + name[len("inventory alias `") : -1]
+    if name == "runtime directories":
+        return "runtime dirs"
+    if name == "setup state":
+        return "setup"
+    return name
+
+
+def abbreviate_home_in_text(value: str) -> str:
+    """Render paths under the current user's home directory with `~`."""
+    home = str(Path.home().resolve())
+    if value == home:
+        return "~"
+    return value.replace(f"{home}/", "~/")
+
+
+def get_doctor_check_detail(check: DoctorCheck) -> str:
+    """Return a concise human-readable detail for a doctor check."""
+    return abbreviate_home_in_text(check.detail)
+
+
+def get_doctor_status_cell(status: str, width: int) -> str:
+    """Render a padded status cell for doctor tables."""
+    plain_status = status.upper().ljust(width)
+    if status == DOCTOR_OK:
+        return f"{Colors.GREEN}{plain_status}{Colors.RESET}"
+    if status == DOCTOR_WARN:
+        return f"{Colors.YELLOW}{plain_status}{Colors.RESET}"
+    return f"{Colors.RED}{plain_status}{Colors.RESET}"
+
+
+def render_doctor_checks_table(checks: list[DoctorCheck]) -> str:
+    """Render doctor checks as a compact ASCII table."""
+    status_width = len("STATUS")
+    labels = [get_doctor_check_label(check.name) for check in checks]
+    label_width = min(
+        max([len("CHECK"), *(len(label) for label in labels)], default=len("CHECK")),
+        20,
+    )
+    terminal_width = shutil.get_terminal_size(fallback=(100, 20)).columns
+    detail_width = max(24, terminal_width - status_width - label_width - 6)
+
+    lines = [
+        f"{'STATUS':<{status_width}}  {'CHECK':<{label_width}}  DETAIL",
+        f"{'-' * status_width}  {'-' * label_width}  {'-' * detail_width}",
+    ]
+
+    for check, label in zip(checks, labels, strict=True):
+        detail_lines = textwrap.wrap(get_doctor_check_detail(check), width=detail_width)
+        if not detail_lines:
+            detail_lines = [""]
+        lines.append(
+            f"{get_doctor_status_cell(check.status, status_width)}  "
+            f"{label:<{label_width}}  {detail_lines[0]}"
+        )
+        for continuation in detail_lines[1:]:
+            lines.append(f"{' ' * status_width}  {' ' * label_width}  {continuation}")
+
+    return "\n".join(lines)
+
+
+def print_doctor_overview(report: DoctorReport, configured_home: str | None) -> None:
+    """Print the high-level context for a doctor report."""
+    runtime_home_value = abbreviate_home_in_text(str(report.paths.home))
+    if configured_home:
+        runtime_home_value += " (from ENVMGR_HOME)"
+    else:
+        runtime_home_value += " (default)"
+
+    context_rows: list[tuple[str, str]] = [
+        ("Runtime home", runtime_home_value),
+    ]
+    default_parts: list[str] = []
+    if report.default_inventory is not None:
+        default_parts.append(f"inventory={report.default_inventory}")
+    if report.default_playbook_path is not None:
+        default_parts.append(f"playbook={report.default_playbook_path}")
+    if default_parts:
+        context_rows.append(("Defaults", " ".join(default_parts)))
+
+    label_width = max(len(label) for label, _value in context_rows)
+    for label, value in context_rows:
+        print(f"{label:<{label_width}}  {value}")
 
 
 def get_existing_default_playbooks() -> list[str]:
@@ -1127,6 +1424,53 @@ def ping() -> None:
         print("Error: ansible command not found. Please ensure ansible is installed.")
 
 
+def doctor() -> None:
+    """Inspect envmgr runtime health without mutating ~/.envmgr."""
+    parser = argparse.ArgumentParser(
+        description="Inspect envmgr runtime health without modifying the runtime"
+    )
+    parser.add_argument(
+        "--json",
+        action="store_true",
+        dest="json_output",
+        help="Print the doctor report as JSON",
+    )
+    args = parser.parse_args()
+
+    report = build_doctor_report()
+    configured_home = os.environ.get("ENVMGR_HOME")
+    ok_count, warn_count, fail_count = summarize_doctor_report(report)
+
+    if args.json_output:
+        print(
+            json.dumps(
+                build_doctor_json_payload(
+                    report,
+                    configured_home=configured_home,
+                ),
+                indent=2,
+            )
+        )
+        if fail_count:
+            raise SystemExit(1)
+        return
+
+    overall_status = get_doctor_overall_status(report)
+    summary = f"Summary: {ok_count} ok, {warn_count} warn, {fail_count} fail"
+    print(f"Envmgr Doctor [{render_doctor_status_text(overall_status)}]")
+    print(summary)
+    print()
+    print_doctor_overview(report, configured_home)
+    print()
+    print(render_doctor_checks_table(report.checks))
+
+    if fail_count:
+        raise SystemExit(1)
+
+    if warn_count:
+        return
+
+
 def setup() -> None:
     """
     Setup the envmgr project by syncing dependencies, initializing ~/.envmgr, and installing ansible content.
@@ -2058,6 +2402,200 @@ all:
                     "worker group wiring" + (f": {output}" if output else "")
                 ) from error
 
+    def check_doctor_report_detects_unbootstrapped_runtime() -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            envmgr_home = Path(temp_dir) / ".envmgr"
+            report = build_doctor_report(envmgr_home)
+            check_statuses = {check.name: check.status for check in report.checks}
+
+            if check_statuses.get("runtime home") != DOCTOR_FAIL:
+                raise AssertionError(
+                    "expected doctor to fail when the runtime home is missing"
+                )
+            if check_statuses.get("runtime config") != DOCTOR_FAIL:
+                raise AssertionError(
+                    "expected doctor to fail when config.toml is missing"
+                )
+            if check_statuses.get("setup state") != DOCTOR_FAIL:
+                raise AssertionError(
+                    "expected doctor to fail when setup has not completed"
+                )
+
+    def check_doctor_report_passes_bootstrapped_runtime() -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            envmgr_home = Path(temp_dir) / ".envmgr"
+            runtime_paths = ensure_runtime_layout(envmgr_home)
+            (runtime_paths.galaxy_roles_dir / "gantsign.oh-my-zsh").mkdir()
+            (runtime_paths.galaxy_collections_dir / "community").mkdir()
+            mark_runtime_setup_complete(runtime_paths)
+
+            report = build_doctor_report(envmgr_home)
+            failures = [
+                check.name for check in report.checks if check.status == DOCTOR_FAIL
+            ]
+            if failures:
+                raise AssertionError(
+                    "expected doctor to pass a bootstrapped runtime, got failures: "
+                    + ", ".join(failures)
+                )
+
+            check_statuses = {check.name: check.status for check in report.checks}
+            if "runtime config" in check_statuses:
+                raise AssertionError(
+                    "expected doctor to omit runtime config from healthy output"
+                )
+            if check_statuses.get("setup state") != DOCTOR_OK:
+                raise AssertionError("expected doctor to report setup as complete")
+            if "default playbook" in check_statuses:
+                raise AssertionError(
+                    "expected doctor to fold default playbook into runtime config"
+                )
+            if check_statuses.get("inventory alias `default`") != DOCTOR_OK:
+                raise AssertionError(
+                    "expected doctor to validate the default inventory alias"
+                )
+
+    def check_doctor_ignores_non_default_inventory_aliases() -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            envmgr_home = Path(temp_dir) / ".envmgr"
+            runtime_paths = ensure_runtime_layout(envmgr_home)
+            (runtime_paths.galaxy_roles_dir / "gantsign.oh-my-zsh").mkdir()
+            (runtime_paths.galaxy_collections_dir / "community").mkdir()
+            mark_runtime_setup_complete(runtime_paths)
+            runtime_paths.remote_inventory_file.unlink()
+            runtime_paths.password_inventory_file.unlink()
+
+            report = build_doctor_report(envmgr_home)
+            failures = [
+                check.name for check in report.checks if check.status == DOCTOR_FAIL
+            ]
+            if failures:
+                raise AssertionError(
+                    "expected doctor to ignore non-default inventory aliases, got "
+                    "failures: " + ", ".join(failures)
+                )
+
+            if any(
+                check.name == "inventory alias `remote`" for check in report.checks
+            ) or any(
+                check.name == "inventory alias `password`" for check in report.checks
+            ):
+                raise AssertionError(
+                    "expected doctor to skip non-default inventory alias checks"
+                )
+
+    def check_doctor_text_output() -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            envmgr_home = Path(temp_dir) / ".envmgr"
+            runtime_paths = ensure_runtime_layout(envmgr_home)
+            (runtime_paths.galaxy_roles_dir / "gantsign.oh-my-zsh").mkdir()
+            (runtime_paths.galaxy_collections_dir / "community").mkdir()
+            mark_runtime_setup_complete(runtime_paths)
+            captured_output = io.StringIO()
+
+            with (
+                patch("sys.argv", ["doctor"]),
+                patch("sys.stdout", new=captured_output),
+                patch.dict(os.environ, {"ENVMGR_HOME": str(envmgr_home)}, clear=False),
+            ):
+                doctor()
+
+            output = captured_output.getvalue()
+            for expected_fragment in (
+                "Envmgr Doctor",
+                "Runtime home",
+                "(from ENVMGR_HOME)",
+                "Defaults",
+                "STATUS",
+                "CHECK",
+                "DETAIL",
+                "commands",
+                "inventory default",
+                "setup",
+            ):
+                if expected_fragment not in output:
+                    raise AssertionError(
+                        f"expected doctor text output to include {expected_fragment!r}"
+                    )
+            if "runtime dirs" in output:
+                raise AssertionError(
+                    "expected doctor text output to omit runtime dirs when healthy"
+                )
+            if "Default playbook" in output:
+                raise AssertionError(
+                    "expected doctor text output to fold the default playbook into "
+                    "the defaults/runtime config lines"
+                )
+            if "runtime config" in output:
+                raise AssertionError(
+                    "expected doctor text output to omit runtime config when healthy"
+                )
+            if "ENVMGR_HOME   " in output:
+                raise AssertionError(
+                    "expected doctor text output to fold ENVMGR_HOME into runtime home"
+                )
+
+    def check_doctor_json_output() -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            envmgr_home = Path(temp_dir) / ".envmgr"
+            runtime_paths = ensure_runtime_layout(envmgr_home)
+            (runtime_paths.galaxy_roles_dir / "gantsign.oh-my-zsh").mkdir()
+            (runtime_paths.galaxy_collections_dir / "community").mkdir()
+            mark_runtime_setup_complete(runtime_paths)
+            captured_output = io.StringIO()
+
+            with (
+                patch("sys.argv", ["doctor", "--json"]),
+                patch("sys.stdout", new=captured_output),
+                patch.dict(os.environ, {"ENVMGR_HOME": str(envmgr_home)}, clear=False),
+            ):
+                doctor()
+
+            payload = json.loads(captured_output.getvalue())
+            if payload["status"] != DOCTOR_OK:
+                raise AssertionError("expected doctor --json to report ok status")
+            if payload["runtime"]["home"] != str(envmgr_home.resolve()):
+                raise AssertionError(
+                    "expected doctor --json to report the resolved runtime home"
+                )
+            if payload["runtime"]["configured_home"] != str(envmgr_home.resolve()):
+                raise AssertionError(
+                    "expected doctor --json to include ENVMGR_HOME when set"
+                )
+            if payload["summary"]["fail"] != 0:
+                raise AssertionError(
+                    "expected doctor --json to report zero failures for a "
+                    "bootstrapped runtime"
+                )
+            if payload["runtime"]["config_file"] != str(runtime_paths.config_file):
+                raise AssertionError(
+                    "expected doctor --json to expose the runtime config path"
+                )
+            if payload["defaults"]["inventory"] != "default":
+                raise AssertionError(
+                    "expected doctor --json to expose the default inventory"
+                )
+            if payload["defaults"]["playbook"] != "playbooks/workstation.yml":
+                raise AssertionError(
+                    "expected doctor --json to expose the resolved default playbook"
+                )
+            if not isinstance(payload["checks"], list) or not payload["checks"]:
+                raise AssertionError(
+                    "expected doctor --json to include per-check entries"
+                )
+            if payload["checks"][0]["name"] != "commands":
+                raise AssertionError(
+                    "expected doctor --json to summarize command checks into one row"
+                )
+            if any(check["name"] == "default playbook" for check in payload["checks"]):
+                raise AssertionError(
+                    "expected doctor --json to fold default playbook into runtime config"
+                )
+            if any(check["name"] == "runtime config" for check in payload["checks"]):
+                raise AssertionError(
+                    "expected doctor --json to omit runtime config when healthy"
+                )
+
     parser = argparse.ArgumentParser(
         description="Run lightweight smoke tests for metadata, scaffolds, and playbooks"
     )
@@ -2139,6 +2677,26 @@ all:
         run_assertion_step(
             "multi-node inventory topology",
             check_multi_node_inventory_topology,
+        ),
+        run_assertion_step(
+            "doctor detects an unbootstrapped runtime",
+            check_doctor_report_detects_unbootstrapped_runtime,
+        ),
+        run_assertion_step(
+            "doctor passes a bootstrapped runtime",
+            check_doctor_report_passes_bootstrapped_runtime,
+        ),
+        run_assertion_step(
+            "doctor ignores non-default inventory aliases",
+            check_doctor_ignores_non_default_inventory_aliases,
+        ),
+        run_assertion_step(
+            "doctor renders readable text output",
+            check_doctor_text_output,
+        ),
+        run_assertion_step(
+            "doctor emits json output",
+            check_doctor_json_output,
         ),
     ]
 

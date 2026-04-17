@@ -24,6 +24,8 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 uv run setup
 
 # Verify the bootstrap completed successfully
+uv run doctor
+uv run doctor --json
 uv run ping
 uv run install -l
 ```
@@ -31,6 +33,12 @@ uv run install -l
 Run `uv run setup` before `uv run install`, `uv run ping`, `uv run validate`,
 or `uv run smoke-test` on a fresh machine or a fresh `ENVMGR_HOME`. The command
 is safe to re-run and does not overwrite existing runtime config files.
+
+`uv run doctor` performs a read-only health check for the current runtime. It is
+safe to run before or after setup when you want to inspect what is missing
+under `~/.envmgr/`.
+Use `uv run doctor --json` when you want a machine-readable report for scripts
+or CI.
 
 ### Host Settings
 
@@ -198,6 +206,10 @@ uv run install -i remote zsh docker kubernetes_tools
 ```bash
 # Test local connection
 uv run ping
+
+# Inspect runtime health
+uv run doctor
+uv run doctor --json
 
 # Test remote connection
 uv run ping -i remote
