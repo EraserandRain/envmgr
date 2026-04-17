@@ -172,6 +172,7 @@ log/
 *tmp
 .vscode/
 roles/test
+playbooks/.envmgr-*.yml
 
 *.retry
 .ansible/

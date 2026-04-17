@@ -159,10 +159,10 @@ run_in_master "$workstation_list_hosts_command | tee /tmp/workstation-hosts.txt"
 run_in_master "grep -q 'master-ci' /tmp/workstation-hosts.txt && grep -q 'worker-ci-1' /tmp/workstation-hosts.txt && grep -q 'worker-ci-2' /tmp/workstation-hosts.txt"
 
 printf 'Installing AI tools from the master across the workstation group...\n'
-run_in_master "uv run install -i ${inventory_alias} ai_tools --no-claude-code --codex --no-context7"
+run_in_master "uv run install -i ${inventory_alias} ai_tools --codex --no-context7"
 
-printf 'Verifying Node.js and Codex CLI on every workstation node...\n'
-run_uv_ansible_in_master ansible -i "$inventory_file" workstation -m shell -a 'test -x "$HOME/.volta/bin/node" && test -x "$HOME/.volta/bin/codex" && "$HOME/.volta/bin/node" --version >/dev/null 2>&1 && "$HOME/.volta/bin/codex" --version >/dev/null 2>&1 && test ! -e "$HOME/.local/bin/context7-codex"'
+printf 'Verifying Node.js, Claude Code, and Codex CLI on every workstation node...\n'
+run_uv_ansible_in_master ansible -i "$inventory_file" workstation -m shell -a 'test -x "$HOME/.volta/bin/node" && test -x "$HOME/.volta/bin/claude" && test -x "$HOME/.volta/bin/codex" && "$HOME/.volta/bin/node" --version >/dev/null 2>&1 && "$HOME/.volta/bin/claude" --version >/dev/null 2>&1 && "$HOME/.volta/bin/codex" --version >/dev/null 2>&1 && test ! -e "$HOME/.local/bin/context7-codex"'
 
 printf 'Installing zsh from the master across the workstation group...\n'
 run_in_master "uv run install -i ${inventory_alias} zsh"
