@@ -24,6 +24,10 @@
         installed: false
         version: "not installed"
         context7_installed: false
+      rtk:
+        installed: false
+        version: "not installed"
+        init_configured: false
     ai_tools_errors: []
 
 - name: Resolve requested AI tool base installation list
@@ -136,12 +140,6 @@
       - "  • Verify volta is properly configured"
       - "  • Run the installation again"
   when: not ((ai_tools_manage_claude_code | default(false) and ai_tools_summary.claude_code.installed) or (ai_tools_manage_codex | default(false) and ai_tools_summary.codex.installed))
-
-- name: Ensure at least one tool is installed
-  assert:
-    that:
-      - (ai_tools_manage_claude_code | default(false) and ai_tools_summary.claude_code.installed) or (ai_tools_manage_codex | default(false) and ai_tools_summary.codex.installed)
-    fail_msg: "No requested AI tools were installed or detected."
 
 - name: Provide usage instructions
   debug:

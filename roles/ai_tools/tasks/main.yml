@@ -23,17 +23,29 @@
           else ('all' in requested_tags or 'codex' in requested_tags)
         ) | bool
       }}
+    ai_tools_manage_rtk: >-
+      {{
+        (
+          ai_tools_manage_rtk_override
+          if ai_tools_manage_rtk_override is not none
+          else (
+            'all' in requested_tags
+            or 'ai_tools' in requested_tags
+            or 'rtk' in requested_tags
+          )
+        ) | bool
+      }}
 
 - name: Ensure at least one AI tool is selected
   assert:
     that:
-      - ai_tools_manage_claude_code or ai_tools_manage_codex
-    fail_msg: "AI tools role was selected but both Claude Code and Codex CLI were disabled."
+      - ai_tools_manage_claude_code or ai_tools_manage_codex or ai_tools_manage_rtk
+    fail_msg: "AI tools role was selected but Claude Code, Codex CLI, and RTK were all disabled."
 
 - name: Pre-flight checks for AI tools installation
   environment:
     VOLTA_HOME: "{{ ansible_facts['env']['HOME'] }}/.volta"
-    PATH: "{{ volta_root }}/bin:{{ ansible_facts['env']['PATH'] }}"
+    PATH: "{{ ai_tools_user_bin_path }}:{{ volta_root }}/bin:{{ ansible_facts['env']['PATH'] }}"
   block:
     - name: Check if volta is installed and accessible
       command: volta --version
@@ -79,7 +91,7 @@
     apply:
       environment:
         VOLTA_HOME: "{{ ansible_facts['env']['HOME'] }}/.volta"
-        PATH: "{{ volta_root }}/bin:{{ ansible_facts['env']['PATH'] }}"
+        PATH: "{{ ai_tools_user_bin_path }}:{{ volta_root }}/bin:{{ ansible_facts['env']['PATH'] }}"
   vars:
     current_tool: "ai_tools_basic"
   when: ai_tools_manage_claude_code or ai_tools_manage_codex
@@ -95,7 +107,7 @@
     apply:
       environment:
         VOLTA_HOME: "{{ ansible_facts['env']['HOME'] }}/.volta"
-        PATH: "{{ volta_root }}/bin:{{ ansible_facts['env']['PATH'] }}"
+        PATH: "{{ ai_tools_user_bin_path }}:{{ volta_root }}/bin:{{ ansible_facts['env']['PATH'] }}"
       tags:
         - claude_code
   vars:
@@ -115,7 +127,7 @@
     apply:
       environment:
         VOLTA_HOME: "{{ ansible_facts['env']['HOME'] }}/.volta"
-        PATH: "{{ volta_root }}/bin:{{ ansible_facts['env']['PATH'] }}"
+        PATH: "{{ ai_tools_user_bin_path }}:{{ volta_root }}/bin:{{ ansible_facts['env']['PATH'] }}"
       tags:
         - codex
   vars:
@@ -129,9 +141,32 @@
     global_ai_tools_status: "{{ global_ai_tools_status | combine({'tools_attempted': global_ai_tools_status.tools_attempted + ['codex'], 'tools_successful': global_ai_tools_status.tools_successful + (['codex'] if (codex_installed | default(false)) else []), 'tools_failed': global_ai_tools_status.tools_failed + ([] if (codex_installed | default(false)) else ['codex'])}) }}"
   when: ai_tools_manage_codex
 
+- name: Install RTK
+  include_tasks:
+    file: rtk.yml
+    apply:
+      environment:
+        VOLTA_HOME: "{{ ansible_facts['env']['HOME'] }}/.volta"
+        PATH: "{{ ai_tools_user_bin_path }}:{{ volta_root }}/bin:{{ ansible_facts['env']['PATH'] }}"
+      tags:
+        - rtk
+  vars:
+    current_tool: "rtk"
+  tags:
+    - rtk
+  when: ai_tools_manage_rtk
+
+- name: Update global status after RTK configuration
+  set_fact:
+    global_ai_tools_status: "{{ global_ai_tools_status | combine({'tools_attempted': global_ai_tools_status.tools_attempted + ['rtk'], 'tools_successful': global_ai_tools_status.tools_successful + (['rtk'] if (rtk_installed | default(false)) else []), 'tools_failed': global_ai_tools_status.tools_failed + ([] if (rtk_installed | default(false)) else ['rtk'])}) }}"
+  when: ai_tools_manage_rtk
+
 - name: Final verification and rollback check
   block:
     - name: Perform final verification of requested AI tools
+      environment:
+        VOLTA_HOME: "{{ ansible_facts['env']['HOME'] }}/.volta"
+        PATH: "{{ ai_tools_user_bin_path }}:{{ volta_root }}/bin:{{ ansible_facts['env']['PATH'] }}"
       shell: |
         echo "=== Final AI Tools Verification ==="
         tools_working=0
@@ -161,6 +196,20 @@
           fi
         else
           echo "⚠ Codex CLI: not installed"
+        fi
+        tools_total=$((tools_total + 1))
+        {% endif %}
+
+        {% if ai_tools_manage_rtk | bool %}
+        if command -v rtk >/dev/null 2>&1; then
+          if rtk --version >/dev/null 2>&1; then
+            echo "✓ RTK: Working"
+            tools_working=$((tools_working + 1))
+          else
+            echo "⚠ RTK: Installed but not working"
+          fi
+        else
+          echo "⚠ RTK: not installed"
         fi
         tools_total=$((tools_total + 1))
         {% endif %}
@@ -207,6 +256,12 @@
             path: "{{ ansible_facts['env']['HOME'] }}/.local/bin/context7-codex"
             state: absent
           when: "'codex' in global_ai_tools_status.tools_failed"
+
+        - name: Remove failed RTK installation
+          file:
+            path: "{{ ai_tools_config.rtk.install_dir }}/{{ ai_tools_config.rtk.binary }}"
+            state: absent
+          when: "'rtk' in global_ai_tools_status.tools_failed"
 
         - name: Display rollback information
           debug:

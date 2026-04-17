@@ -1,6 +1,7 @@
 ---
 # Global vars file for ai_tools
 volta_root: "{{ ansible_facts['env']['HOME'] }}/.volta"
+ai_tools_user_bin_path: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
 ai_tools_context7_api_key: "{{ lookup('env', 'CONTEXT7_API_KEY') | default('', true) }}"
 
 # AI tools configuration
@@ -24,3 +25,10 @@ ai_tools_config:
     mcp_context7:
       enabled: true
       package: "@upstash/context7-mcp"
+  rtk:
+    enabled: true
+    binary: "rtk"
+    description: "RTK CLI proxy"
+    install_dir: "{{ ai_tools_user_bin_path }}"
+    install_script_url: "https://raw.githubusercontent.com/rtk-ai/rtk/master/install.sh"
+    release_api_url: "https://api.github.com/repos/rtk-ai/rtk/releases/latest"

@@ -159,6 +159,7 @@ uv run install golang dotnet    # Install multiple tools (space-separated)
 uv run install kubernetes_tools # Install kubectl, helm, crictl, CNI plugins
 uv run install ai_tools         # Launch the interactive AI Tools Setup wizard in a TTY
 uv run install ai_tools --codex # Install default AI tools and explicitly manage Codex CLI
+uv run install ai_tools --no-rtk # RTK is enabled by default; use this to skip it
 
 # Use an explicit scenario playbook for ambiguous tags or full-scenario runs
 uv run install --playbook playbooks/workstation.yml zsh node ai_tools
@@ -235,6 +236,7 @@ Task-level tags execute specific configuration tasks:
 
 - claude_code (configure Claude Code)
 - codex (install or update Codex CLI explicitly)
+- rtk (install or update RTK explicitly)
 - hashicorp (install HashiCorp repository tooling)
 - terraform (install Terraform)
 - tf (alias for Terraform tasks)
@@ -249,6 +251,10 @@ Supported Setup Items:
 - codex:
   - Codex (OpenAI's coding assistant CLI)
   - Context7 MCP integration for Codex
+- rtk:
+  - RTK CLI proxy
+  - `rtk init --global --auto-patch` for Claude Code when both tools are managed
+  - `rtk init --global --codex` for Codex CLI when both tools are managed
 - cloud
   - terraform
 - zsh
@@ -271,7 +277,7 @@ Supported Setup Items:
 
 #### AI Tools Configuration
 
-The AI tools role installs Claude Code and Codex CLI tools with optional Context7 MCP integration for enhanced functionality.
+The AI tools role installs Claude Code plus RTK by default, with optional Codex CLI support. Context7 remains available for Claude Code and Codex CLI.
 
 **Prerequisites:**
 
@@ -280,7 +286,7 @@ The AI tools role installs Claude Code and Codex CLI tools with optional Context
 
 When you run `uv run install ai_tools` in a TTY without AI-tools flags, envmgr launches an `AI Tools Setup` wizard that:
 
-- lets you choose Claude Code and/or Codex CLI
+- lets you choose Claude Code, Codex CLI, and/or RTK
 - asks whether to enable Context7 integration
 - explains the Context7 connection modes before you choose one
 - shows a summary and asks for confirmation before installation starts
@@ -290,12 +296,15 @@ You can also skip the wizard and drive the same choices with CLI flags:
 
 ```bash
 uv run install ai_tools --codex
+uv run install ai_tools --no-rtk
 uv run install ai_tools --no-context7
 uv run install ai_tools --codex --codex-context7-method remote
-uv run install ai_tools --claude-code --codex --claude-context7-method local
+uv run install ai_tools --claude-code --codex --rtk --claude-context7-method local
 ```
 
 If your Context7 setup needs an API key, export `CONTEXT7_API_KEY` before running `uv run install ...`.
+
+RTK is enabled by default for `ai_tools` installs and is placed into `~/.local/bin`. When Claude Code is also selected, envmgr runs `rtk init --global --auto-patch`. When Codex CLI is also selected, envmgr runs `rtk init --global --codex`.
 
 **Installation:**
 
@@ -306,11 +315,14 @@ uv run install node ai_tools
 # Or install everything at once
 uv run install init node ai_tools
 
-# Install Claude Code and Codex together
+# Install Claude Code, Codex, and RTK together
 uv run install ai_tools --codex
 
 # Install Codex only, without Context7
 uv run install ai_tools --no-claude-code --codex --no-context7
+
+# Install RTK only
+uv run install rtk
 ```
 
 ### Development Commands

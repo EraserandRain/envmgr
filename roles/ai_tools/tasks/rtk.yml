@@ -1,0 +1,194 @@
+---
+- name: Check current RTK version
+  shell: |
+    set -o pipefail
+    if command -v {{ ai_tools_config.rtk.binary }} >/dev/null 2>&1; then
+      {{ ai_tools_config.rtk.binary }} --version 2>&1 | head -n1
+    elif [ -x "{{ ai_tools_config.rtk.install_dir }}/{{ ai_tools_config.rtk.binary }}" ]; then
+      "{{ ai_tools_config.rtk.install_dir }}/{{ ai_tools_config.rtk.binary }}" --version 2>&1 | head -n1
+    else
+      echo "not_installed"
+    fi
+  args:
+    executable: /bin/bash
+  register: rtk_current_version_result
+  changed_when: false
+
+- name: Get latest RTK release version
+  uri:
+    url: "{{ ai_tools_config.rtk.release_api_url }}"
+    return_content: true
+    headers:
+      Accept: "application/vnd.github+json"
+  register: rtk_latest_release_result
+  changed_when: false
+
+- name: Determine if RTK needs update
+  set_fact:
+    rtk_current_version: "{{ rtk_current_version_result.stdout.strip() }}"
+    rtk_latest_version: "{{ rtk_latest_release_result.json.tag_name | default('unknown') }}"
+    rtk_needs_update: >-
+      {{
+        rtk_current_version_result.stdout.strip() == 'not_installed'
+        or (
+          (rtk_latest_release_result.json.tag_name | default('unknown')) != 'unknown'
+          and (
+            (rtk_latest_release_result.json.tag_name | default('unknown') | regex_replace('^v', ''))
+            not in rtk_current_version_result.stdout.strip()
+          )
+        )
+      }}
+
+- name: Display RTK version information
+  debug:
+    msg:
+      - "=== RTK Version Check ==="
+      - "Current version: {{ rtk_current_version }}"
+      - "Latest version: {{ rtk_latest_version }}"
+      - "Action: {{ 'Install/Update needed' if (rtk_needs_update | bool) else 'Already up-to-date, skipping' }}"
+      - "========================="
+
+- block:
+    - name: Download RTK installer if update is needed
+      get_url:
+        url: "{{ ai_tools_config.rtk.install_script_url }}"
+        dest: "{{ installers_cache_dir }}/rtk-installer"
+        mode: "0755"
+        force: true
+        timeout: 30
+      register: rtk_installer_download
+      retries: 3
+      delay: 5
+      until: rtk_installer_download is succeeded
+      when: rtk_needs_update | bool
+
+    - name: Install or update RTK
+      command: "{{ installers_cache_dir }}/rtk-installer"
+      environment:
+        RTK_INSTALL_DIR: "{{ ai_tools_config.rtk.install_dir }}"
+      register: rtk_install_result
+      changed_when: rtk_needs_update | bool
+      when: rtk_needs_update | bool
+
+    - name: Verify RTK binary exists
+      stat:
+        path: "{{ ai_tools_config.rtk.install_dir }}/{{ ai_tools_config.rtk.binary }}"
+      register: rtk_binary_stat
+
+    - name: Fail if RTK binary is not found
+      fail:
+        msg: "RTK installation failed - binary not found at {{ ai_tools_config.rtk.install_dir }}/{{ ai_tools_config.rtk.binary }}"
+      when: not rtk_binary_stat.stat.exists
+
+  rescue:
+    - name: Handle RTK installation failure
+      debug:
+        msg: "RTK installation failed: {{ rtk_install_result.stderr | default('Unknown error') }}"
+
+    - name: Clean up failed RTK installation
+      file:
+        path: "{{ ai_tools_config.rtk.install_dir }}/{{ ai_tools_config.rtk.binary }}"
+        state: absent
+      when: rtk_binary_stat.stat.exists | default(false)
+
+    - name: Re-raise RTK installation failure
+      fail:
+        msg: "RTK installation failed and cleanup completed"
+
+- name: Verify RTK installation and get version
+  command: "{{ ai_tools_config.rtk.install_dir }}/{{ ai_tools_config.rtk.binary }} --version"
+  register: rtk_version_check
+  changed_when: false
+  failed_when: false
+
+- name: Set RTK installation status
+  set_fact:
+    rtk_installed: "{{ rtk_version_check.rc == 0 }}"
+    rtk_version: "{{ rtk_version_check.stdout if rtk_version_check.rc == 0 else 'version check failed' }}"
+    rtk_claude_init_configured: false
+    rtk_codex_init_configured: false
+
+- when:
+    - rtk_installed | default(false)
+    - ai_tools_manage_claude_code | default(false)
+  block:
+    - name: Initialize RTK for Claude Code
+      command:
+        argv:
+          - "{{ ai_tools_config.rtk.install_dir }}/{{ ai_tools_config.rtk.binary }}"
+          - init
+          - --global
+          - --auto-patch
+      register: rtk_claude_init_result
+      changed_when: >-
+        rtk_claude_init_result.rc == 0 and
+        'already' not in (((rtk_claude_init_result.stdout | default('')) ~ ' ' ~ (rtk_claude_init_result.stderr | default(''))) | lower)
+      failed_when: >-
+        rtk_claude_init_result.rc != 0 and
+        'already' not in (((rtk_claude_init_result.stdout | default('')) ~ ' ' ~ (rtk_claude_init_result.stderr | default(''))) | lower)
+
+    - name: Mark RTK Claude Code init as configured
+      set_fact:
+        rtk_claude_init_configured: true
+  rescue:
+    - name: Record RTK Claude Code init failure
+      set_fact:
+        rtk_claude_init_error: "{{ rtk_claude_init_result.stderr | default(rtk_claude_init_result.stdout) | default('Unknown RTK Claude Code init error') }}"
+
+    - name: Warn about RTK Claude Code init failure
+      debug:
+        msg: "RTK Claude Code init failed, but the RTK binary is still installed"
+
+- when:
+    - rtk_installed | default(false)
+    - ai_tools_manage_codex | default(false)
+  block:
+    - name: Initialize RTK for Codex CLI
+      command:
+        argv:
+          - "{{ ai_tools_config.rtk.install_dir }}/{{ ai_tools_config.rtk.binary }}"
+          - init
+          - --global
+          - --codex
+      register: rtk_codex_init_result
+      changed_when: >-
+        rtk_codex_init_result.rc == 0 and
+        'already' not in (((rtk_codex_init_result.stdout | default('')) ~ ' ' ~ (rtk_codex_init_result.stderr | default(''))) | lower)
+      failed_when: >-
+        rtk_codex_init_result.rc != 0 and
+        'already' not in (((rtk_codex_init_result.stdout | default('')) ~ ' ' ~ (rtk_codex_init_result.stderr | default(''))) | lower)
+
+    - name: Mark RTK Codex init as configured
+      set_fact:
+        rtk_codex_init_configured: true
+  rescue:
+    - name: Record RTK Codex init failure
+      set_fact:
+        rtk_codex_init_error: "{{ rtk_codex_init_result.stderr | default(rtk_codex_init_result.stdout) | default('Unknown RTK Codex init error') }}"
+
+    - name: Warn about RTK Codex init failure
+      debug:
+        msg: "RTK Codex init failed, but the RTK binary is still installed"
+
+- name: Display RTK summary and usage guidance
+  include_tasks:
+    file: show_tool_summary.yml
+  vars:
+    ai_tool_display_name: "RTK"
+    ai_tool_installed: "{{ rtk_installed | default(false) }}"
+    ai_tool_version: "{{ rtk_version }}"
+    ai_tool_summary_footer: "==============================="
+    additional_summary_items:
+      - "{% if ai_tools_manage_claude_code | default(false) %}Claude Code init configured: {{ rtk_claude_init_configured | default(false) }}{% endif %}"
+      - "{% if ai_tools_manage_codex | default(false) %}Codex init configured: {{ rtk_codex_init_configured | default(false) }}{% endif %}"
+      - "{% if rtk_claude_init_error is defined %}Claude Code init error: {{ rtk_claude_init_error }}{% endif %}"
+      - "{% if rtk_codex_init_error is defined %}Codex init error: {{ rtk_codex_init_error }}{% endif %}"
+    usage_lines:
+      - "RTK Installation Complete!"
+      - ""
+      - "Next steps:"
+      - "1. Run 'rtk --help' to inspect the available RTK commands"
+      - "{% if ai_tools_manage_claude_code | default(false) and rtk_claude_init_configured | default(false) %}2. Claude Code global RTK integration is configured{% endif %}"
+      - "{% if ai_tools_manage_codex | default(false) and rtk_codex_init_configured | default(false) %}3. Codex global RTK integration is configured{% endif %}"
+      - ""
+      - "RTK is now available in ~/.local/bin."
