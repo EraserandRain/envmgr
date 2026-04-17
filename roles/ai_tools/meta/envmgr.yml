@@ -10,6 +10,7 @@ depends_on:
 task_tags:
   - claude_code
   - codex
+  - rtk
 vars_files: []
 playbook_roles:
   - ai_tools

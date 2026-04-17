@@ -55,6 +55,7 @@ AI_TOOLS_CONTEXT7_METHODS = ("remote", "local")
 class AiToolsInstallOptions:
     manage_claude_code: bool
     manage_codex: bool
+    manage_rtk: bool
     enable_context7: bool
     claude_context7_method: str
     codex_context7_method: str
@@ -372,14 +373,19 @@ def build_ai_tools_setup_summary(
     context7_api_key_present: bool,
 ) -> list[str]:
     """Build a short setup summary for the interactive AI tools wizard."""
+    context7_applicable = options.manage_claude_code or options.manage_codex
     lines = [
         "",
         "AI Tools Setup Summary",
         f"- Claude Code: {'enabled' if options.manage_claude_code else 'disabled'}",
         f"- Codex CLI: {'enabled' if options.manage_codex else 'disabled'}",
-        f"- Context7: {'enabled' if options.enable_context7 else 'disabled'}",
+        f"- RTK: {'enabled' if options.manage_rtk else 'disabled'}",
     ]
-    if options.enable_context7:
+    if context7_applicable:
+        lines.append(
+            f"- Context7: {'enabled' if options.enable_context7 else 'disabled'}"
+        )
+    if options.enable_context7 and context7_applicable:
         if options.manage_claude_code:
             lines.append(
                 "- Claude Code Context7: "
@@ -399,8 +405,10 @@ def run_ai_tools_setup_wizard(
     *,
     default_manage_claude_code: bool,
     default_manage_codex: bool,
+    default_manage_rtk: bool,
     manage_claude_code: bool | None,
     manage_codex: bool | None,
+    manage_rtk: bool | None,
     enable_context7: bool | None,
     claude_context7_method: str | None,
     codex_context7_method: str | None,
@@ -420,6 +428,7 @@ def run_ai_tools_setup_wizard(
         resolved_manage_codex = (
             default_manage_codex if manage_codex is None else manage_codex
         )
+        resolved_manage_rtk = default_manage_rtk if manage_rtk is None else manage_rtk
 
         if manage_claude_code is None:
             resolved_manage_claude_code = prompt_bool(
@@ -431,19 +440,31 @@ def run_ai_tools_setup_wizard(
                 "Install Codex CLI?",
                 default=default_manage_codex,
             )
+        if manage_rtk is None:
+            resolved_manage_rtk = prompt_bool(
+                "Install RTK?",
+                default=default_manage_rtk,
+            )
 
-        if resolved_manage_claude_code or resolved_manage_codex:
+        if resolved_manage_claude_code or resolved_manage_codex or resolved_manage_rtk:
             break
 
-        if manage_claude_code is not None or manage_codex is not None:
+        if (
+            manage_claude_code is not None
+            or manage_codex is not None
+            or manage_rtk is not None
+        ):
             raise CatalogError(
-                "AI tools selection disabled both Claude Code and Codex CLI; choose at least one tool"
+                "AI tools selection disabled Claude Code, Codex CLI, and RTK; choose at least one tool"
             )
 
         print("Select at least one tool to continue.")
 
-    resolved_enable_context7 = True if enable_context7 is None else enable_context7
-    if enable_context7 is None:
+    context7_applicable = resolved_manage_claude_code or resolved_manage_codex
+    resolved_enable_context7 = False
+    if context7_applicable:
+        resolved_enable_context7 = True if enable_context7 is None else enable_context7
+    if context7_applicable and enable_context7 is None:
         resolved_enable_context7 = prompt_bool(
             "Enable optional Context7 integration?",
             default=True,
@@ -471,6 +492,7 @@ def run_ai_tools_setup_wizard(
     options = AiToolsInstallOptions(
         manage_claude_code=resolved_manage_claude_code,
         manage_codex=resolved_manage_codex,
+        manage_rtk=resolved_manage_rtk,
         enable_context7=resolved_enable_context7,
         claude_context7_method=resolved_claude_context7_method,
         codex_context7_method=resolved_codex_context7_method,
@@ -494,6 +516,7 @@ def resolve_ai_tools_install_options(
     execution_playbook_path: str,
     manage_claude_code: bool | None,
     manage_codex: bool | None,
+    manage_rtk: bool | None,
     enable_context7: bool | None,
     claude_context7_method: str | None,
     codex_context7_method: str | None,
@@ -508,13 +531,18 @@ def resolve_ai_tools_install_options(
         tag in requested_tags for tag in ("all", "ai_tools", "claude_code")
     )
     default_manage_codex = any(tag in requested_tags for tag in ("all", "codex"))
+    default_manage_rtk = any(
+        tag in requested_tags for tag in ("all", "ai_tools", "rtk")
+    )
 
     if interactive:
         return run_ai_tools_setup_wizard(
             default_manage_claude_code=default_manage_claude_code,
             default_manage_codex=default_manage_codex,
+            default_manage_rtk=default_manage_rtk,
             manage_claude_code=manage_claude_code,
             manage_codex=manage_codex,
+            manage_rtk=manage_rtk,
             enable_context7=enable_context7,
             claude_context7_method=claude_context7_method,
             codex_context7_method=codex_context7_method,
@@ -527,13 +555,19 @@ def resolve_ai_tools_install_options(
     resolved_manage_codex = (
         default_manage_codex if manage_codex is None else manage_codex
     )
+    resolved_manage_rtk = default_manage_rtk if manage_rtk is None else manage_rtk
 
-    if not (resolved_manage_claude_code or resolved_manage_codex):
+    if not (
+        resolved_manage_claude_code or resolved_manage_codex or resolved_manage_rtk
+    ):
         raise CatalogError(
-            "AI tools selection disabled both Claude Code and Codex CLI; choose at least one tool"
+            "AI tools selection disabled Claude Code, Codex CLI, and RTK; choose at least one tool"
         )
 
-    resolved_enable_context7 = True if enable_context7 is None else enable_context7
+    context7_applicable = resolved_manage_claude_code or resolved_manage_codex
+    resolved_enable_context7 = False
+    if context7_applicable:
+        resolved_enable_context7 = True if enable_context7 is None else enable_context7
     resolved_claude_context7_method = (
         "remote" if claude_context7_method is None else claude_context7_method
     )
@@ -544,6 +578,7 @@ def resolve_ai_tools_install_options(
     return AiToolsInstallOptions(
         manage_claude_code=resolved_manage_claude_code,
         manage_codex=resolved_manage_codex,
+        manage_rtk=resolved_manage_rtk,
         enable_context7=resolved_enable_context7,
         claude_context7_method=resolved_claude_context7_method,
         codex_context7_method=resolved_codex_context7_method,
@@ -555,6 +590,7 @@ def build_ai_tools_extra_vars(options: AiToolsInstallOptions) -> dict[str, Any]:
     return {
         "ai_tools_manage_claude_code_override": options.manage_claude_code,
         "ai_tools_manage_codex_override": options.manage_codex,
+        "ai_tools_manage_rtk_override": options.manage_rtk,
         "ai_tools_context7_enabled": options.enable_context7,
         "ai_tools_claude_context7_method": options.claude_context7_method,
         "ai_tools_codex_context7_method": options.codex_context7_method,
@@ -771,6 +807,21 @@ def install() -> None:
         help="When AI tools are selected, skip Codex CLI",
     )
     parser.add_argument(
+        "--rtk",
+        dest="ai_tools_manage_rtk",
+        action="store_const",
+        const=True,
+        default=None,
+        help="When AI tools are selected, explicitly install RTK",
+    )
+    parser.add_argument(
+        "--no-rtk",
+        dest="ai_tools_manage_rtk",
+        action="store_const",
+        const=False,
+        help="When AI tools are selected, skip RTK",
+    )
+    parser.add_argument(
         "--context7",
         dest="ai_tools_context7",
         action="store_const",
@@ -890,6 +941,7 @@ def install() -> None:
         for value in (
             args.ai_tools_manage_claude_code,
             args.ai_tools_manage_codex,
+            args.ai_tools_manage_rtk,
             args.ai_tools_context7,
             args.claude_context7_method,
             args.codex_context7_method,
@@ -902,6 +954,7 @@ def install() -> None:
             execution_playbook_path=execution_playbook_path,
             manage_claude_code=args.ai_tools_manage_claude_code,
             manage_codex=args.ai_tools_manage_codex,
+            manage_rtk=args.ai_tools_manage_rtk,
             enable_context7=args.ai_tools_context7,
             claude_context7_method=args.claude_context7_method,
             codex_context7_method=args.codex_context7_method,
@@ -939,11 +992,16 @@ def install() -> None:
                 print(f"[Task: {tag}]", end=" ")
         print(f"{Colors.RESET}")
     if ai_tools_options is not None:
-        context7_status = "enabled" if ai_tools_options.enable_context7 else "disabled"
         print(
             f"  AI tools: Claude Code={ai_tools_options.manage_claude_code}, "
-            f"Codex CLI={ai_tools_options.manage_codex}, Context7={context7_status}"
+            f"Codex CLI={ai_tools_options.manage_codex}, "
+            f"RTK={ai_tools_options.manage_rtk}"
         )
+        if ai_tools_options.manage_claude_code or ai_tools_options.manage_codex:
+            context7_status = (
+                "enabled" if ai_tools_options.enable_context7 else "disabled"
+            )
+            print(f"  Context7: {context7_status}")
         if ai_tools_options.enable_context7:
             if ai_tools_options.manage_claude_code:
                 print(
@@ -1303,6 +1361,8 @@ def smoke_test() -> None:
             raise AssertionError("expected git task tag to stay hidden")
         if "codex" not in task_tags:
             raise AssertionError("expected task tag 'codex' to be present")
+        if "rtk" not in task_tags:
+            raise AssertionError("expected task tag 'rtk' to be present")
 
     def check_scaffold_generation() -> None:
         required_files = [
@@ -1382,6 +1442,10 @@ def smoke_test() -> None:
             "playbooks/workstation.yml",
             ["codex"],
         )
+        generated_rtk_playbook = build_execution_playbook(
+            "playbooks/workstation.yml",
+            ["rtk"],
+        )
         generated_init_playbook = build_execution_playbook(
             "playbooks/workstation.yml",
             ["init"],
@@ -1396,6 +1460,8 @@ def smoke_test() -> None:
                 ai_tools_data = yaml.safe_load(file)
             with Path(generated_codex_playbook).open(encoding="utf-8") as file:
                 codex_data = yaml.safe_load(file)
+            with Path(generated_rtk_playbook).open(encoding="utf-8") as file:
+                rtk_data = yaml.safe_load(file)
             with Path(generated_init_playbook).open(encoding="utf-8") as file:
                 init_data = yaml.safe_load(file)
             with Path(generated_monitoring_playbook).open(encoding="utf-8") as file:
@@ -1409,6 +1475,10 @@ def smoke_test() -> None:
                 raise AssertionError(
                     "expected generated codex playbook to contain a play"
                 )
+            if not isinstance(rtk_data, list) or not rtk_data:
+                raise AssertionError(
+                    "expected generated rtk playbook to contain a play"
+                )
             if not isinstance(init_data, list) or not init_data:
                 raise AssertionError(
                     "expected generated init playbook to contain a play"
@@ -1420,12 +1490,14 @@ def smoke_test() -> None:
 
             ai_tools_roles = ai_tools_data[0].get("roles", [])
             codex_roles = codex_data[0].get("roles", [])
+            rtk_roles = rtk_data[0].get("roles", [])
             init_roles = init_data[0].get("roles", [])
             monitoring_node_roles = monitoring_data[0].get("roles", [])
             monitoring_master_roles = monitoring_data[1].get("roles", [])
             if (
                 not isinstance(ai_tools_roles, list)
                 or not isinstance(codex_roles, list)
+                or not isinstance(rtk_roles, list)
                 or not isinstance(init_roles, list)
                 or not isinstance(monitoring_node_roles, list)
                 or not isinstance(monitoring_master_roles, list)
@@ -1439,6 +1511,10 @@ def smoke_test() -> None:
             codex_role_names = [
                 read_playbook_role_name(role_entry, Path(generated_codex_playbook))
                 for role_entry in codex_roles
+            ]
+            rtk_role_names = [
+                read_playbook_role_name(role_entry, Path(generated_rtk_playbook))
+                for role_entry in rtk_roles
             ]
             init_role_names = [
                 read_playbook_role_name(role_entry, Path(generated_init_playbook))
@@ -1463,6 +1539,11 @@ def smoke_test() -> None:
                 raise AssertionError(
                     "expected codex execution roles to be "
                     f"['init_core', 'node', 'ai_tools'], got {codex_role_names}"
+                )
+            if rtk_role_names != ["init_core", "node", "ai_tools"]:
+                raise AssertionError(
+                    "expected rtk execution roles to be "
+                    f"['init_core', 'node', 'ai_tools'], got {rtk_role_names}"
                 )
             if init_role_names != ["init_core", "init"]:
                 raise AssertionError(
@@ -1513,9 +1594,21 @@ def smoke_test() -> None:
                 raise AssertionError(
                     "expected ai_tools role to inherit the codex tag for task-level runs"
                 )
+
+            rtk_ai_tools_entry = rtk_roles[2]
+            if not isinstance(rtk_ai_tools_entry, dict):
+                raise AssertionError("expected rtk role entry to include tags")
+            if "rtk" not in read_playbook_role_tags(
+                rtk_ai_tools_entry,
+                Path(generated_rtk_playbook),
+            ):
+                raise AssertionError(
+                    "expected ai_tools role to inherit the rtk tag for task-level runs"
+                )
         finally:
             Path(generated_ai_tools_playbook).unlink(missing_ok=True)
             Path(generated_codex_playbook).unlink(missing_ok=True)
+            Path(generated_rtk_playbook).unlink(missing_ok=True)
             Path(generated_init_playbook).unlink(missing_ok=True)
             Path(generated_monitoring_playbook).unlink(missing_ok=True)
 
@@ -1611,6 +1704,7 @@ def smoke_test() -> None:
             execution_playbook_path="playbooks/workstation.yml",
             manage_claude_code=None,
             manage_codex=True,
+            manage_rtk=None,
             enable_context7=False,
             claude_context7_method=None,
             codex_context7_method="remote",
@@ -1623,6 +1717,8 @@ def smoke_test() -> None:
             raise AssertionError("expected ai_tools tag to keep Claude Code enabled")
         if not options.manage_codex:
             raise AssertionError("expected explicit Codex selection to be honored")
+        if not options.manage_rtk:
+            raise AssertionError("expected ai_tools tag to keep RTK enabled")
         if options.enable_context7:
             raise AssertionError("expected explicit Context7 disable to be honored")
         if options.codex_context7_method != "remote":
@@ -1630,11 +1726,30 @@ def smoke_test() -> None:
                 "expected Codex Context7 method override to be honored"
             )
 
+        rtk_only_options = resolve_ai_tools_install_options(
+            ["rtk"],
+            execution_playbook_path="playbooks/workstation.yml",
+            manage_claude_code=None,
+            manage_codex=None,
+            manage_rtk=None,
+            enable_context7=None,
+            claude_context7_method=None,
+            codex_context7_method=None,
+            interactive=False,
+        )
+        if rtk_only_options is None:
+            raise AssertionError("expected rtk task tag to resolve AI tools options")
+        if not rtk_only_options.manage_rtk:
+            raise AssertionError("expected rtk task tag to enable RTK")
+        if rtk_only_options.enable_context7:
+            raise AssertionError("expected RTK-only installs to skip Context7")
+
         node_options = resolve_ai_tools_install_options(
             ["all"],
             execution_playbook_path="playbooks/node.yml",
             manage_claude_code=None,
             manage_codex=None,
+            manage_rtk=None,
             enable_context7=None,
             claude_context7_method=None,
             codex_context7_method=None,
@@ -1646,13 +1761,14 @@ def smoke_test() -> None:
     def check_ai_tools_setup_wizard_flow() -> None:
         with patch(
             "builtins.input",
-            side_effect=["", "y", "", "1", "1", ""],
+            side_effect=["", "y", "", "", "1", "1", ""],
         ):
             options = resolve_ai_tools_install_options(
                 ["ai_tools"],
                 execution_playbook_path="playbooks/workstation.yml",
                 manage_claude_code=None,
                 manage_codex=None,
+                manage_rtk=None,
                 enable_context7=None,
                 claude_context7_method=None,
                 codex_context7_method=None,
@@ -1665,6 +1781,8 @@ def smoke_test() -> None:
             raise AssertionError("expected wizard to keep Claude Code enabled")
         if not options.manage_codex:
             raise AssertionError("expected wizard to allow enabling Codex CLI")
+        if not options.manage_rtk:
+            raise AssertionError("expected wizard to keep RTK enabled by default")
         if not options.enable_context7:
             raise AssertionError("expected wizard to keep Context7 enabled")
         if options.claude_context7_method != "remote":

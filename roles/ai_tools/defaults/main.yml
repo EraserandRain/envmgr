@@ -1,6 +1,7 @@
 ---
 ai_tools_manage_claude_code_override:
 ai_tools_manage_codex_override:
+ai_tools_manage_rtk_override:
 ai_tools_context7_enabled: true
 ai_tools_claude_context7_method: "remote"
 ai_tools_codex_context7_method: "remote"
