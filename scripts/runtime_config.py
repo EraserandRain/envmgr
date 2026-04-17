@@ -252,12 +252,25 @@ def _load_runtime_setup_stamp(paths: RuntimePaths) -> dict[str, Any] | None:
 
 def is_runtime_setup_complete(paths: RuntimePaths) -> bool:
     """Return whether setup installed the runtime assets required by envmgr."""
+    is_complete, _detail = get_runtime_setup_status(paths)
+    return is_complete
+
+
+def get_runtime_setup_status(paths: RuntimePaths) -> tuple[bool, str]:
+    """Describe whether setup installed the runtime assets required by envmgr."""
     setup_stamp = _load_runtime_setup_stamp(paths)
     if setup_stamp is None:
-        return False
+        if not paths.setup_marker_file.exists():
+            return False, f"setup marker is missing: {paths.setup_marker_file}"
+        return False, f"setup marker is invalid: {paths.setup_marker_file}"
 
     if setup_stamp["schema_version"] < SETUP_SCHEMA_VERSION:
-        return False
+        return (
+            False,
+            "setup marker schema version "
+            f"{setup_stamp['schema_version']} is older than required "
+            f"{SETUP_SCHEMA_VERSION}",
+        )
 
     try:
         galaxy_roles_ready = paths.galaxy_roles_dir.exists() and any(
@@ -266,10 +279,23 @@ def is_runtime_setup_complete(paths: RuntimePaths) -> bool:
         galaxy_collections_ready = paths.galaxy_collections_dir.exists() and any(
             paths.galaxy_collections_dir.iterdir()
         )
-    except OSError:
-        return False
+    except OSError as error:
+        return False, f"failed to inspect Galaxy cache directories: {error}"
 
-    return galaxy_roles_ready and galaxy_collections_ready
+    if not galaxy_roles_ready:
+        return False, f"Galaxy roles cache is empty: {paths.galaxy_roles_dir}"
+
+    if not galaxy_collections_ready:
+        return (
+            False,
+            f"Galaxy collections cache is empty: {paths.galaxy_collections_dir}",
+        )
+
+    completed_at = setup_stamp.get("completed_at")
+    if completed_at:
+        return True, f"setup completed at {completed_at}"
+
+    return True, "setup marker is current"
 
 
 def _require_mapping(value: Any, field_name: str, config_path: Path) -> dict[str, Any]:
@@ -335,8 +361,21 @@ def _require_runtime_inventory_path(
     return inventory_path
 
 
-def load_runtime_config(envmgr_home: str | Path | None = None) -> RuntimeConfig:
-    paths = ensure_runtime_layout(envmgr_home)
+def load_runtime_config(
+    envmgr_home: str | Path | None = None,
+    *,
+    ensure_layout: bool = True,
+) -> RuntimeConfig:
+    paths = (
+        ensure_runtime_layout(envmgr_home)
+        if ensure_layout
+        else get_runtime_paths(envmgr_home)
+    )
+
+    if not paths.config_file.exists():
+        raise ConfigError(
+            f"{paths.config_file} does not exist; run `uv run setup` first"
+        )
 
     try:
         with paths.config_file.open("rb") as file:
@@ -410,8 +449,9 @@ def resolve_inventory_reference(
     reference: str | None,
     *,
     envmgr_home: str | Path | None = None,
+    ensure_layout: bool = True,
 ) -> tuple[Path, str]:
-    config = load_runtime_config(envmgr_home)
+    config = load_runtime_config(envmgr_home, ensure_layout=ensure_layout)
     selected = config.default_inventory if reference is None else reference
 
     if selected not in config.inventories:
