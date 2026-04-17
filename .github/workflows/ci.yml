@@ -66,6 +66,38 @@ jobs:
       - name: Run smoke tests with multi-node topology checks
         run: uv run smoke-test
 
+  init_install:
+    name: Init Install (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-22.04
+          - ubuntu-24.04
+    env:
+      ENVMGR_HOME: /tmp/.envmgr
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Bootstrap envmgr runtime
+        run: uv run setup
+
+      - name: Run init install on localhost
+        run: uv run install init --playbook playbooks/workstation.yml
+
   master_worker_e2e:
     name: Master/Worker E2E
     runs-on: ubuntu-latest

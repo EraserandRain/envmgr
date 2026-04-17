@@ -1,15 +1,14 @@
-name: node
-description: Node.js and Volta installation
+name: init_core
+description: Internal host-local prerequisites for dependent roles
 enabled: true
 targets:
   - workstation
-tags:
   - node
-depends_on:
-  - init_core
+tags: []
+depends_on: []
 task_tags: []
 vars_files: []
 playbook_roles:
-  - node
+  - init_core
 galaxy_roles: []
 collections: []

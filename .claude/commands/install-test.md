@@ -20,7 +20,7 @@ This will:
 Available tags:
 
 - Role tags: ai_tools, node, zsh, docker, kubernetes_tools, etc.
-- Task tags: claude_code, codex, github_cli, git, etc.
+- Task tags: claude_code, codex, terraform, etc.
 
 Example usage:
 

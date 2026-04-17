@@ -152,9 +152,9 @@ uv run install [tag1 tag2 ...]
 uv run install all
 
 # Examples:
+uv run install init             # Apply the baseline host bootstrap bundle
 uv run install zsh              # Install zsh with oh-my-zsh and aliases
 uv run install kubeadm          # Install kubeadm on node targets
-uv run install github_cli       # Install GitHub CLI (task-level)
 uv run install golang dotnet    # Install multiple tools (space-separated)
 uv run install kubernetes_tools # Install kubectl, helm, crictl, CNI plugins
 uv run install ai_tools         # Launch the interactive AI Tools Setup wizard in a TTY
@@ -162,11 +162,15 @@ uv run install ai_tools --codex # Install default AI tools and explicitly manage
 
 # Use an explicit scenario playbook for ambiguous tags or full-scenario runs
 uv run install --playbook playbooks/workstation.yml zsh node ai_tools
-uv run install --playbook playbooks/node.yml init docker kubeadm
+uv run install --playbook playbooks/node.yml docker kubeadm
 
 # Use a scenario-specific playbook for a common preset
 uv run install --playbook playbooks/workstation.yml init zsh java node golang ruby dotnet cloud
 uv run install --playbook playbooks/workstation.yml init docker kubernetes_tools minikube
+uv run install --playbook playbooks/node.yml docker kubeadm monitoring
+
+`playbooks/node.yml` installs shared node prerequisites on every cluster node,
+then applies cluster management tools only on the `master` group.
 ```
 
 **Remote execution:**
@@ -176,10 +180,10 @@ uv run install --playbook playbooks/workstation.yml init docker kubernetes_tools
 uv run install -i remote zsh
 
 # Use a scenario-specific playbook on remote hosts
-uv run install -i remote --playbook playbooks/node.yml init docker kubeadm
+uv run install -i remote --playbook playbooks/node.yml docker kubeadm
 
 # Using password authentication (with vault)
-uv run install -i password --playbook playbooks/node.yml --ask-vault-pass init docker kubeadm
+uv run install -i password --playbook playbooks/node.yml --ask-vault-pass docker kubeadm
 
 # List tags (inventory-independent)
 uv run install -l
@@ -212,7 +216,7 @@ Role-level tags install complete functional modules:
 - docker
 - dotnet
 - golang
-- init
+- init   (workstation baseline bundle)
 - java
 - kubeadm
 - kubernetes_tools
@@ -222,16 +226,16 @@ Role-level tags install complete functional modules:
 - ruby   (default version: 3.0.5)
 - zsh
 
+`playbooks/node.yml` runs `docker` and `kubeadm` on all nodes, while
+`kubernetes_tools` and `monitoring` are master-only.
+
 ##### Task-level Tags
 
 Task-level tags execute specific configuration tasks:
 
 - claude_code (configure Claude Code)
 - codex (install or update Codex CLI explicitly)
-- git (configure git)
-- github_cli (install GitHub CLI)
 - hashicorp (install HashiCorp repository tooling)
-- sync_time (synchronize system time)
 - terraform (install Terraform)
 - tf (alias for Terraform tasks)
 
@@ -254,7 +258,10 @@ Supported Setup Items:
 - docker
 - dotnet (default version: 8.0)
 - java (default version: 8)
-- init
+- init:
+  - system time synchronization and timezone setup
+  - git installation and global defaults
+  - GitHub CLI installation
 - minikube (latest)
 - kubeadm (1.31.9-1.1)
 - kubernetes_tools:

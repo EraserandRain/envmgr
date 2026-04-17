@@ -1,0 +1,4 @@
+---
+# Install git from distro packages by default. Set to `git_core_ppa` to opt in
+# to the git-core PPA on Ubuntu 22.04 and earlier hosts.
+git_install_source: distro

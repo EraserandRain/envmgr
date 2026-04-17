@@ -1,5 +1,5 @@
 name: monitoring
-description: Kubernetes monitoring stack
+description: Master-side Kubernetes monitoring stack
 enabled: true
 targets:
   - node

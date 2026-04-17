@@ -1,5 +1,22 @@
 ---
-- name: Install git repository prerequisites on Ubuntu
+- name: Validate git install source
+  assert:
+    that:
+      - git_install_source in ["distro", "git_core_ppa"]
+    fail_msg: >-
+      git_install_source must be either 'distro' or 'git_core_ppa'.
+
+- name: Explain when git-core PPA is ignored
+  debug:
+    msg: >-
+      git_install_source=git_core_ppa only applies to Ubuntu 22.04 and earlier;
+      falling back to distro git on
+      {{ ansible_facts["distribution"] }} {{ ansible_facts["distribution_version"] }}.
+  when:
+    - git_install_source == "git_core_ppa"
+    - ansible_facts["distribution"] != "Ubuntu" or ansible_facts["distribution_major_version"] | int >= 24
+
+- name: Install git-core PPA prerequisites on Ubuntu 22.04 and earlier
   become: true
   apt:
     pkg:
@@ -8,19 +25,27 @@
     state: present
     update_cache: true
     cache_valid_time: 86400
-  when: ansible_facts["distribution"] == "Ubuntu"
+  when:
+    - git_install_source == "git_core_ppa"
+    - ansible_facts["distribution"] == "Ubuntu"
+    - ansible_facts["distribution_major_version"] | int < 24
 
-- name: Add git PPA on Ubuntu
+- name: Add git-core PPA on Ubuntu 22.04 and earlier
   become: true
   apt_repository:
     repo: ppa:git-core/ppa
-  when: ansible_facts["distribution"] == "Ubuntu"
+  when:
+    - git_install_source == "git_core_ppa"
+    - ansible_facts["distribution"] == "Ubuntu"
+    - ansible_facts["distribution_major_version"] | int < 24
 
-- name: Upgrade git
+- name: Install or upgrade git
   become: true
   apt:
-    pkg: git
+    name: git
     state: latest
+    update_cache: true
+    cache_valid_time: 86400
 
 - name: Set vim as default git editor
   community.general.git_config:

@@ -6,7 +6,7 @@ targets:
 tags:
   - golang
 depends_on:
-  - init
+  - init_core
 task_tags: []
 vars_files: []
 playbook_roles:
