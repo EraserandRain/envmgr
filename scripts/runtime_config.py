@@ -5,12 +5,12 @@ import sys
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
 if sys.version_info >= (3, 11):
     import tomllib
 else:  # pragma: no cover - Python 3.10 fallback
-    import tomli as tomllib  # type: ignore[import-not-found]
+    import tomli as tomllib
 
 
 ENVMGR_HOME_ENV_VAR = "ENVMGR_HOME"
@@ -239,9 +239,6 @@ def _load_runtime_setup_stamp(paths: RuntimePaths) -> dict[str, Any] | None:
     except (OSError, tomllib.TOMLDecodeError):
         return None
 
-    if not isinstance(data, dict):
-        return None
-
     schema_version = data.get("schema_version")
     if not isinstance(schema_version, int):
         return None
@@ -250,7 +247,7 @@ def _load_runtime_setup_stamp(paths: RuntimePaths) -> dict[str, Any] | None:
     if completed_at is not None and not isinstance(completed_at, str):
         return None
 
-    return cast(dict[str, Any], data)
+    return data
 
 
 def is_runtime_setup_complete(paths: RuntimePaths) -> bool:
