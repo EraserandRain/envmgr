@@ -31,6 +31,9 @@
     fail_msg: "AI tools role was selected but both Claude Code and Codex CLI were disabled."
 
 - name: Pre-flight checks for AI tools installation
+  environment:
+    VOLTA_HOME: "{{ ansible_facts['env']['HOME'] }}/.volta"
+    PATH: "{{ volta_root }}/bin:{{ ansible_facts['env']['PATH'] }}"
   block:
     - name: Check if volta is installed and accessible
       command: volta --version
