@@ -1,16 +1,26 @@
 from __future__ import annotations
 
+import importlib
 import os
 import sys
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, BinaryIO, Protocol, cast
 
 if sys.version_info >= (3, 11):
-    import tomllib
+    import tomllib as _tomllib
 else:  # pragma: no cover - Python 3.10 fallback
-    import tomli as tomllib
+    _tomllib = importlib.import_module("tomli")
+
+
+class _TomlModule(Protocol):
+    TOMLDecodeError: type[Exception]
+
+    def load(self, file: BinaryIO, /) -> dict[str, Any]: ...
+
+
+tomllib = cast(_TomlModule, _tomllib)
 
 
 ENVMGR_HOME_ENV_VAR = "ENVMGR_HOME"
