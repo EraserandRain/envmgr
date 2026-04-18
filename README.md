@@ -159,7 +159,7 @@ dependencies, and cache directories already exist.
 uv run install -l
 
 # Install specified tools
-uv run install [tag1 tag2 ...] 
+uv run install [tag1 tag2 ...]
 
 # Install all roles in one scenario
 uv run install all
@@ -361,22 +361,18 @@ uv run create [role]
 # - meta/envmgr.yml
 # - README.md
 
-# Run Python code linting (ruff) for scripts/ and tests/
-uv run lint
+# Install local Git hooks for commit-time and push-time checks
+uv run pre-commit install
 
-# Run Ansible linting
-uv run ansible-check
+# Run the commit-time hook suite across the whole repository
+uv run pre-commit run --all-files
 
-# Run type checking for scripts/ and tests/
-uv run typecheck
+# Run the push-time hook suite manually
+uv run pre-commit run --hook-stage pre-push --all-files
 
-# Run the combined validation suite
-uv run validate
-
-# Run the lightweight smoke test suite
-# (runs tests.test_smoke, including a CI-safe 1 master + 2 workers topology check,
-# then verifies playbook tag listing against the selected inventory)
-uv run smoke-test
+# Run the full validation flows through pre-commit
+uv run pre-commit run --hook-stage manual validate --all-files
+uv run pre-commit run --hook-stage manual smoke-test --all-files
 
 # Run only the Python smoke suite directly
 uv run python -m unittest tests.test_smoke
@@ -385,13 +381,29 @@ uv run python -m unittest tests.test_smoke
 # drives `uv run install zsh` and `uv run install ai_tools --codex` from the
 # master node against the full workstation group.
 
-# Validate specific playbooks
+# Rare direct entrypoints for debugging one tool in isolation
+# Most day-to-day local checks should go through pre-commit instead.
+uv run lint
+uv run ansible-check
+uv run typecheck
+uv run validate
+uv run smoke-test
+
+# Validate specific playbooks directly
 uv run validate --playbook playbooks/workstation.yml
 uv run validate --playbook playbooks/node.yml -i remote
 
-# Smoke-test a specific playbook inventory combination
+# Smoke-test a specific playbook inventory combination directly
 uv run smoke-test --playbook playbooks/workstation.yml
 ```
+
+The intended local workflow is `pre-commit`-first: the `pre-commit` hook
+auto-runs Ruff plus basic file hygiene checks, the `pre-push` hook runs
+`uv run typecheck` and `uv run ansible-check` when relevant files changed, and
+the manual stage exposes `validate` and `smoke-test` through the same
+`pre-commit` interface. Treat the direct `uv run lint`, `uv run typecheck`,
+and `uv run ansible-check` commands as debugging fallbacks for cases where you
+want to rerun one tool by itself or reproduce a CI failure more directly.
 
 ## Reference
 

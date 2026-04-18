@@ -1,0 +1,66 @@
+minimum_pre_commit_version: "4.0.0"
+default_install_hook_types:
+  - pre-commit
+  - pre-push
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: check-yaml
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+
+  - repo: local
+    hooks:
+      - id: ruff-check
+        name: ruff check --fix
+        entry: uv run ruff check --fix
+        language: system
+        files: ^(scripts/|tests/)
+        types_or:
+          - python
+          - pyi
+
+      - id: ruff-format
+        name: ruff format
+        entry: uv run ruff format
+        language: system
+        files: ^(scripts/|tests/)
+        types_or:
+          - python
+          - pyi
+
+      - id: typecheck
+        name: uv run typecheck
+        entry: uv run typecheck
+        language: system
+        pass_filenames: false
+        files: ^(scripts/|tests/|pyproject\.toml)$
+        stages:
+          - pre-push
+
+      - id: ansible-check
+        name: uv run ansible-check
+        entry: uv run ansible-check
+        language: system
+        pass_filenames: false
+        files: ^(roles/|playbooks/|vars/|ansible\.cfg)$
+        stages:
+          - pre-push
+
+      - id: validate
+        name: uv run validate
+        entry: uv run validate
+        language: system
+        pass_filenames: false
+        stages:
+          - manual
+
+      - id: smoke-test
+        name: uv run smoke-test
+        entry: uv run smoke-test
+        language: system
+        pass_filenames: false
+        stages:
+          - manual

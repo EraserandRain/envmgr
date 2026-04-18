@@ -29,7 +29,7 @@ Format: `<type>(<scope>): <description>`
 **Common types:**
 
 - `feat` - new features
-- `fix` - bug fixes  
+- `fix` - bug fixes
 - `refactor` - code refactoring
 - `chore` - maintenance
 - `docs` - documentation
