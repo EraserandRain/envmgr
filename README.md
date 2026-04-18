@@ -32,7 +32,9 @@ uv run install -l
 
 Run `uv run setup` before `uv run install`, `uv run ping`, `uv run validate`,
 or `uv run smoke-test` on a fresh machine or a fresh `ENVMGR_HOME`. The command
-is safe to re-run and does not overwrite existing runtime config files.
+is safe to re-run and does not overwrite existing runtime config files. `uv run
+validate` now checks both `scripts/` and `tests/`, and `uv run smoke-test` runs
+the `tests.test_smoke` suite before the playbook `--list-tags` checks.
 
 `uv run doctor` performs a read-only health check for the current runtime. It is
 safe to run before or after setup when you want to inspect what is missing
@@ -359,21 +361,25 @@ uv run create [role]
 # - meta/envmgr.yml
 # - README.md
 
-# Run Python code linting (ruff)
+# Run Python code linting (ruff) for scripts/ and tests/
 uv run lint
 
 # Run Ansible linting
 uv run ansible-check
 
-# Run type checking
+# Run type checking for scripts/ and tests/
 uv run typecheck
 
 # Run the combined validation suite
 uv run validate
 
 # Run the lightweight smoke test suite
-# (includes a CI-safe multi-node topology check with 1 master + 2 workers)
+# (runs tests.test_smoke, including a CI-safe 1 master + 2 workers topology check,
+# then verifies playbook tag listing against the selected inventory)
 uv run smoke-test
+
+# Run only the Python smoke suite directly
+uv run python -m unittest tests.test_smoke
 
 # GitHub Actions also runs a containerized 1 master + 2 workers e2e that
 # drives `uv run install zsh` and `uv run install ai_tools --codex` from the
