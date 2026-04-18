@@ -18,6 +18,7 @@ build-backend = "hatchling.build"
 dev = [
     "ansible-lint>=25.1.2",
     "mypy>=1.15.0",
+    "pre-commit>=4.0.0",
     "types-PyYAML>=6.0.0",
     "ruff>=0.8.0",
 ]

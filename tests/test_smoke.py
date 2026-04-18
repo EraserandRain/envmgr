@@ -98,7 +98,8 @@ def check_scaffold_generation() -> None:
         metadata_contents = (role_path / "meta" / "envmgr.yml").read_text(
             encoding="utf-8"
         )
-        if "name: smoke-role" not in metadata_contents:
+        metadata = yaml.safe_load(metadata_contents)
+        if metadata["name"] != "smoke-role":
             raise AssertionError("generated metadata did not render role name")
 
 
