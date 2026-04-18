@@ -8,6 +8,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, BinaryIO, Protocol, cast
 
+from .command_text import SETUP_HINT
+
 if sys.version_info >= (3, 11):
     import tomllib as _tomllib
 else:  # pragma: no cover - Python 3.10 fallback
@@ -226,7 +228,7 @@ def ensure_runtime_layout(envmgr_home: str | Path | None = None) -> RuntimePaths
 
 
 def mark_runtime_setup_complete(paths: RuntimePaths) -> None:
-    """Persist a marker showing that `uv run setup` completed successfully."""
+    """Persist a marker showing that envmgr runtime bootstrap completed."""
     completed_at = (
         datetime.now(timezone.utc)
         .replace(microsecond=0)
@@ -383,9 +385,7 @@ def load_runtime_config(
     )
 
     if not paths.config_file.exists():
-        raise ConfigError(
-            f"{paths.config_file} does not exist; run `uv run setup` first"
-        )
+        raise ConfigError(f"{paths.config_file} does not exist; {SETUP_HINT}")
 
     try:
         with paths.config_file.open("rb") as file:

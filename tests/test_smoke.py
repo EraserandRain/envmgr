@@ -15,6 +15,7 @@ from unittest.mock import Mock, patch
 import yaml
 
 from scripts.catalog import CatalogError, get_available_tags
+from scripts.command_text import SETUP_COMMAND
 from scripts.main import (
     DOCTOR_FAIL,
     DOCTOR_OK,
@@ -25,6 +26,7 @@ from scripts.main import (
     doctor,
     history,
     install,
+    main,
     popen_runtime_subprocess,
     read_playbook_role_name,
     read_playbook_role_tags,
@@ -374,11 +376,13 @@ def check_unbootstrapped_runtime_surfaces_setup_guidance() -> None:
                     ) from error
             else:
                 raise AssertionError(
-                    "expected unbootstrapped runtime to require uv run setup"
+                    "expected unbootstrapped runtime to require setup guidance"
                 )
 
-        if "`uv run setup`" not in captured_output.getvalue():
-            raise AssertionError("expected setup guidance to mention `uv run setup`")
+        if f"`{SETUP_COMMAND}`" not in captured_output.getvalue():
+            raise AssertionError(
+                f"expected setup guidance to mention `{SETUP_COMMAND}`"
+            )
 
 
 def check_outdated_setup_stamp_requires_setup() -> None:
@@ -489,16 +493,51 @@ def check_ai_tools_setup_wizard_flow() -> None:
         raise AssertionError("expected wizard to select remote for Codex CLI")
 
 
+def check_dispatcher_routes_install_subcommand() -> None:
+    captured_output = io.StringIO()
+
+    with (
+        patch("sys.stdout", new=captured_output),
+        patch("scripts.main.load_available_tags", return_value=(["zsh"], ["codex"])),
+    ):
+        main(["install", "-l"])
+
+    output = captured_output.getvalue()
+    if "Envmgr available tags:" not in output:
+        raise AssertionError("expected dispatcher to route to the install subcommand")
+    if "  - zsh" not in output:
+        raise AssertionError("expected dispatcher to print install role tags")
+    if "  - codex" not in output:
+        raise AssertionError("expected dispatcher to print install task tags")
+
+
+def check_dispatcher_rejects_dev_only_subcommands() -> None:
+    captured_error = io.StringIO()
+
+    with patch("sys.stderr", new=captured_error):
+        try:
+            main(["validate"])
+        except SystemExit as error:
+            if error.code != 2:
+                raise AssertionError(
+                    "expected dispatcher to reject dev-only subcommands with exit code 2"
+                ) from error
+        else:
+            raise AssertionError("expected dispatcher to reject dev-only subcommands")
+
+    if "invalid choice" not in captured_error.getvalue():
+        raise AssertionError("expected dispatcher rejection to come from argparse")
+
+
 def check_install_rejects_unknown_tags_with_exit_code() -> None:
     captured_output = io.StringIO()
 
     with (
-        patch("sys.argv", ["install", "does-not-exist"]),
         patch("sys.stdout", new=captured_output),
         patch("scripts.main.load_available_tags", return_value=(["zsh"], ["codex"])),
     ):
         try:
-            install()
+            install(["does-not-exist"])
         except SystemExit as error:
             if error.code != 1:
                 raise AssertionError(
@@ -517,12 +556,9 @@ def check_install_rejects_unknown_tags_with_exit_code() -> None:
 def check_install_rejects_all_plus_other_tags() -> None:
     captured_output = io.StringIO()
 
-    with (
-        patch("sys.argv", ["install", "all", "zsh"]),
-        patch("sys.stdout", new=captured_output),
-    ):
+    with patch("sys.stdout", new=captured_output):
         try:
-            install()
+            install(["all", "zsh"])
         except SystemExit as error:
             if error.code != 1:
                 raise AssertionError(
@@ -544,7 +580,6 @@ def check_install_interrupt_exits_cleanly() -> None:
         execution_playbook_path.write_text("---\n", encoding="utf-8")
 
         with (
-            patch("sys.argv", ["install", "zsh", "--ask-vault-pass"]),
             patch("scripts.main.require_setup_completed"),
             patch("scripts.main.load_available_tags", return_value=(["zsh"], [])),
             patch("scripts.main.ensure_runtime_layout", return_value=runtime_paths),
@@ -567,7 +602,7 @@ def check_install_interrupt_exits_cleanly() -> None:
             ),
         ):
             try:
-                install()
+                install(["zsh", "--ask-vault-pass"])
             except SystemExit as error:
                 if error.code != 130:
                     raise AssertionError(
@@ -728,7 +763,6 @@ def check_runtime_subprocess_helpers_use_runtime_paths() -> None:
 def check_setup_logs_ansible_galaxy_runs() -> None:
     with tempfile.TemporaryDirectory() as temp_dir:
         envmgr_home = Path(temp_dir) / ".envmgr"
-        captured_output = io.StringIO()
 
         def fake_run(
             command: list[str],
@@ -740,7 +774,6 @@ def check_setup_logs_ansible_galaxy_runs() -> None:
 
         with (
             patch("subprocess.run", side_effect=fake_run),
-            patch("sys.stdout", new=captured_output),
             patch.dict(os.environ, {"ENVMGR_HOME": str(envmgr_home)}, clear=False),
         ):
             setup()
@@ -844,11 +877,10 @@ def check_history_text_output() -> None:
 
         captured_output = io.StringIO()
         with (
-            patch("sys.argv", ["history", "--limit", "2"]),
             patch("sys.stdout", new=captured_output),
             patch.dict(os.environ, {"ENVMGR_HOME": str(envmgr_home)}, clear=False),
         ):
-            history()
+            history(["--limit", "2"])
 
         output = captured_output.getvalue()
         if "Envmgr History" not in output:
@@ -902,11 +934,10 @@ def check_history_json_output() -> None:
 
         captured_output = io.StringIO()
         with (
-            patch("sys.argv", ["history", "--json"]),
             patch("sys.stdout", new=captured_output),
             patch.dict(os.environ, {"ENVMGR_HOME": str(envmgr_home)}, clear=False),
         ):
-            history()
+            history(["--json"])
 
         payload = json.loads(captured_output.getvalue())
         if payload["count"] != 1 or payload["total"] != 1:
@@ -1215,11 +1246,10 @@ def check_doctor_text_output() -> None:
         captured_output = io.StringIO()
 
         with (
-            patch("sys.argv", ["doctor"]),
             patch("sys.stdout", new=captured_output),
             patch.dict(os.environ, {"ENVMGR_HOME": str(envmgr_home)}, clear=False),
         ):
-            doctor()
+            doctor([])
 
         output = captured_output.getvalue()
         for expected_fragment in (
@@ -1267,11 +1297,10 @@ def check_doctor_json_output() -> None:
         captured_output = io.StringIO()
 
         with (
-            patch("sys.argv", ["doctor", "--json"]),
             patch("sys.stdout", new=captured_output),
             patch.dict(os.environ, {"ENVMGR_HOME": str(envmgr_home)}, clear=False),
         ):
-            doctor()
+            doctor(["--json"])
 
         payload = json.loads(captured_output.getvalue())
         if payload["status"] != DOCTOR_OK:
@@ -1334,6 +1363,14 @@ SMOKE_TEST_CHECKS: tuple[SmokeCheck, ...] = (
         check_ai_tools_install_option_resolution,
     ),
     ("AI tools setup wizard flow", check_ai_tools_setup_wizard_flow),
+    (
+        "dispatcher routes install subcommands",
+        check_dispatcher_routes_install_subcommand,
+    ),
+    (
+        "dispatcher rejects dev-only subcommands",
+        check_dispatcher_rejects_dev_only_subcommands,
+    ),
     (
         "install rejects unknown tags with exit code 1",
         check_install_rejects_unknown_tags_with_exit_code,

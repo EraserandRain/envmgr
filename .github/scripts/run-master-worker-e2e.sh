@@ -103,7 +103,7 @@ for target in worker1 worker2; do
 done
 
 printf 'Bootstrapping envmgr on the master container...\n'
-run_in_master "uv run setup"
+run_in_master "uv run envmgr setup"
 
 printf 'Writing the CI inventory and config...\n'
 run_in_master "cat > ~/.envmgr/config.toml <<'CONFIG'
@@ -151,7 +151,7 @@ all:
 INVENTORY"
 
 printf 'Checking reachability from the master to all cluster nodes...\n'
-run_in_master "uv run ping -i ${inventory_alias}"
+run_in_master "uv run envmgr ping -i ${inventory_alias}"
 
 printf 'Confirming the workstation playbook sees every target node...\n'
 workstation_list_hosts_command=$(build_uv_ansible_command ansible-playbook -i "$inventory_file" playbooks/workstation.yml --list-hosts)
@@ -159,13 +159,13 @@ run_in_master "$workstation_list_hosts_command | tee /tmp/workstation-hosts.txt"
 run_in_master "grep -q 'master-ci' /tmp/workstation-hosts.txt && grep -q 'worker-ci-1' /tmp/workstation-hosts.txt && grep -q 'worker-ci-2' /tmp/workstation-hosts.txt"
 
 printf 'Installing AI tools from the master across the workstation group...\n'
-run_in_master "uv run install -i ${inventory_alias} ai_tools --codex --no-context7"
+run_in_master "uv run envmgr install -i ${inventory_alias} ai_tools --codex --no-context7"
 
 printf 'Verifying Node.js, Claude Code, and Codex CLI on every workstation node...\n'
 run_uv_ansible_in_master ansible -i "$inventory_file" workstation -m shell -a 'test -x "$HOME/.volta/bin/node" && test -x "$HOME/.volta/bin/claude" && test -x "$HOME/.volta/bin/codex" && "$HOME/.volta/bin/node" --version >/dev/null 2>&1 && "$HOME/.volta/bin/claude" --version >/dev/null 2>&1 && "$HOME/.volta/bin/codex" --version >/dev/null 2>&1 && test ! -e "$HOME/.local/bin/context7-codex"'
 
 printf 'Installing zsh from the master across the workstation group...\n'
-run_in_master "uv run install -i ${inventory_alias} zsh"
+run_in_master "uv run envmgr install -i ${inventory_alias} zsh"
 
 printf 'Verifying zsh and oh-my-zsh assets on every workstation node...\n'
 run_uv_ansible_in_master ansible -i "$inventory_file" workstation -m shell -a 'test -d "$HOME/.oh-my-zsh" && test -d "$HOME/.oh-my-zsh/custom/plugins/zsh-autosuggestions" && test -f "$HOME/.zshrc" && grep -q "ANSIBLE MANAGED CUSTOM BLOCK" "$HOME/.zshrc"'

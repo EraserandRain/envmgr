@@ -24,6 +24,7 @@ from .catalog import (
     load_playbook_tags,
     load_role_catalog,
 )
+from .command_text import CLI_ROOT_COMMAND, SETUP_HINT
 from .runtime_config import (
     ConfigError,
     RuntimeConfig,
@@ -56,6 +57,7 @@ ALL_TAG = "all"
 AI_TOOLS_CONTEXT7_METHODS = ("remote", "local")
 DOCTOR_COMMANDS = ("uv", "ansible", "ansible-playbook", "ansible-galaxy")
 RUNTIME_RUN_RECORD_SCHEMA_VERSION = 1
+CommandHandler = Callable[[list[str] | None], None]
 
 
 @dataclass(frozen=True)
@@ -210,6 +212,27 @@ def exit_with_error(message: str, *, code: int = 1) -> NoReturn:
     raise SystemExit(code)
 
 
+def build_command_parser(
+    command_name: str,
+    description: str,
+    *,
+    prog_name: str | None = None,
+) -> argparse.ArgumentParser:
+    """Create a parser for one `envmgr <command>` subcommand."""
+    return argparse.ArgumentParser(
+        prog=prog_name or f"{CLI_ROOT_COMMAND} {command_name}",
+        description=description,
+    )
+
+
+def parse_command_args(
+    parser: argparse.ArgumentParser,
+    argv: list[str] | None,
+) -> argparse.Namespace:
+    """Parse subcommand arguments without inheriting outer `sys.argv` by default."""
+    return parser.parse_args([] if argv is None else argv)
+
+
 def load_available_tags() -> tuple[list[str], list[str]]:
     """Load role-level and task-level tags from role metadata."""
     try:
@@ -249,7 +272,7 @@ def require_setup_completed(
 
     print(
         f"{Colors.RED}Setup required: '{command_name}' needs a bootstrapped envmgr "
-        f"runtime at {runtime_paths.home}. Please run `uv run setup` first."
+        f"runtime at {runtime_paths.home}. Please {SETUP_HINT}."
         f"{Colors.RESET}"
     )
     raise SystemExit(1)
@@ -581,7 +604,7 @@ def build_doctor_report(envmgr_home: str | Path | None = None) -> DoctorReport:
         add_check(
             "runtime home",
             DOCTOR_FAIL,
-            f"missing: {paths.home}; run `uv run setup` first",
+            f"missing: {paths.home}; {SETUP_HINT}",
         )
 
     missing_runtime_directories = [
@@ -600,7 +623,7 @@ def build_doctor_report(envmgr_home: str | Path | None = None) -> DoctorReport:
         add_check(
             "runtime config",
             DOCTOR_FAIL,
-            f"missing {paths.config_file}; run `uv run setup` first",
+            f"missing {paths.config_file}; {SETUP_HINT}",
         )
     else:
         try:
@@ -1406,12 +1429,12 @@ def resolve_install_playbook(
     )
 
 
-def install() -> None:
+def install(argv: list[str] | None = None) -> None:
     """
     Install and configure the envmgr project using Ansible.
     """
-    parser = argparse.ArgumentParser(
-        description="Install and Configure envmgr with ansible"
+    parser = build_command_parser(
+        "install", description="Install and Configure envmgr with ansible"
     )
 
     # Define the positional argument for tags
@@ -1512,7 +1535,7 @@ def install() -> None:
         help="Choose the Context7 transport for Codex CLI",
     )
 
-    args = parser.parse_args()
+    args = parse_command_args(parser, argv)
 
     if args.list_tags:
         role_tags, task_tags = load_available_tags()
@@ -1736,16 +1759,22 @@ def install() -> None:
             Path(execution_playbook_path).unlink(missing_ok=True)
 
 
-def create() -> None:
+def create(
+    argv: list[str] | None = None,
+    *,
+    prog_name: str | None = None,
+) -> None:
     """
     Create a new Ansible role by prompting the user for a role name and generating the role directory.
     """
-    parser = argparse.ArgumentParser(
-        description="Create a new Ansible role by prompting the user for a role name and generating the role directory."
+    parser = build_command_parser(
+        "create",
+        description="Create a new Ansible role by prompting the user for a role name and generating the role directory.",
+        prog_name=prog_name,
     )
     parser.add_argument("role", nargs="?", help="The name of the role to create")
 
-    args = parser.parse_args()
+    args = parse_command_args(parser, argv)
 
     if args.role:
         try:
@@ -1762,12 +1791,12 @@ def create() -> None:
         parser.print_help()
 
 
-def ping() -> None:
+def ping(argv: list[str] | None = None) -> None:
     """
     Test connection to all hosts using ansible ping module.
     """
-    parser = argparse.ArgumentParser(
-        description="Test connection to all hosts using ansible ping module"
+    parser = build_command_parser(
+        "ping", description="Test connection to all hosts using ansible ping module"
     )
 
     # Add inventory option
@@ -1777,7 +1806,7 @@ def ping() -> None:
         help="Specify an inventory alias from ~/.envmgr/config.toml",
     )
 
-    args = parser.parse_args()
+    args = parse_command_args(parser, argv)
 
     require_setup_completed("ping")
 
@@ -1798,10 +1827,11 @@ def ping() -> None:
         )
 
 
-def doctor() -> None:
+def doctor(argv: list[str] | None = None) -> None:
     """Inspect envmgr runtime health without mutating ~/.envmgr."""
-    parser = argparse.ArgumentParser(
-        description="Inspect envmgr runtime health without modifying the runtime"
+    parser = build_command_parser(
+        "doctor",
+        description="Inspect envmgr runtime health without modifying the runtime",
     )
     parser.add_argument(
         "--json",
@@ -1809,7 +1839,7 @@ def doctor() -> None:
         dest="json_output",
         help="Print the doctor report as JSON",
     )
-    args = parser.parse_args()
+    args = parse_command_args(parser, argv)
 
     report = build_doctor_report()
     configured_home = os.environ.get("ENVMGR_HOME")
@@ -1845,10 +1875,10 @@ def doctor() -> None:
         return
 
 
-def history() -> None:
+def history(argv: list[str] | None = None) -> None:
     """Show recent runtime subprocess records from ~/.envmgr/log/runs."""
-    parser = argparse.ArgumentParser(
-        description="Show recent envmgr runtime subprocess records"
+    parser = build_command_parser(
+        "history", description="Show recent envmgr runtime subprocess records"
     )
     parser.add_argument(
         "-n",
@@ -1864,7 +1894,7 @@ def history() -> None:
         help="Print recent runtime records as JSON",
     )
 
-    args = parser.parse_args()
+    args = parse_command_args(parser, argv)
     if args.limit <= 0:
         print(f"{Colors.RED}History limit must be greater than zero.{Colors.RESET}")
         raise SystemExit(1)
@@ -1923,24 +1953,22 @@ def history() -> None:
         print(f"  {stringify_runtime_history_command(record.get('command'))}")
 
 
-def setup() -> None:
+def setup(argv: list[str] | None = None) -> None:
     """
-    Setup the envmgr project by syncing dependencies, initializing ~/.envmgr, and installing ansible content.
+    Initialize ~/.envmgr and install the Ansible content envmgr needs at runtime.
     """
-    print("Setting up envmgr...")
+    parse_command_args(
+        build_command_parser(
+            "setup",
+            "Initialize ~/.envmgr and install the Ansible content envmgr needs at runtime.",
+        ),
+        argv,
+    )
 
-    # Step 1: Sync dependencies with uv
-    print("1. Syncing dependencies with uv...")
-    try:
-        subprocess.run(["uv", "sync"], check=True)
-        print("✓ Dependencies synced successfully")
-    except subprocess.CalledProcessError as e:
-        exit_with_error(f"✗ Failed to sync dependencies: {e}")
-    except FileNotFoundError:
-        exit_with_error("✗ Error: uv command not found. Please ensure uv is installed.")
+    print("Setting up envmgr runtime...")
 
-    # Step 2: Initialize the user-level envmgr runtime directory
-    print("2. Initializing ~/.envmgr...")
+    # Step 1: Initialize the user-level envmgr runtime directory
+    print("1. Initializing ~/.envmgr...")
     try:
         runtime_paths = ensure_runtime_layout()
         print(f"✓ Runtime config initialized at {runtime_paths.config_file}")
@@ -1952,8 +1980,8 @@ def setup() -> None:
     except OSError as error:
         exit_with_error(f"✗ Failed to initialize ~/.envmgr: {error}")
 
-    # Step 3: Install ansible roles and collections
-    print("3. Installing ansible roles and collections...")
+    # Step 2: Install ansible roles and collections
+    print("2. Installing ansible roles and collections...")
     try:
         run_runtime_subprocess(
             [
@@ -1993,10 +2021,23 @@ def setup() -> None:
     print("🎉 Setup completed successfully!")
 
 
-def lint() -> None:
+def lint(
+    argv: list[str] | None = None,
+    *,
+    prog_name: str | None = None,
+) -> None:
     """
     Run ruff linting and formatting on Python code.
     """
+    parse_command_args(
+        build_command_parser(
+            "lint",
+            "Run ruff linting and formatting on Python code.",
+            prog_name=prog_name,
+        ),
+        argv,
+    )
+
     print("Running Python code linting with ruff...")
 
     # Run ruff check
@@ -2032,10 +2073,23 @@ def lint() -> None:
     print("🎉 All Python linting checks passed!")
 
 
-def ansible_lint() -> None:
+def ansible_lint(
+    argv: list[str] | None = None,
+    *,
+    prog_name: str | None = None,
+) -> None:
     """
     Run ansible-lint on the roles directory.
     """
+    parse_command_args(
+        build_command_parser(
+            "ansible-check",
+            "Run ansible-lint on the roles directory.",
+            prog_name=prog_name,
+        ),
+        argv,
+    )
+
     command: list[str] = ["ansible-lint", "./roles"]
 
     print("Running Ansible linting...")
@@ -2051,10 +2105,23 @@ def ansible_lint() -> None:
         )
 
 
-def typecheck() -> None:
+def typecheck(
+    argv: list[str] | None = None,
+    *,
+    prog_name: str | None = None,
+) -> None:
     """
     Run mypy type checking on the Python source directories.
     """
+    parse_command_args(
+        build_command_parser(
+            "typecheck",
+            "Run mypy type checking on the Python source directories.",
+            prog_name=prog_name,
+        ),
+        argv,
+    )
+
     command: list[str] = ["mypy", *PYTHON_CHECK_PATHS]
 
     print("Running type checking with mypy...")
@@ -2070,12 +2137,18 @@ def typecheck() -> None:
         )
 
 
-def validate() -> None:
+def validate(
+    argv: list[str] | None = None,
+    *,
+    prog_name: str | None = None,
+) -> None:
     """
     Run the project validation suite in one command.
     """
-    parser = argparse.ArgumentParser(
-        description="Run lint, typecheck, ansible lint, and playbook syntax checks"
+    parser = build_command_parser(
+        "validate",
+        description="Run lint, typecheck, ansible lint, and playbook syntax checks",
+        prog_name=prog_name,
     )
     parser.add_argument(
         "-i",
@@ -2088,7 +2161,7 @@ def validate() -> None:
         help="Specify a playbook file to syntax-check (can be used multiple times)",
     )
 
-    args = parser.parse_args()
+    args = parse_command_args(parser, argv)
 
     require_setup_completed("validate")
 
@@ -2147,12 +2220,18 @@ def validate() -> None:
     raise SystemExit(1)
 
 
-def smoke_test() -> None:
+def smoke_test(
+    argv: list[str] | None = None,
+    *,
+    prog_name: str | None = None,
+) -> None:
     """Run lightweight integration checks without installing software."""
     from .smoke_checks import iter_smoke_tests
 
-    parser = argparse.ArgumentParser(
-        description="Run lightweight smoke tests for metadata, scaffolds, and playbooks"
+    parser = build_command_parser(
+        "smoke-test",
+        description="Run lightweight smoke tests for metadata, scaffolds, and playbooks",
+        prog_name=prog_name,
     )
     parser.add_argument(
         "-i",
@@ -2165,7 +2244,7 @@ def smoke_test() -> None:
         help="Specify a playbook file to smoke-check (can be used multiple times)",
     )
 
-    args = parser.parse_args()
+    args = parse_command_args(parser, argv)
 
     require_setup_completed("smoke-test")
 
@@ -2213,3 +2292,92 @@ def smoke_test() -> None:
 
     print("\n✗ Smoke tests failed")
     raise SystemExit(1)
+
+
+COMMAND_SUMMARIES: dict[str, str] = {
+    "doctor": "Inspect envmgr runtime health.",
+    "history": "Show recent runtime subprocess records.",
+    "install": "Run Ansible roles and task tags.",
+    "ping": "Test inventory connectivity with ansible ping.",
+    "setup": "Bootstrap the envmgr runtime under ~/.envmgr.",
+}
+
+COMMAND_HANDLERS: dict[str, CommandHandler] = {
+    "doctor": doctor,
+    "history": history,
+    "install": install,
+    "ping": ping,
+    "setup": setup,
+}
+
+
+def build_dispatcher_parser() -> argparse.ArgumentParser:
+    """Create the top-level `envmgr` dispatcher parser."""
+    commands_text = "\n".join(
+        f"  {command_name:<13} {summary}"
+        for command_name, summary in COMMAND_SUMMARIES.items()
+    )
+    parser = argparse.ArgumentParser(
+        prog=CLI_ROOT_COMMAND,
+        description="envmgr command dispatcher",
+        epilog=(
+            "Available commands:\n"
+            f"{commands_text}\n\n"
+            f"Use `{CLI_ROOT_COMMAND} <command> --help` for command-specific options."
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument(
+        "command",
+        nargs="?",
+        choices=sorted(COMMAND_HANDLERS),
+        help="Subcommand to run",
+    )
+    parser.add_argument(
+        "args",
+        nargs=argparse.REMAINDER,
+        help=argparse.SUPPRESS,
+    )
+    return parser
+
+
+def main(argv: list[str] | None = None) -> None:
+    """Dispatch `envmgr <subcommand>` to the appropriate command handler."""
+    parser = build_dispatcher_parser()
+    parsed_args = parser.parse_args(argv)
+
+    if parsed_args.command is None:
+        parser.print_help()
+        return
+
+    COMMAND_HANDLERS[parsed_args.command](parsed_args.args)
+
+
+def create_entrypoint() -> None:
+    """Run the role-scaffolding helper from its dedicated development command."""
+    create(sys.argv[1:], prog_name="create")
+
+
+def lint_entrypoint() -> None:
+    """Run the Ruff helper from its dedicated development command."""
+    lint(sys.argv[1:], prog_name="lint")
+
+
+def ansible_lint_entrypoint() -> None:
+    """Run the ansible-lint helper from its dedicated development command."""
+    ansible_lint(sys.argv[1:], prog_name="ansible-check")
+
+
+def typecheck_entrypoint() -> None:
+    """Run the mypy helper from its dedicated development command."""
+    typecheck(sys.argv[1:], prog_name="typecheck")
+
+
+def validate_entrypoint() -> None:
+    """Run the full validation helper from its dedicated development command."""
+    validate(sys.argv[1:], prog_name="validate")
+
+
+def smoke_test_entrypoint() -> None:
+    """Run the smoke helper from its dedicated development command."""
+    smoke_test(sys.argv[1:], prog_name="smoke-test")

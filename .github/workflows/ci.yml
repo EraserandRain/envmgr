@@ -30,12 +30,12 @@ jobs:
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: Bootstrap envmgr runtime
-        run: uv run setup
+        run: uv run envmgr setup
 
       - name: Verify first-run command surface
         run: |
-          uv run ping
-          uv run install -l
+          uv run envmgr ping
+          uv run envmgr install -l
 
       - name: Run validation suite
         run: uv run validate
@@ -61,7 +61,7 @@ jobs:
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: Bootstrap envmgr runtime
-        run: uv run setup
+        run: uv run envmgr setup
 
       - name: Run smoke tests with multi-node topology checks
         run: uv run smoke-test
@@ -93,10 +93,10 @@ jobs:
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: Bootstrap envmgr runtime
-        run: uv run setup
+        run: uv run envmgr setup
 
       - name: Run init install on localhost
-        run: uv run install init --playbook playbooks/workstation.yml
+        run: uv run envmgr install init --playbook playbooks/workstation.yml
 
   master_worker_e2e:
     name: Master/Worker E2E
