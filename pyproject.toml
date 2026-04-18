@@ -30,17 +30,13 @@ allow-direct-references = true
 packages = ["scripts"]
 
 [project.scripts]
-install = "scripts:install"
-create = "scripts:create"
-ping = "scripts:ping"
-doctor = "scripts:doctor"
-history = "scripts:history"
-setup = "scripts:setup"
-lint = "scripts:lint"
-ansible-check = "scripts:ansible_lint"
-typecheck = "scripts:typecheck"
-validate = "scripts:validate"
-smoke-test = "scripts:smoke_test"
+envmgr = "scripts.main:main"
+create = "scripts.main:create_entrypoint"
+lint = "scripts.main:lint_entrypoint"
+ansible-check = "scripts.main:ansible_lint_entrypoint"
+typecheck = "scripts.main:typecheck_entrypoint"
+validate = "scripts.main:validate_entrypoint"
+smoke-test = "scripts.main:smoke_test_entrypoint"
 
 [tool.mypy]
 python_version = "3.10"
