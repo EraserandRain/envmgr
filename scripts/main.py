@@ -10,9 +10,11 @@ import textwrap
 from collections.abc import Callable
 from copy import deepcopy
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
-from unittest.mock import patch
+from unittest.mock import Mock, patch
+from uuid import uuid4
 
 import yaml
 
@@ -54,6 +56,7 @@ DEFAULT_PLAYBOOKS = [
 ]
 AI_TOOLS_CONTEXT7_METHODS = ("remote", "local")
 DOCTOR_COMMANDS = ("uv", "ansible", "ansible-playbook", "ansible-galaxy")
+RUNTIME_RUN_RECORD_SCHEMA_VERSION = 1
 
 
 @dataclass(frozen=True)
@@ -85,6 +88,61 @@ class DoctorReport:
     checks: list[DoctorCheck]
 
 
+@dataclass(frozen=True)
+class RuntimeRunRecord:
+    path: Path
+    command: tuple[str, ...]
+    cwd: str
+    mode: str
+    started_at: datetime
+
+
+@dataclass
+class RuntimePopenProcess:
+    process: subprocess.Popen[Any]
+    record: RuntimeRunRecord
+    runtime_paths: RuntimePaths
+    _finalized: bool = False
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self.process, name)
+
+    def _finalize(self, return_code: int) -> None:
+        if self._finalized:
+            return
+
+        finish_runtime_run_record(
+            self.record,
+            runtime_paths=self.runtime_paths,
+            status="succeeded" if return_code == 0 else "failed",
+            return_code=return_code,
+            pid=self.process.pid,
+        )
+        self._finalized = True
+
+    def poll(self) -> int | None:
+        return_code = self.process.poll()
+        if return_code is not None:
+            self._finalize(return_code)
+        return return_code
+
+    def wait(self, timeout: float | None = None) -> int:
+        return_code = self.process.wait(timeout=timeout)
+        self._finalize(return_code)
+        return return_code
+
+    def communicate(
+        self,
+        input: str | bytes | None = None,
+        timeout: float | None = None,
+    ) -> tuple[Any, Any]:
+        output = self.process.communicate(input=input, timeout=timeout)
+        return_code = self.process.returncode
+        if return_code is not None:
+            self._finalize(return_code)
+        return output
+
+
 DOCTOR_OK = "ok"
 DOCTOR_WARN = "warn"
 DOCTOR_FAIL = "fail"
@@ -105,11 +163,20 @@ def run_command_step(
     command: list[str],
     *,
     env: dict[str, str] | None = None,
+    runtime_paths: RuntimePaths | None = None,
 ) -> bool:
     """Run one validation step and report its outcome."""
     print(f"\n[{step_name}] {' '.join(command)}")
     try:
-        subprocess.run(command, check=True, env=env)
+        if runtime_paths is not None:
+            run_runtime_subprocess(
+                command,
+                check=True,
+                runtime_paths=runtime_paths,
+                extra_env=env,
+            )
+        else:
+            subprocess.run(command, check=True, env=env)
         print(f"✓ {step_name} passed")
         return True
     except subprocess.CalledProcessError as error:
@@ -221,6 +288,243 @@ def build_ansible_runtime_env(paths: RuntimePaths) -> dict[str, str]:
     )
     env["ANSIBLE_LOCAL_TEMP"] = str(paths.tmp_dir)
     return env
+
+
+def get_current_utc_time() -> datetime:
+    """Return the current UTC timestamp for runtime logs."""
+    return datetime.now(timezone.utc)
+
+
+def format_runtime_timestamp(timestamp: datetime) -> str:
+    """Render runtime timestamps in RFC 3339 format with timezone suffix."""
+    return timestamp.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def get_runtime_command_name(command: list[str]) -> str:
+    """Return a readable command name for a subprocess invocation."""
+    if not command:
+        return "command"
+    return Path(command[0]).name or "command"
+
+
+def sanitize_runtime_record_slug(value: str) -> str:
+    """Convert a command name into a filesystem-friendly slug."""
+    characters = [
+        character.lower() if character.isalnum() else "-" for character in value.strip()
+    ]
+    slug = "".join(characters).strip("-")
+    while "--" in slug:
+        slug = slug.replace("--", "-")
+    return slug or "command"
+
+
+def resolve_runtime_subprocess_cwd(cwd: str | os.PathLike[str] | None) -> str:
+    """Resolve the working directory used for a subprocess record."""
+    if cwd is None:
+        return str(Path.cwd().resolve())
+    return str(Path(cwd).expanduser().resolve())
+
+
+def write_runtime_run_record(path: Path, payload: dict[str, Any]) -> None:
+    """Persist a runtime subprocess record without interrupting the command flow."""
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    except OSError:
+        return
+
+
+def persist_runtime_run_record(
+    record: RuntimeRunRecord,
+    *,
+    runtime_paths: RuntimePaths,
+    status: str,
+    pid: int | None = None,
+    return_code: int | None = None,
+    error: str | None = None,
+    completed_at: datetime | None = None,
+) -> None:
+    """Write the current state of a runtime subprocess record to disk."""
+    duration_seconds: float | None = None
+    if completed_at is not None:
+        duration_seconds = round(
+            max((completed_at - record.started_at).total_seconds(), 0.0),
+            3,
+        )
+
+    payload = {
+        "schema_version": RUNTIME_RUN_RECORD_SCHEMA_VERSION,
+        "mode": record.mode,
+        "command_name": get_runtime_command_name(list(record.command)),
+        "command": list(record.command),
+        "cwd": record.cwd,
+        "runtime_home": str(runtime_paths.home),
+        "ansible_log_file": str(runtime_paths.ansible_log_file),
+        "status": status,
+        "pid": pid,
+        "return_code": return_code,
+        "started_at": format_runtime_timestamp(record.started_at),
+        "completed_at": (
+            format_runtime_timestamp(completed_at) if completed_at is not None else None
+        ),
+        "duration_seconds": duration_seconds,
+        "error": error,
+    }
+    write_runtime_run_record(record.path, payload)
+
+
+def start_runtime_run_record(
+    command: list[str],
+    *,
+    runtime_paths: RuntimePaths,
+    mode: str,
+    cwd: str,
+) -> RuntimeRunRecord:
+    """Create an initial running record for a runtime subprocess."""
+    started_at = get_current_utc_time()
+    command_name = sanitize_runtime_record_slug(get_runtime_command_name(command))
+    timestamp = started_at.strftime("%Y%m%dT%H%M%S%fZ")
+    record_path = (
+        runtime_paths.runs_log_dir
+        / f"{timestamp}-{command_name}-{uuid4().hex[:8]}.json"
+    )
+    record = RuntimeRunRecord(
+        path=record_path,
+        command=tuple(command),
+        cwd=cwd,
+        mode=mode,
+        started_at=started_at,
+    )
+    persist_runtime_run_record(
+        record,
+        runtime_paths=runtime_paths,
+        status="running",
+    )
+    return record
+
+
+def finish_runtime_run_record(
+    record: RuntimeRunRecord,
+    *,
+    runtime_paths: RuntimePaths,
+    status: str,
+    pid: int | None = None,
+    return_code: int | None = None,
+    error: str | None = None,
+) -> None:
+    """Finalize a runtime subprocess record with completion metadata."""
+    persist_runtime_run_record(
+        record,
+        runtime_paths=runtime_paths,
+        status=status,
+        pid=pid,
+        return_code=return_code,
+        error=error,
+        completed_at=get_current_utc_time(),
+    )
+
+
+def run_runtime_subprocess(
+    command: list[str],
+    *,
+    runtime_paths: RuntimePaths,
+    extra_env: dict[str, str] | None = None,
+    **kwargs: Any,
+) -> subprocess.CompletedProcess[Any]:
+    """Run a subprocess with the envmgr Ansible runtime environment."""
+    record = start_runtime_run_record(
+        command,
+        runtime_paths=runtime_paths,
+        mode="run",
+        cwd=resolve_runtime_subprocess_cwd(kwargs.get("cwd")),
+    )
+    env = build_ansible_runtime_env(runtime_paths)
+    if extra_env is not None:
+        env.update(extra_env)
+    try:
+        result = subprocess.run(command, env=env, **kwargs)
+    except subprocess.CalledProcessError as error:
+        finish_runtime_run_record(
+            record,
+            runtime_paths=runtime_paths,
+            status="failed",
+            return_code=error.returncode,
+            error=str(error),
+        )
+        raise
+    except FileNotFoundError as error:
+        finish_runtime_run_record(
+            record,
+            runtime_paths=runtime_paths,
+            status="missing-command",
+            error=str(error),
+        )
+        raise
+    except OSError as error:
+        finish_runtime_run_record(
+            record,
+            runtime_paths=runtime_paths,
+            status="error",
+            error=str(error),
+        )
+        raise
+
+    finish_runtime_run_record(
+        record,
+        runtime_paths=runtime_paths,
+        status="succeeded" if result.returncode == 0 else "failed",
+        return_code=result.returncode,
+    )
+    return result
+
+
+def popen_runtime_subprocess(
+    command: list[str],
+    *,
+    runtime_paths: RuntimePaths,
+    extra_env: dict[str, str] | None = None,
+    **kwargs: Any,
+) -> RuntimePopenProcess:
+    """Start a subprocess with the envmgr Ansible runtime environment."""
+    record = start_runtime_run_record(
+        command,
+        runtime_paths=runtime_paths,
+        mode="popen",
+        cwd=resolve_runtime_subprocess_cwd(kwargs.get("cwd")),
+    )
+    env = build_ansible_runtime_env(runtime_paths)
+    if extra_env is not None:
+        env.update(extra_env)
+    try:
+        process = subprocess.Popen(command, env=env, **kwargs)
+    except FileNotFoundError as error:
+        finish_runtime_run_record(
+            record,
+            runtime_paths=runtime_paths,
+            status="missing-command",
+            error=str(error),
+        )
+        raise
+    except OSError as error:
+        finish_runtime_run_record(
+            record,
+            runtime_paths=runtime_paths,
+            status="error",
+            error=str(error),
+        )
+        raise
+
+    persist_runtime_run_record(
+        record,
+        runtime_paths=runtime_paths,
+        status="running",
+        pid=process.pid,
+    )
+    return RuntimePopenProcess(
+        process=process,
+        record=record,
+        runtime_paths=runtime_paths,
+    )
 
 
 def build_doctor_report(envmgr_home: str | Path | None = None) -> DoctorReport:
@@ -459,6 +763,48 @@ def render_doctor_checks_table(checks: list[DoctorCheck]) -> str:
             lines.append(f"{' ' * status_width}  {' ' * label_width}  {continuation}")
 
     return "\n".join(lines)
+
+
+def load_runtime_run_history(paths: RuntimePaths) -> list[dict[str, Any]]:
+    """Load runtime subprocess records sorted from newest to oldest."""
+    if not paths.runs_log_dir.exists():
+        return []
+
+    records: list[dict[str, Any]] = []
+    for record_path in sorted(paths.runs_log_dir.glob("*.json"), reverse=True):
+        try:
+            payload = json.loads(record_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        if not isinstance(payload, dict):
+            continue
+        payload["record_path"] = str(record_path)
+        records.append(payload)
+    return records
+
+
+def get_runtime_history_status_text(status: str) -> str:
+    """Render a colored status label for runtime history output."""
+    text = status.upper()
+    if status == "succeeded":
+        return f"{Colors.GREEN}{text}{Colors.RESET}"
+    if status in {"running"}:
+        return f"{Colors.YELLOW}{text}{Colors.RESET}"
+    return f"{Colors.RED}{text}{Colors.RESET}"
+
+
+def get_runtime_history_duration_text(value: Any) -> str:
+    """Render a short duration cell for runtime history output."""
+    if isinstance(value, int | float):
+        return f"{value:.3f}s"
+    return "-"
+
+
+def stringify_runtime_history_command(value: Any) -> str:
+    """Render a stored runtime command as a human-readable shell command."""
+    if isinstance(value, list) and all(isinstance(item, str) for item in value):
+        return " ".join(value)
+    return "<unknown command>"
 
 
 def print_doctor_overview(report: DoctorReport, configured_home: str | None) -> None:
@@ -1332,7 +1678,6 @@ def install() -> None:
     if args.ask_vault_pass or default_ask_vault_pass:
         command.append("--ask-vault-pass")
 
-    env = build_ansible_runtime_env(runtime_paths)
     if ai_tools_options is not None:
         command.extend(
             ["--extra-vars", json.dumps(build_ai_tools_extra_vars(ai_tools_options))]
@@ -1340,12 +1685,12 @@ def install() -> None:
 
     # Use Popen for real-time output
     try:
-        process = subprocess.Popen(
+        process = popen_runtime_subprocess(
             command,
+            runtime_paths=runtime_paths,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
-            env=env,
         )
 
         # Read and print output line by line
@@ -1412,12 +1757,12 @@ def ping() -> None:
     inventory_path, inventory_label = resolve_inventory_option(args.inventory)
     command: list[str] = ["ansible", "-i", str(inventory_path), "-m", "ping", "all"]
 
-    env = build_ansible_runtime_env(ensure_runtime_layout())
+    runtime_paths = ensure_runtime_layout()
 
     print(f"Testing connection with inventory: {inventory_label} -> {inventory_path}")
 
     try:
-        subprocess.run(command, env=env, check=True)
+        run_runtime_subprocess(command, check=True, runtime_paths=runtime_paths)
     except subprocess.CalledProcessError as e:
         print(f"Ping failed with exit code {e.returncode}")
     except FileNotFoundError:
@@ -1471,6 +1816,84 @@ def doctor() -> None:
         return
 
 
+def history() -> None:
+    """Show recent runtime subprocess records from ~/.envmgr/log/runs."""
+    parser = argparse.ArgumentParser(
+        description="Show recent envmgr runtime subprocess records"
+    )
+    parser.add_argument(
+        "-n",
+        "--limit",
+        type=int,
+        default=10,
+        help="Show at most this many recent records (default: 10)",
+    )
+    parser.add_argument(
+        "--json",
+        action="store_true",
+        dest="json_output",
+        help="Print recent runtime records as JSON",
+    )
+
+    args = parser.parse_args()
+    if args.limit <= 0:
+        print(f"{Colors.RED}History limit must be greater than zero.{Colors.RESET}")
+        raise SystemExit(1)
+
+    paths = get_runtime_paths()
+    configured_home = os.environ.get("ENVMGR_HOME")
+    records = load_runtime_run_history(paths)
+    selected_records = records[: args.limit]
+
+    if args.json_output:
+        payload = {
+            "runtime": {
+                "home": str(paths.home),
+                "configured_home": (
+                    str(Path(configured_home).expanduser().resolve())
+                    if configured_home
+                    else None
+                ),
+                "runs_log_dir": str(paths.runs_log_dir),
+            },
+            "count": len(selected_records),
+            "total": len(records),
+            "records": selected_records,
+        }
+        print(json.dumps(payload, indent=2))
+        return
+
+    runtime_home_value = abbreviate_home_in_text(str(paths.home))
+    runtime_home_suffix = " (from ENVMGR_HOME)" if configured_home else " (default)"
+
+    print("Envmgr History")
+    print(f"Runtime home  {runtime_home_value}{runtime_home_suffix}")
+    print(f"Runs dir      {abbreviate_home_in_text(str(paths.runs_log_dir))}")
+
+    if not records:
+        print()
+        print("No runtime subprocess history has been recorded yet.")
+        return
+
+    print(
+        f"Showing {len(selected_records)} of {len(records)} recorded runtime commands"
+    )
+    print()
+
+    for record in selected_records:
+        status = str(record.get("status", "unknown"))
+        return_code = record.get("return_code")
+        return_code_text = "-" if return_code is None else str(return_code)
+        print(
+            f"- {record.get('started_at', '<unknown time>')} "
+            f"[{get_runtime_history_status_text(status)}] "
+            f"rc={return_code_text} "
+            f"dur={get_runtime_history_duration_text(record.get('duration_seconds'))} "
+            f"mode={record.get('mode', '-')}"
+        )
+        print(f"  {stringify_runtime_history_command(record.get('command'))}")
+
+
 def setup() -> None:
     """
     Setup the envmgr project by syncing dependencies, initializing ~/.envmgr, and installing ansible content.
@@ -1506,9 +1929,8 @@ def setup() -> None:
 
     # Step 3: Install ansible roles and collections
     print("3. Installing ansible roles and collections...")
-    env = build_ansible_runtime_env(runtime_paths)
     try:
-        subprocess.run(
+        run_runtime_subprocess(
             [
                 "ansible-galaxy",
                 "role",
@@ -1519,9 +1941,9 @@ def setup() -> None:
                 "requirements.yaml",
             ],
             check=True,
-            env=env,
+            runtime_paths=runtime_paths,
         )
-        subprocess.run(
+        run_runtime_subprocess(
             [
                 "ansible-galaxy",
                 "collection",
@@ -1532,7 +1954,7 @@ def setup() -> None:
                 "requirements.yaml",
             ],
             check=True,
-            env=env,
+            runtime_paths=runtime_paths,
         )
         mark_runtime_setup_complete(runtime_paths)
         print("✓ Ansible roles and collections installed successfully")
@@ -1650,7 +2072,7 @@ def validate() -> None:
     ]
     inventory_path, _inventory_label = resolve_inventory_option(args.inventory)
 
-    env = build_ansible_runtime_env(ensure_runtime_layout())
+    runtime_paths = ensure_runtime_layout()
 
     print("Running project validation...")
 
@@ -1658,7 +2080,11 @@ def validate() -> None:
         run_command_step("ruff check", ["ruff", "check", "scripts/"]),
         run_command_step("ruff format", ["ruff", "format", "--check", "scripts/"]),
         run_command_step("mypy", ["mypy", "scripts/"]),
-        run_command_step("ansible-lint", ["ansible-lint", "./roles"]),
+        run_command_step(
+            "ansible-lint",
+            ["ansible-lint", "./roles"],
+            runtime_paths=runtime_paths,
+        ),
     ]
 
     if not playbooks:
@@ -1679,7 +2105,7 @@ def validate() -> None:
                     playbook,
                     "--syntax-check",
                 ],
-                env=env,
+                runtime_paths=runtime_paths,
             )
         )
 
@@ -2193,6 +2619,291 @@ def smoke_test() -> None:
             if env["ANSIBLE_LOG_PATH"] != str(runtime_paths.ansible_log_file):
                 raise AssertionError("expected ansible log path to point to ~/.envmgr")
 
+    def check_runtime_subprocess_helpers_use_runtime_paths() -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            runtime_paths = ensure_runtime_layout(Path(temp_dir) / ".envmgr")
+
+            with patch(
+                "subprocess.run",
+                return_value=subprocess.CompletedProcess(
+                    ["ansible-playbook", "--version"],
+                    0,
+                ),
+            ) as mock_run:
+                run_runtime_subprocess(
+                    ["ansible-playbook", "--version"],
+                    runtime_paths=runtime_paths,
+                    extra_env={"ENVMGR_TEST_FLAG": "run"},
+                )
+
+            run_env = mock_run.call_args.kwargs.get("env")
+            if not isinstance(run_env, dict):
+                raise AssertionError("expected run helper to pass an env mapping")
+            if run_env.get("ANSIBLE_LOG_PATH") != str(runtime_paths.ansible_log_file):
+                raise AssertionError(
+                    "expected run helper to point ansible logs at ~/.envmgr"
+                )
+            if run_env.get("ENVMGR_TEST_FLAG") != "run":
+                raise AssertionError(
+                    "expected run helper to merge extra environment variables"
+                )
+            run_records = sorted(runtime_paths.runs_log_dir.glob("*.json"))
+            if len(run_records) != 1:
+                raise AssertionError("expected run helper to write one runtime record")
+            run_payload = json.loads(run_records[0].read_text(encoding="utf-8"))
+            if run_payload["status"] != "succeeded":
+                raise AssertionError("expected run helper to mark successful records")
+            if run_payload["mode"] != "run":
+                raise AssertionError("expected run helper to record mode=run")
+            if run_payload["return_code"] != 0:
+                raise AssertionError("expected run helper to persist return_code=0")
+            if run_payload["ansible_log_file"] != str(runtime_paths.ansible_log_file):
+                raise AssertionError(
+                    "expected run helper to persist the ansible log path"
+                )
+            if run_payload["completed_at"] is None:
+                raise AssertionError(
+                    "expected run helper to persist completion timestamps"
+                )
+
+            mock_process = Mock()
+            mock_process.pid = 4242
+            mock_process.wait.return_value = 0
+            mock_process.poll.return_value = None
+            mock_process.returncode = 0
+
+            with patch("subprocess.Popen", return_value=mock_process) as mock_popen:
+                process = popen_runtime_subprocess(
+                    ["ansible-playbook", "--version"],
+                    runtime_paths=runtime_paths,
+                    extra_env={"ENVMGR_TEST_FLAG": "popen"},
+                    stdout=subprocess.PIPE,
+                )
+                process.wait()
+
+            popen_env = mock_popen.call_args.kwargs.get("env")
+            if not isinstance(popen_env, dict):
+                raise AssertionError("expected popen helper to pass an env mapping")
+            if popen_env.get("ANSIBLE_LOCAL_TEMP") != str(runtime_paths.tmp_dir):
+                raise AssertionError(
+                    "expected popen helper to point ansible temp files at ~/.envmgr"
+                )
+            if popen_env.get("ENVMGR_TEST_FLAG") != "popen":
+                raise AssertionError(
+                    "expected popen helper to merge extra environment variables"
+                )
+            popen_records = sorted(runtime_paths.runs_log_dir.glob("*.json"))
+            if len(popen_records) != 2:
+                raise AssertionError(
+                    "expected popen helper to append a second runtime record"
+                )
+            popen_payload = json.loads(popen_records[-1].read_text(encoding="utf-8"))
+            if popen_payload["mode"] != "popen":
+                raise AssertionError("expected popen helper to record mode=popen")
+            if popen_payload["status"] != "succeeded":
+                raise AssertionError("expected popen helper to mark successful records")
+            if popen_payload["pid"] != 4242:
+                raise AssertionError("expected popen helper to persist the child pid")
+            if popen_payload["return_code"] != 0:
+                raise AssertionError(
+                    "expected popen helper to persist the child return code"
+                )
+
+    def check_setup_logs_ansible_galaxy_runs() -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            envmgr_home = Path(temp_dir) / ".envmgr"
+            captured_output = io.StringIO()
+
+            def fake_run(
+                command: list[str],
+                *,
+                env: dict[str, str] | None = None,
+                **_kwargs: Any,
+            ) -> subprocess.CompletedProcess[Any]:
+                return subprocess.CompletedProcess(command, 0)
+
+            with (
+                patch("subprocess.run", side_effect=fake_run),
+                patch("sys.stdout", new=captured_output),
+                patch.dict(os.environ, {"ENVMGR_HOME": str(envmgr_home)}, clear=False),
+            ):
+                setup()
+
+            runtime_paths = get_runtime_paths(envmgr_home)
+            run_records = sorted(runtime_paths.runs_log_dir.glob("*.json"))
+            if len(run_records) != 2:
+                raise AssertionError(
+                    "expected setup to log the role and collection galaxy installs"
+                )
+
+            payloads = [
+                json.loads(record.read_text(encoding="utf-8")) for record in run_records
+            ]
+            commands = [payload["command"][:3] for payload in payloads]
+            if ["ansible-galaxy", "role", "install"] not in commands:
+                raise AssertionError(
+                    "expected setup to log the Galaxy role installation command"
+                )
+            if ["ansible-galaxy", "collection", "install"] not in commands:
+                raise AssertionError(
+                    "expected setup to log the Galaxy collection installation command"
+                )
+            if not runtime_paths.setup_marker_file.exists():
+                raise AssertionError(
+                    "expected setup to keep writing the runtime setup marker"
+                )
+
+    def check_history_text_output() -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            envmgr_home = Path(temp_dir) / ".envmgr"
+            runtime_paths = ensure_runtime_layout(envmgr_home)
+
+            records = [
+                (
+                    "20260418T100000000000Z-ansible-11111111.json",
+                    {
+                        "schema_version": RUNTIME_RUN_RECORD_SCHEMA_VERSION,
+                        "mode": "run",
+                        "command_name": "ansible",
+                        "command": ["ansible", "-m", "ping", "all"],
+                        "cwd": str(Path.cwd()),
+                        "runtime_home": str(runtime_paths.home),
+                        "ansible_log_file": str(runtime_paths.ansible_log_file),
+                        "status": "failed",
+                        "pid": 1001,
+                        "return_code": 2,
+                        "started_at": "2026-04-18T10:00:00Z",
+                        "completed_at": "2026-04-18T10:00:01Z",
+                        "duration_seconds": 1.0,
+                        "error": None,
+                    },
+                ),
+                (
+                    "20260418T110000000000Z-ansible-playbook-22222222.json",
+                    {
+                        "schema_version": RUNTIME_RUN_RECORD_SCHEMA_VERSION,
+                        "mode": "run",
+                        "command_name": "ansible-playbook",
+                        "command": [
+                            "ansible-playbook",
+                            "playbooks/workstation.yml",
+                            "--syntax-check",
+                        ],
+                        "cwd": str(Path.cwd()),
+                        "runtime_home": str(runtime_paths.home),
+                        "ansible_log_file": str(runtime_paths.ansible_log_file),
+                        "status": "succeeded",
+                        "pid": 1002,
+                        "return_code": 0,
+                        "started_at": "2026-04-18T11:00:00Z",
+                        "completed_at": "2026-04-18T11:00:02Z",
+                        "duration_seconds": 2.0,
+                        "error": None,
+                    },
+                ),
+                (
+                    "20260418T120000000000Z-ansible-galaxy-33333333.json",
+                    {
+                        "schema_version": RUNTIME_RUN_RECORD_SCHEMA_VERSION,
+                        "mode": "run",
+                        "command_name": "ansible-galaxy",
+                        "command": ["ansible-galaxy", "role", "install"],
+                        "cwd": str(Path.cwd()),
+                        "runtime_home": str(runtime_paths.home),
+                        "ansible_log_file": str(runtime_paths.ansible_log_file),
+                        "status": "running",
+                        "pid": 1003,
+                        "return_code": None,
+                        "started_at": "2026-04-18T12:00:00Z",
+                        "completed_at": None,
+                        "duration_seconds": None,
+                        "error": None,
+                    },
+                ),
+            ]
+
+            for filename, payload in records:
+                write_runtime_run_record(runtime_paths.runs_log_dir / filename, payload)
+
+            captured_output = io.StringIO()
+            with (
+                patch("sys.argv", ["history", "--limit", "2"]),
+                patch("sys.stdout", new=captured_output),
+                patch.dict(os.environ, {"ENVMGR_HOME": str(envmgr_home)}, clear=False),
+            ):
+                history()
+
+            output = captured_output.getvalue()
+            if "Envmgr History" not in output:
+                raise AssertionError("expected history text output to include a title")
+            if "Showing 2 of 3 recorded runtime commands" not in output:
+                raise AssertionError("expected history text output to honor the limit")
+            if (
+                "2026-04-18T12:00:00Z" not in output
+                or "ansible-galaxy role install" not in output
+            ):
+                raise AssertionError(
+                    "expected history text output to include the newest record"
+                )
+            if (
+                "2026-04-18T11:00:00Z" not in output
+                or "ansible-playbook playbooks/workstation.yml --syntax-check"
+                not in output
+            ):
+                raise AssertionError(
+                    "expected history text output to include the second-newest record"
+                )
+            if "2026-04-18T10:00:00Z" in output:
+                raise AssertionError(
+                    "expected history text output to omit records beyond the limit"
+                )
+
+    def check_history_json_output() -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            envmgr_home = Path(temp_dir) / ".envmgr"
+            runtime_paths = ensure_runtime_layout(envmgr_home)
+
+            write_runtime_run_record(
+                runtime_paths.runs_log_dir
+                / "20260418T120000000000Z-ansible-44444444.json",
+                {
+                    "schema_version": RUNTIME_RUN_RECORD_SCHEMA_VERSION,
+                    "mode": "run",
+                    "command_name": "ansible",
+                    "command": ["ansible", "-m", "ping", "all"],
+                    "cwd": str(Path.cwd()),
+                    "runtime_home": str(runtime_paths.home),
+                    "ansible_log_file": str(runtime_paths.ansible_log_file),
+                    "status": "succeeded",
+                    "pid": 1004,
+                    "return_code": 0,
+                    "started_at": "2026-04-18T12:00:00Z",
+                    "completed_at": "2026-04-18T12:00:01Z",
+                    "duration_seconds": 1.0,
+                    "error": None,
+                },
+            )
+
+            captured_output = io.StringIO()
+            with (
+                patch("sys.argv", ["history", "--json"]),
+                patch("sys.stdout", new=captured_output),
+                patch.dict(os.environ, {"ENVMGR_HOME": str(envmgr_home)}, clear=False),
+            ):
+                history()
+
+            payload = json.loads(captured_output.getvalue())
+            if payload["count"] != 1 or payload["total"] != 1:
+                raise AssertionError("expected history --json to report record counts")
+            if payload["runtime"]["home"] != str(runtime_paths.home):
+                raise AssertionError(
+                    "expected history --json to report the runtime home"
+                )
+            if payload["records"][0]["command_name"] != "ansible":
+                raise AssertionError(
+                    "expected history --json to expose stored runtime records"
+                )
+
     def check_inventory_aliases_stay_under_runtime_inventory_dir() -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             envmgr_home = Path(temp_dir) / ".envmgr"
@@ -2312,10 +3023,8 @@ all:
             if inventory_label != "ci_cluster":
                 raise AssertionError("expected ci_cluster inventory alias to resolve")
 
-            env = build_ansible_runtime_env(runtime_paths)
-
             try:
-                list_hosts_result = subprocess.run(
+                list_hosts_result = run_runtime_subprocess(
                     [
                         "ansible-playbook",
                         "-i",
@@ -2324,9 +3033,9 @@ all:
                         "--list-hosts",
                     ],
                     check=True,
+                    runtime_paths=runtime_paths,
                     capture_output=True,
                     text=True,
-                    env=env,
                 )
             except subprocess.CalledProcessError as error:
                 output = (error.stdout or error.stderr or "").strip()
@@ -2376,7 +3085,7 @@ all:
             )
 
             try:
-                subprocess.run(
+                run_runtime_subprocess(
                     [
                         "ansible-playbook",
                         "-i",
@@ -2384,9 +3093,9 @@ all:
                         str(topology_playbook_path),
                     ],
                     check=True,
+                    runtime_paths=runtime_paths,
                     capture_output=True,
                     text=True,
-                    env=env,
                 )
             except subprocess.CalledProcessError as error:
                 output = "\n".join(
@@ -2621,7 +3330,7 @@ all:
     ]
     inventory_path, _inventory_label = resolve_inventory_option(args.inventory)
 
-    env = build_ansible_runtime_env(ensure_runtime_layout())
+    runtime_paths = ensure_runtime_layout()
 
     print("Running smoke tests...")
 
@@ -2661,6 +3370,22 @@ all:
         run_assertion_step(
             "runtime env uses ~/.envmgr paths only",
             check_runtime_env_uses_runtime_paths_only,
+        ),
+        run_assertion_step(
+            "runtime subprocess helpers use ~/.envmgr paths",
+            check_runtime_subprocess_helpers_use_runtime_paths,
+        ),
+        run_assertion_step(
+            "setup logs ansible-galaxy runtime runs",
+            check_setup_logs_ansible_galaxy_runs,
+        ),
+        run_assertion_step(
+            "history renders readable text output",
+            check_history_text_output,
+        ),
+        run_assertion_step(
+            "history emits json output",
+            check_history_json_output,
         ),
         run_assertion_step(
             "inventory aliases stay under ~/.envmgr/inventory",
@@ -2718,7 +3443,7 @@ all:
                     playbook,
                     "--list-tags",
                 ],
-                env=env,
+                runtime_paths=runtime_paths,
             )
         )
 

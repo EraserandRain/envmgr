@@ -39,6 +39,8 @@ safe to run before or after setup when you want to inspect what is missing
 under `~/.envmgr/`.
 Use `uv run doctor --json` when you want a machine-readable report for scripts
 or CI.
+Use `uv run history` to inspect the most recent runtime subprocess records, or
+`uv run history -n 5` to focus on the latest few commands.
 
 ### Host Settings
 
@@ -55,6 +57,7 @@ creates:
 For `uv run` commands, envmgr now uses these runtime paths consistently:
 
 - Ansible logs are written to `~/.envmgr/log/ansible.log`
+- Runtime subprocess records are written to `~/.envmgr/log/runs/*.json`
 - Galaxy roles are installed to `~/.envmgr/cache/galaxy/roles`
 - Galaxy collections are installed to `~/.envmgr/cache/galaxy/collections`
 - Temporary Ansible files use `~/.envmgr/cache/tmp`
