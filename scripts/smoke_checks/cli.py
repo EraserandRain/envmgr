@@ -203,3 +203,31 @@ def check_install_list_tags_cli_contract() -> None:
         raise AssertionError(
             "expected `envmgr install -l` to keep hidden task tags out of the public CLI"
         )
+
+
+def check_ping_cli_contract() -> None:
+    with tempfile.TemporaryDirectory() as temp_dir:
+        envmgr_home = Path(temp_dir) / ".envmgr"
+        runtime_paths = bootstrap_cli_runtime(envmgr_home)
+        result = run_envmgr_cli(
+            "ping",
+            env_overrides={"ENVMGR_HOME": str(runtime_paths.home)},
+        )
+
+        if result.returncode != 0:
+            raise AssertionError(
+                "expected `envmgr ping` to succeed for the bootstrapped local runtime"
+                f"\nstdout:\n{result.stdout}\nstderr:\n{result.stderr}"
+            )
+        if result.stderr:
+            raise AssertionError("expected `envmgr ping` to keep stderr empty")
+
+        output = result.stdout
+        if "Testing connection with inventory: default ->" not in output:
+            raise AssertionError(
+                "expected `envmgr ping` to print the selected default inventory"
+            )
+        if "localhost" not in output or "SUCCESS" not in output:
+            raise AssertionError(
+                "expected `envmgr ping` to report a successful localhost ansible ping"
+            )
