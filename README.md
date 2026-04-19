@@ -34,8 +34,9 @@ uv run envmgr install -l
 Run `uv run envmgr setup` before `uv run envmgr install`, `uv run envmgr ping`, `uv run validate`,
 or `uv run smoke-test` on a fresh machine or a fresh `ENVMGR_HOME`. The command
 is safe to re-run and does not overwrite existing runtime config files. `uv run
-validate` now checks both `scripts/` and `tests/`, and `uv run smoke-test` runs
-the `tests.test_smoke` suite before the playbook `--list-tags` checks.
+validate` now checks both `scripts/` and `tests/`, runs the split
+`tests/test_*.py` unit modules, and `uv run smoke-test` runs only the
+`tests.test_smoke` suite before the playbook `--list-tags` checks.
 
 `uv run envmgr doctor` performs a read-only health check for the current runtime. It is
 safe to run before or after setup when you want to inspect what is missing
@@ -382,6 +383,9 @@ uv run pre-commit run --hook-stage pre-push --all-files
 # Run the full validation flows through pre-commit
 uv run pre-commit run --hook-stage manual validate --all-files
 uv run pre-commit run --hook-stage manual smoke-test --all-files
+
+# Run the full Python test matrix directly
+uv run python -m unittest discover tests -p 'test_*.py'
 
 # Run only the Python smoke suite directly
 uv run python -m unittest tests.test_smoke
