@@ -5,6 +5,9 @@ import unittest
 from tests.checks.cli import (
     check_dispatcher_rejects_dev_only_subcommands,
     check_dispatcher_routes_install_subcommand,
+    check_dispatcher_routes_ping_subcommand,
+    check_dispatcher_routes_setup_subcommand,
+    check_runtime_subcommands_use_typer_help,
 )
 from tests.support import Check, build_check_suite, build_check_test_case
 
@@ -12,6 +15,18 @@ CLI_CONTRACT_TEST_CHECKS: tuple[Check, ...] = (
     (
         "public CLI exposes help and install subcommands",
         check_dispatcher_routes_install_subcommand,
+    ),
+    (
+        "public runtime subcommands keep Typer Rich help output",
+        check_runtime_subcommands_use_typer_help,
+    ),
+    (
+        "public CLI routes setup to the shared Rich runtime summary",
+        check_dispatcher_routes_setup_subcommand,
+    ),
+    (
+        "public CLI routes ping to the shared Rich runtime summary",
+        check_dispatcher_routes_ping_subcommand,
     ),
     (
         "public CLI rejects dev-only subcommands",

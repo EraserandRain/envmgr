@@ -60,12 +60,16 @@ def check_ping_uses_selected_inventory_alias() -> None:
             raise AssertionError("expected ping to run ansible in check mode")
 
         output = captured_output.getvalue()
-        if (
-            "Testing connection with inventory: remote -> "
-            f"{runtime_paths.remote_inventory_file}" not in output
-        ):
+        expected_fragments = (
+            "Envmgr Ping",
+            "Inventory: remote",
+            f"Inventory path: {runtime_paths.remote_inventory_file}",
+            "Info: Running ansible ping against all hosts...",
+            "Success: Ping completed successfully.",
+        )
+        if any(fragment not in output for fragment in expected_fragments):
             raise AssertionError(
-                "expected ping to print the selected inventory alias and path"
+                "expected ping to use the shared heading, summary, and status output"
             )
 
 

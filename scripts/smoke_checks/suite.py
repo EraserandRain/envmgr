@@ -16,6 +16,7 @@ from .cli import (
     check_history_json_cli_contract,
     check_install_list_tags_cli_contract,
     check_ping_cli_contract,
+    check_setup_cli_contract,
 )
 from .install import check_ai_tools_setup_wizard_flow
 from .runtime import (
@@ -36,6 +37,7 @@ SMOKE_TEST_CHECKS: tuple[SmokeCheck, ...] = (
     ("history json CLI contract", check_history_json_cli_contract),
     ("install list-tags CLI contract", check_install_list_tags_cli_contract),
     ("ping CLI contract", check_ping_cli_contract),
+    ("setup CLI contract", check_setup_cli_contract),
     ("setup logs ansible-galaxy runtime runs", check_setup_logs_ansible_galaxy_runs),
     ("multi-node inventory topology", check_multi_node_inventory_topology),
 )
