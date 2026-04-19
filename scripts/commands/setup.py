@@ -8,19 +8,11 @@ from ..runtime_config import (
     mark_runtime_setup_complete,
 )
 from ..services.runtime import run_runtime_subprocess
-from .shared import build_command_parser, exit_with_error, parse_command_args
+from .shared import exit_with_error
 
 
-def setup(argv: list[str] | None = None) -> None:
+def run_setup() -> None:
     """Initialize ~/.envmgr and install the Ansible content envmgr needs."""
-    parse_command_args(
-        build_command_parser(
-            "setup",
-            "Initialize ~/.envmgr and install the Ansible content envmgr needs at runtime.",
-        ),
-        argv,
-    )
-
     print("Setting up envmgr runtime...")
     print("1. Initializing ~/.envmgr...")
     try:
@@ -72,3 +64,17 @@ def setup(argv: list[str] | None = None) -> None:
         )
 
     print("🎉 Setup completed successfully!")
+
+
+def setup(argv: list[str] | None = None) -> None:
+    """Initialize ~/.envmgr and install the Ansible content envmgr needs."""
+    from .legacy_argparse import build_command_parser, parse_command_args
+
+    parse_command_args(
+        build_command_parser(
+            "setup",
+            "Initialize ~/.envmgr and install the Ansible content envmgr needs at runtime.",
+        ),
+        argv,
+    )
+    run_setup()

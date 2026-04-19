@@ -1,11 +1,13 @@
 from __future__ import annotations
 
-import argparse
 from pathlib import Path
 from typing import NoReturn
 
+import typer
+from rich.console import Console
+
 from ..catalog import CatalogError
-from ..command_text import CLI_ROOT_COMMAND, SETUP_HINT
+from ..command_text import SETUP_HINT
 from ..runtime_config import (
     ConfigError,
     get_runtime_paths,
@@ -14,39 +16,14 @@ from ..runtime_config import (
 )
 from ..services.install import load_available_tags as load_available_tags_service
 
-
-class Colors:
-    GREEN = "\033[32m"
-    YELLOW = "\033[33m"
-    RED = "\033[31m"
-    RESET = "\033[0m"
+console = Console()
+error_console = Console(stderr=True)
 
 
 def exit_with_error(message: str, *, code: int = 1) -> NoReturn:
     """Print a user-facing error message and exit with a non-zero status."""
-    print(f"{Colors.RED}{message}{Colors.RESET}")
-    raise SystemExit(code)
-
-
-def build_command_parser(
-    command_name: str,
-    description: str,
-    *,
-    prog_name: str | None = None,
-) -> argparse.ArgumentParser:
-    """Create a parser for one `envmgr <command>` subcommand."""
-    return argparse.ArgumentParser(
-        prog=prog_name or f"{CLI_ROOT_COMMAND} {command_name}",
-        description=description,
-    )
-
-
-def parse_command_args(
-    parser: argparse.ArgumentParser,
-    argv: list[str] | None,
-) -> argparse.Namespace:
-    """Parse subcommand arguments without inheriting outer `sys.argv` by default."""
-    return parser.parse_args([] if argv is None else argv)
+    error_console.print(f"[red]{message}[/red]")
+    raise typer.Exit(code=code)
 
 
 def load_available_tags() -> tuple[list[str], list[str]]:
@@ -54,8 +31,7 @@ def load_available_tags() -> tuple[list[str], list[str]]:
     try:
         return load_available_tags_service()
     except CatalogError as error:
-        print(f"{Colors.RED}Metadata error: {error}{Colors.RESET}")
-        raise SystemExit(1) from error
+        exit_with_error(f"Metadata error: {error}")
 
 
 def resolve_inventory_option(selected_inventory: str | None) -> tuple[Path, str]:
@@ -63,8 +39,7 @@ def resolve_inventory_option(selected_inventory: str | None) -> tuple[Path, str]
     try:
         return resolve_inventory_reference(selected_inventory)
     except ConfigError as error:
-        print(f"{Colors.RED}Configuration error: {error}{Colors.RESET}")
-        raise SystemExit(1) from error
+        exit_with_error(f"Configuration error: {error}")
 
 
 def require_setup_completed(
@@ -77,9 +52,7 @@ def require_setup_completed(
     if is_runtime_setup_complete(runtime_paths):
         return
 
-    print(
-        f"{Colors.RED}Setup required: '{command_name}' needs a bootstrapped envmgr "
-        f"runtime at {runtime_paths.home}. Please {SETUP_HINT}."
-        f"{Colors.RESET}"
+    exit_with_error(
+        f"Setup required: '{command_name}' needs a bootstrapped envmgr runtime at "
+        f"{runtime_paths.home}. Please {SETUP_HINT}."
     )
-    raise SystemExit(1)

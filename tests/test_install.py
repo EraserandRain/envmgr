@@ -8,6 +8,7 @@ from tests.checks.install import (
     check_install_interrupt_exits_cleanly,
     check_install_rejects_all_plus_other_tags,
     check_install_rejects_unknown_tags_with_exit_code,
+    check_install_typer_flags_preserve_tri_state_bools,
 )
 from tests.support import Check, build_check_suite, build_check_test_case
 
@@ -27,6 +28,10 @@ INSTALL_TEST_CHECKS: tuple[Check, ...] = (
     (
         "install rejects mixed all-tag selections",
         check_install_rejects_all_plus_other_tags,
+    ),
+    (
+        "install Typer flags preserve tri-state bool semantics",
+        check_install_typer_flags_preserve_tri_state_bools,
     ),
     ("install exits cleanly on Ctrl+C", check_install_interrupt_exits_cleanly),
 )

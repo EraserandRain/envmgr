@@ -21,11 +21,9 @@ from ..services.install import (
 )
 from ..services.runtime import RuntimePopenProcess, popen_runtime_subprocess
 from .shared import (
-    Colors,
-    build_command_parser,
+    console,
     exit_with_error,
     load_available_tags,
-    parse_command_args,
     require_setup_completed,
 )
 
@@ -296,8 +294,10 @@ def resolve_ai_tools_install_options(
     )
 
 
-def install(argv: list[str] | None = None) -> None:
-    """Install and configure the envmgr project using Ansible."""
+def _build_install_parser():
+    """Create the legacy install parser used by compatibility entrypoints."""
+    from .legacy_argparse import build_command_parser
+
     parser = build_command_parser(
         "install", description="Install and Configure envmgr with ansible"
     )
@@ -387,10 +387,25 @@ def install(argv: list[str] | None = None) -> None:
         choices=AI_TOOLS_CONTEXT7_METHODS,
         help="Choose the Context7 transport for Codex CLI",
     )
+    return parser
 
-    args = parse_command_args(parser, argv)
 
-    if args.list_tags:
+def run_install(
+    *,
+    tags: list[str],
+    list_tags: bool,
+    playbook: str | None,
+    inventory: str | None,
+    ask_vault_pass: bool,
+    manage_claude_code: bool | None,
+    manage_codex: bool | None,
+    manage_rtk: bool | None,
+    enable_context7: bool | None,
+    claude_context7_method: str | None,
+    codex_context7_method: str | None,
+) -> None:
+    """Install and configure envmgr using explicit option values."""
+    if list_tags:
         role_tags, task_tags = load_available_tags()
         print("Envmgr available tags:")
         print("\nRole level tags:")
@@ -401,12 +416,8 @@ def install(argv: list[str] | None = None) -> None:
             print(f"  - {tag}")
         return
 
-    if not args.tags:
-        parser.print_help()
-        return
-
     try:
-        selected_tags = normalize_selected_tags(list(args.tags))
+        selected_tags = normalize_selected_tags(list(tags))
     except CatalogError as error:
         exit_with_error(f"Error: {error}")
 
@@ -428,8 +439,8 @@ def install(argv: list[str] | None = None) -> None:
     try:
         install_plan = build_install_plan(
             selected_tags,
-            explicit_playbook=args.playbook,
-            inventory_reference=args.inventory,
+            explicit_playbook=playbook,
+            inventory_reference=inventory,
             role_tags=role_tags,
             task_tags=task_tags,
         )
@@ -440,12 +451,12 @@ def install(argv: list[str] | None = None) -> None:
     ai_tools_flags_provided = any(
         value is not None
         for value in (
-            args.ai_tools_manage_claude_code,
-            args.ai_tools_manage_codex,
-            args.ai_tools_manage_rtk,
-            args.ai_tools_context7,
-            args.claude_context7_method,
-            args.codex_context7_method,
+            manage_claude_code,
+            manage_codex,
+            manage_rtk,
+            enable_context7,
+            claude_context7_method,
+            codex_context7_method,
         )
     )
     use_ai_tools_wizard = interactive_ai_tools and not ai_tools_flags_provided
@@ -455,12 +466,12 @@ def install(argv: list[str] | None = None) -> None:
         ai_tools_options = resolve_ai_tools_install_options(
             install_plan.selected_tags,
             execution_playbook_path=install_plan.execution_playbook_path,
-            manage_claude_code=args.ai_tools_manage_claude_code,
-            manage_codex=args.ai_tools_manage_codex,
-            manage_rtk=args.ai_tools_manage_rtk,
-            enable_context7=args.ai_tools_context7,
-            claude_context7_method=args.claude_context7_method,
-            codex_context7_method=args.codex_context7_method,
+            manage_claude_code=manage_claude_code,
+            manage_codex=manage_codex,
+            manage_rtk=manage_rtk,
+            enable_context7=enable_context7,
+            claude_context7_method=claude_context7_method,
+            codex_context7_method=codex_context7_method,
             interactive=use_ai_tools_wizard,
         )
     except WizardCancelled as error:
@@ -473,8 +484,8 @@ def install(argv: list[str] | None = None) -> None:
 
     try:
         if not install_plan.ai_tools_defaults.applicable and ai_tools_flags_provided:
-            print(
-                f"{Colors.RED}Warning: AI-tools flags were ignored because this run does not include the ai_tools role{Colors.RESET}"
+            console.print(
+                "[yellow]Warning:[/yellow] AI-tools flags were ignored because this run does not include the ai_tools role"
             )
 
         print("\nRunning Ansible playbook with:")
@@ -485,15 +496,13 @@ def install(argv: list[str] | None = None) -> None:
             f"  Inventory: {install_plan.inventory_label} -> {install_plan.inventory_path}"
         )
         if is_all_tag_selection(install_plan.selected_tags):
-            print(f"{Colors.GREEN}  All tags will be executed{Colors.RESET}")
+            console.print("[green]  All tags will be executed[/green]")
         else:
-            print(f"{Colors.GREEN}  Tags:", end=" ")
-            for tag in install_plan.selected_tags:
-                if tag in install_plan.role_tags:
-                    print(f"[Role: {tag}]", end=" ")
-                elif tag in install_plan.task_tags:
-                    print(f"[Task: {tag}]", end=" ")
-            print(f"{Colors.RESET}")
+            rendered_tags = [
+                f"[Role: {tag}]" if tag in install_plan.role_tags else f"[Task: {tag}]"
+                for tag in install_plan.selected_tags
+            ]
+            console.print(f"  Tags: {' '.join(rendered_tags)}")
         if ai_tools_options is not None:
             print(
                 f"  AI tools: Claude Code={ai_tools_options.manage_claude_code}, "
@@ -521,7 +530,7 @@ def install(argv: list[str] | None = None) -> None:
 
         command = build_install_command(
             install_plan,
-            ask_vault_pass=args.ask_vault_pass or install_plan.default_ask_vault_pass,
+            ask_vault_pass=ask_vault_pass or install_plan.default_ask_vault_pass,
             ai_tools_options=ai_tools_options,
         )
 
@@ -551,3 +560,29 @@ def install(argv: list[str] | None = None) -> None:
         raise SystemExit(130) from error
     finally:
         cleanup_install_plan(install_plan)
+
+
+def install(argv: list[str] | None = None) -> None:
+    """Install and configure the envmgr project using Ansible."""
+    from .legacy_argparse import parse_command_args
+
+    parser = _build_install_parser()
+    args = parse_command_args(parser, argv)
+
+    if not args.tags and not args.list_tags:
+        parser.print_help()
+        return
+
+    run_install(
+        tags=list(args.tags),
+        list_tags=args.list_tags,
+        playbook=args.playbook,
+        inventory=args.inventory,
+        ask_vault_pass=args.ask_vault_pass,
+        manage_claude_code=args.ai_tools_manage_claude_code,
+        manage_codex=args.ai_tools_manage_codex,
+        manage_rtk=args.ai_tools_manage_rtk,
+        enable_context7=args.ai_tools_context7,
+        claude_context7_method=args.claude_context7_method,
+        codex_context7_method=args.codex_context7_method,
+    )

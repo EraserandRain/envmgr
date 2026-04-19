@@ -3,7 +3,8 @@ from __future__ import annotations
 import subprocess
 
 from .dev_shared import PYTHON_CHECK_PATHS
-from .shared import build_command_parser, exit_with_error, parse_command_args
+from .legacy_argparse import build_command_parser, parse_command_args
+from .shared import exit_with_error
 
 
 def lint(

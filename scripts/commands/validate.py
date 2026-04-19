@@ -7,9 +7,8 @@ from pathlib import Path
 
 from ..runtime_config import ensure_runtime_layout
 from .dev_shared import PYTHON_CHECK_PATHS, run_command_step
+from .legacy_argparse import build_command_parser, parse_command_args
 from .shared import (
-    build_command_parser,
-    parse_command_args,
     require_setup_completed,
     resolve_inventory_option,
 )

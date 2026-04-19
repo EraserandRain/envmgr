@@ -23,14 +23,12 @@ def check_envmgr_help_contract() -> None:
 
     output = result.stdout
     for expected_fragment in (
-        "usage: envmgr [-h]",
-        "Available commands:",
+        "Usage: envmgr",
         "doctor",
         "history",
         "install",
         "ping",
         "setup",
-        "Use `envmgr <command> --help`",
     ):
         if expected_fragment not in output:
             raise AssertionError(
@@ -48,20 +46,18 @@ def check_envmgr_invalid_command_contract() -> None:
     result = run_envmgr_cli("validate")
     if result.returncode != 2:
         raise AssertionError(
-            "expected an unknown `envmgr` subcommand to exit with argparse code 2"
+            "expected an unknown `envmgr` subcommand to exit with Click/Typer code 2"
             f"\nstdout:\n{result.stdout}\nstderr:\n{result.stderr}"
         )
-    if result.stdout:
-        raise AssertionError("expected invalid subcommands to avoid stdout output")
 
     stderr = result.stderr
-    if "invalid choice" not in stderr or "validate" not in stderr:
+    if "No such command 'validate'" not in stderr:
         raise AssertionError(
-            "expected invalid subcommands to surface the argparse invalid-choice error"
+            "expected invalid subcommands to surface the Click/Typer unknown-command error"
         )
-    if "{doctor,history,install,ping,setup}" not in stderr:
+    if "Try 'envmgr --help' for help." not in stderr:
         raise AssertionError(
-            "expected invalid subcommands to show the public `envmgr` command set"
+            "expected invalid subcommands to point users at `envmgr --help`"
         )
 
 

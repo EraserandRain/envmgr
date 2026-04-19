@@ -5,9 +5,8 @@ from pathlib import Path
 from ..runtime_config import ensure_runtime_layout
 from ..smoke_checks import iter_smoke_tests
 from .dev_shared import run_assertion_step, run_command_step
+from .legacy_argparse import build_command_parser, parse_command_args
 from .shared import (
-    build_command_parser,
-    parse_command_args,
     require_setup_completed,
     resolve_inventory_option,
 )
