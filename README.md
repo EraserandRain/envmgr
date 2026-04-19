@@ -69,6 +69,8 @@ Repository-local files still keep their original purpose:
 
 - `roles/` stays the source of first-party envmgr roles in this repo
 - `playbooks/` stays the source of scenario playbooks in this repo
+- `scripts/commands/` holds the `envmgr` subcommand handlers and shared CLI helpers
+- `scripts/services/` holds reusable runtime, install-planning, and doctor logic
 - `ansible.cfg` remains repository metadata used by envmgr internals and project checks
 
 `uv run envmgr ...` is the supported runtime command surface for envmgr. Development

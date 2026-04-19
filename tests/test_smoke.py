@@ -16,26 +16,14 @@ import yaml
 
 from scripts.catalog import CatalogError, get_available_tags
 from scripts.command_text import SETUP_COMMAND
+from scripts.commands.install import resolve_ai_tools_install_options
 from scripts.main import (
-    DOCTOR_FAIL,
-    DOCTOR_OK,
-    RUNTIME_RUN_RECORD_SCHEMA_VERSION,
-    build_ansible_runtime_env,
-    build_doctor_report,
-    build_execution_playbook,
     doctor,
     history,
     install,
     main,
-    popen_runtime_subprocess,
-    read_playbook_role_name,
-    read_playbook_role_tags,
     require_setup_completed,
-    resolve_ai_tools_install_options,
-    resolve_install_playbook,
-    run_runtime_subprocess,
     setup,
-    write_runtime_run_record,
 )
 from scripts.runtime_config import (
     SETUP_SCHEMA_VERSION,
@@ -48,6 +36,26 @@ from scripts.runtime_config import (
     resolve_inventory_reference,
 )
 from scripts.scaffold import generate_role
+from scripts.services.doctor import (
+    DOCTOR_FAIL,
+    DOCTOR_OK,
+    build_doctor_report,
+)
+from scripts.services.install import (
+    AiToolsInstallDefaults,
+    InstallPlan,
+    build_execution_playbook,
+    read_playbook_role_name,
+    read_playbook_role_tags,
+    resolve_install_playbook,
+)
+from scripts.services.runtime import (
+    RUNTIME_RUN_RECORD_SCHEMA_VERSION,
+    build_ansible_runtime_env,
+    popen_runtime_subprocess,
+    run_runtime_subprocess,
+    write_runtime_run_record,
+)
 
 SmokeCheck = tuple[str, Callable[[], None]]
 
@@ -498,7 +506,10 @@ def check_dispatcher_routes_install_subcommand() -> None:
 
     with (
         patch("sys.stdout", new=captured_output),
-        patch("scripts.main.load_available_tags", return_value=(["zsh"], ["codex"])),
+        patch(
+            "scripts.commands.install.load_available_tags",
+            return_value=(["zsh"], ["codex"]),
+        ),
     ):
         main(["install", "-l"])
 
@@ -534,7 +545,10 @@ def check_install_rejects_unknown_tags_with_exit_code() -> None:
 
     with (
         patch("sys.stdout", new=captured_output),
-        patch("scripts.main.load_available_tags", return_value=(["zsh"], ["codex"])),
+        patch(
+            "scripts.commands.install.load_available_tags",
+            return_value=(["zsh"], ["codex"]),
+        ),
     ):
         try:
             install(["does-not-exist"])
@@ -578,26 +592,36 @@ def check_install_interrupt_exits_cleanly() -> None:
         runtime_paths = ensure_runtime_layout(Path(temp_dir) / ".envmgr")
         execution_playbook_path = Path(temp_dir) / "execution.yml"
         execution_playbook_path.write_text("---\n", encoding="utf-8")
+        install_plan = InstallPlan(
+            selected_tags=["zsh"],
+            role_tags=["zsh"],
+            task_tags=[],
+            source_playbook_path="playbooks/workstation.yml",
+            execution_playbook_path=str(execution_playbook_path),
+            uses_temporary_execution_playbook=True,
+            inventory_path=runtime_paths.default_inventory_file,
+            inventory_label="default",
+            runtime_paths=runtime_paths,
+            default_ask_vault_pass=False,
+            ai_tools_defaults=AiToolsInstallDefaults(
+                applicable=False,
+                manage_claude_code=False,
+                manage_codex=False,
+                manage_rtk=False,
+            ),
+        )
 
         with (
-            patch("scripts.main.require_setup_completed"),
-            patch("scripts.main.load_available_tags", return_value=(["zsh"], [])),
-            patch("scripts.main.ensure_runtime_layout", return_value=runtime_paths),
+            patch("scripts.commands.install.require_setup_completed"),
             patch(
-                "scripts.main.resolve_install_playbook",
-                return_value="playbooks/workstation.yml",
+                "scripts.commands.install.build_install_plan", return_value=install_plan
             ),
             patch(
-                "scripts.main.resolve_inventory_option",
-                return_value=(runtime_paths.default_inventory_file, "default"),
+                "scripts.commands.install.resolve_ai_tools_install_options",
+                return_value=None,
             ),
             patch(
-                "scripts.main.build_execution_playbook",
-                return_value=str(execution_playbook_path),
-            ),
-            patch("scripts.main.resolve_ai_tools_install_options", return_value=None),
-            patch(
-                "scripts.main.popen_runtime_subprocess",
+                "scripts.commands.install.popen_runtime_subprocess",
                 side_effect=KeyboardInterrupt,
             ),
         ):
