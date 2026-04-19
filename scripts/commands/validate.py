@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 from ..runtime_config import ensure_runtime_layout
-from .dev_shared import PYTHON_CHECK_PATHS, run_command_step
+from .dev_shared import PYTHON_CHECK_PATHS, UNIT_TEST_MODULES, run_command_step
 from .shared import (
     build_command_parser,
     parse_command_args,
@@ -53,6 +54,10 @@ def validate(
         run_command_step(
             "ruff format",
             ["ruff", "format", "--check", *PYTHON_CHECK_PATHS],
+        ),
+        run_command_step(
+            "unittest",
+            [sys.executable, "-m", "unittest", *UNIT_TEST_MODULES],
         ),
         run_command_step("mypy", ["mypy", *PYTHON_CHECK_PATHS]),
         run_command_step(

@@ -7,7 +7,7 @@ This guide helps contributors work effectively on envmgr (Ansible-driven environ
 - `playbooks/` — scenario playbooks (`workstation.yml`, `node.yml`).
 - `roles/` — one folder per tool (`tasks/main.yml`, `vars/`, etc.).
 - `scripts/` — Python CLI entrypoints plus `commands/` and `services/` modules used by `uv`.
-- `tests/` — Python `unittest` smoke coverage exercised by `uv run smoke-test`.
+- `tests/` — Python `unittest` modules split by domain plus a dedicated smoke suite exercised by `uv run smoke-test`.
 - `vars/` — shared variables; `ansible.cfg` — repository Ansible defaults; runtime state lives under `~/.envmgr/`.
 
 ## Build, Test, and Development Commands
@@ -22,7 +22,7 @@ This guide helps contributors work effectively on envmgr (Ansible-driven environ
 - `uv run pre-commit run --hook-stage manual validate --all-files` — run the full validation suite through `pre-commit`.
 - `uv run pre-commit run --hook-stage manual smoke-test --all-files` — run the smoke suite through `pre-commit`.
 - `uv run lint`, `uv run ansible-check`, and `uv run typecheck` are rare direct entrypoints for debugging one tool in isolation.
-- `uv run validate` and `uv run smoke-test` remain the direct full-suite entrypoints for CI or more targeted troubleshooting.
+- `uv run validate` and `uv run smoke-test` remain the direct full-suite entrypoints for CI or more targeted troubleshooting; `validate` runs the split unit modules while `smoke-test` runs the smoke suite.
 
 ## Coding Style & Naming Conventions
 
@@ -35,7 +35,7 @@ This guide helps contributors work effectively on envmgr (Ansible-driven environ
 - Treat `pre-commit` as the primary local workflow; direct commands are mostly for rerunning one tool by itself or reproducing a CI failure more directly.
 - Run `uv sync` when you need the local development environment or tooling refreshed; run `uv run envmgr setup` when you need the user runtime inventory and Galaxy content bootstrapped.
 - Use `uv run validate --playbook <path>` and `uv run smoke-test --playbook <path>` for scenario-level checks against the runtime inventory managed under `~/.envmgr/`.
-- Run `uv run python -m unittest tests.test_smoke` when you want just the Python smoke suite without the CLI wrapper.
+- Run `uv run python -m unittest discover tests -p 'test_*.py'` when you want the full Python test matrix, or `uv run python -m unittest tests.test_smoke` when you want just the Python smoke suite without the CLI wrapper.
 - Ensure tasks are idempotent (second run reports no changes) and scoping via tags works as expected.
 
 ## Documentation Sync
