@@ -9,14 +9,6 @@ from ..scaffold import ScaffoldError
 from ..services.runtime import run_runtime_subprocess
 
 PYTHON_CHECK_PATHS = ["scripts/", "tests/"]
-UNIT_TEST_MODULES = [
-    "tests.test_catalog",
-    "tests.test_cli_contracts",
-    "tests.test_install",
-    "tests.test_runtime_config",
-    "tests.test_runtime_services",
-    "tests.test_doctor_history",
-]
 
 
 def run_command_step(

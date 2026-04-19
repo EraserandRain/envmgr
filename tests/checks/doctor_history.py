@@ -7,10 +7,10 @@ import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
-from ..main import doctor, history
-from ..runtime_config import ensure_runtime_layout, mark_runtime_setup_complete
-from ..services.doctor import DOCTOR_FAIL, DOCTOR_OK, build_doctor_report
-from ..services.runtime import (
+from scripts.main import doctor, history
+from scripts.runtime_config import ensure_runtime_layout, mark_runtime_setup_complete
+from scripts.services.doctor import DOCTOR_FAIL, DOCTOR_OK, build_doctor_report
+from scripts.services.runtime import (
     RUNTIME_RUN_RECORD_SCHEMA_VERSION,
     write_runtime_run_record,
 )

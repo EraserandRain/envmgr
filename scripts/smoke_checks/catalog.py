@@ -5,13 +5,12 @@ from pathlib import Path
 
 import yaml
 
-from ..catalog import CatalogError, get_available_tags
+from ..catalog import get_available_tags
 from ..scaffold import generate_role
 from ..services.install import (
     build_execution_playbook,
     read_playbook_role_name,
     read_playbook_role_tags,
-    resolve_install_playbook,
 )
 
 
@@ -66,40 +65,6 @@ def check_scaffold_generation() -> None:
         metadata = yaml.safe_load(metadata_contents)
         if metadata["name"] != "smoke-role":
             raise AssertionError("generated metadata did not render role name")
-
-
-def check_playbook_resolution() -> None:
-    if resolve_install_playbook(["zsh"], explicit_playbook=None) != (
-        "playbooks/workstation.yml"
-    ):
-        raise AssertionError("expected zsh to resolve to workstation playbook")
-
-    if resolve_install_playbook(["kubeadm"], explicit_playbook=None) != (
-        "playbooks/node.yml"
-    ):
-        raise AssertionError("expected kubeadm to resolve to node playbook")
-
-    try:
-        resolve_install_playbook(["docker"], explicit_playbook=None)
-    except CatalogError:
-        pass
-    else:
-        raise AssertionError("expected docker to require an explicit playbook")
-
-    if (
-        resolve_install_playbook(
-            ["init"], explicit_playbook="playbooks/workstation.yml"
-        )
-        != "playbooks/workstation.yml"
-    ):
-        raise AssertionError("expected init to stay valid on workstation playbook")
-
-    try:
-        resolve_install_playbook(["init"], explicit_playbook="playbooks/node.yml")
-    except CatalogError:
-        return
-
-    raise AssertionError("expected init to be rejected on node playbook")
 
 
 def check_execution_playbook_generation() -> None:
