@@ -2,11 +2,14 @@ from __future__ import annotations
 
 import json
 import os
-import shutil
-import textwrap
+
+import typer
+from rich.table import Table
+from rich.text import Text
 
 from ..services.doctor import (
     DOCTOR_OK,
+    DOCTOR_WARN,
     DoctorCheck,
     DoctorReport,
     build_doctor_json_payload,
@@ -14,17 +17,20 @@ from ..services.doctor import (
     get_doctor_overall_status,
     summarize_doctor_report,
 )
-from .shared import Colors, build_command_parser, parse_command_args
+from .shared import console
 
 
-def render_doctor_status_text(status: str) -> str:
+def render_doctor_status_text(status: str) -> Text:
     """Render a colored uppercase doctor status label."""
-    text = status.upper()
+    style = "red"
+    label = "FAIL"
     if status == DOCTOR_OK:
-        return f"{Colors.GREEN}{text}{Colors.RESET}"
-    if status == "warn":
-        return f"{Colors.YELLOW}{text}{Colors.RESET}"
-    return f"{Colors.RED}{text}{Colors.RESET}"
+        style = "green"
+        label = "OK"
+    elif status == DOCTOR_WARN:
+        style = "yellow"
+        label = "WARN"
+    return Text(label, style=style)
 
 
 def get_doctor_check_label(name: str) -> str:
@@ -53,44 +59,21 @@ def abbreviate_home_in_text(value: str) -> str:
     return value.replace(f"{home}/", "~/")
 
 
-def get_doctor_status_cell(status: str, width: int) -> str:
-    """Render a padded status cell for doctor tables."""
-    plain_status = status.upper().ljust(width)
-    if status == DOCTOR_OK:
-        return f"{Colors.GREEN}{plain_status}{Colors.RESET}"
-    if status == "warn":
-        return f"{Colors.YELLOW}{plain_status}{Colors.RESET}"
-    return f"{Colors.RED}{plain_status}{Colors.RESET}"
+def build_doctor_checks_table(checks: list[DoctorCheck]) -> Table:
+    """Render doctor checks as a compact Rich table."""
+    table = Table(show_header=True)
+    table.add_column("STATUS", no_wrap=True)
+    table.add_column("CHECK", no_wrap=True)
+    table.add_column("DETAIL")
 
-
-def render_doctor_checks_table(checks: list[DoctorCheck]) -> str:
-    """Render doctor checks as a compact ASCII table."""
-    status_width = len("STATUS")
-    labels = [get_doctor_check_label(check.name) for check in checks]
-    label_width = min(
-        max([len("CHECK"), *(len(label) for label in labels)], default=len("CHECK")),
-        20,
-    )
-    terminal_width = shutil.get_terminal_size(fallback=(100, 20)).columns
-    detail_width = max(24, terminal_width - status_width - label_width - 6)
-
-    lines = [
-        f"{'STATUS':<{status_width}}  {'CHECK':<{label_width}}  DETAIL",
-        f"{'-' * status_width}  {'-' * label_width}  {'-' * detail_width}",
-    ]
-
-    for check, label in zip(checks, labels, strict=True):
-        detail_lines = textwrap.wrap(get_doctor_check_detail(check), width=detail_width)
-        if not detail_lines:
-            detail_lines = [""]
-        lines.append(
-            f"{get_doctor_status_cell(check.status, status_width)}  "
-            f"{label:<{label_width}}  {detail_lines[0]}"
+    for check in checks:
+        table.add_row(
+            render_doctor_status_text(check.status),
+            get_doctor_check_label(check.name),
+            get_doctor_check_detail(check),
         )
-        for continuation in detail_lines[1:]:
-            lines.append(f"{' ' * status_width}  {' ' * label_width}  {continuation}")
 
-    return "\n".join(lines)
+    return table
 
 
 def print_doctor_overview(report: DoctorReport, configured_home: str | None) -> None:
@@ -115,25 +98,13 @@ def print_doctor_overview(report: DoctorReport, configured_home: str | None) -> 
         print(f"{label:<{label_width}}  {value}")
 
 
-def doctor(argv: list[str] | None = None) -> None:
+def run_doctor(*, json_output: bool) -> None:
     """Inspect envmgr runtime health without mutating ~/.envmgr."""
-    parser = build_command_parser(
-        "doctor",
-        description="Inspect envmgr runtime health without modifying the runtime",
-    )
-    parser.add_argument(
-        "--json",
-        action="store_true",
-        dest="json_output",
-        help="Print the doctor report as JSON",
-    )
-    args = parse_command_args(parser, argv)
-
     report = build_doctor_report()
     configured_home = os.environ.get("ENVMGR_HOME")
     ok_count, warn_count, fail_count = summarize_doctor_report(report)
 
-    if args.json_output:
+    if json_output:
         print(
             json.dumps(
                 build_doctor_json_payload(
@@ -144,17 +115,20 @@ def doctor(argv: list[str] | None = None) -> None:
             )
         )
         if fail_count:
-            raise SystemExit(1)
+            raise typer.Exit(code=1)
         return
 
     overall_status = get_doctor_overall_status(report)
     summary = f"Summary: {ok_count} ok, {warn_count} warn, {fail_count} fail"
-    print(f"Envmgr Doctor [{render_doctor_status_text(overall_status)}]")
-    print(summary)
-    print()
+    heading = Text("Envmgr Doctor [")
+    heading.append(render_doctor_status_text(overall_status))
+    heading.append("]")
+    console.print(heading)
+    console.print(summary)
+    console.print()
     print_doctor_overview(report, configured_home)
-    print()
-    print(render_doctor_checks_table(report.checks))
+    console.print()
+    console.print(build_doctor_checks_table(report.checks))
 
     if fail_count:
-        raise SystemExit(1)
+        raise typer.Exit(code=1)

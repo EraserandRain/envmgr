@@ -10,11 +10,11 @@ from tests.support import Check, build_check_suite, build_check_test_case
 
 CLI_CONTRACT_TEST_CHECKS: tuple[Check, ...] = (
     (
-        "dispatcher routes install subcommands",
+        "public CLI exposes help and install subcommands",
         check_dispatcher_routes_install_subcommand,
     ),
     (
-        "dispatcher rejects dev-only subcommands",
+        "public CLI rejects dev-only subcommands",
         check_dispatcher_rejects_dev_only_subcommands,
     ),
 )

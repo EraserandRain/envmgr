@@ -1,19 +1,26 @@
 from __future__ import annotations
 
-import io
 import json
-import os
 import tempfile
 from pathlib import Path
-from unittest.mock import patch
 
-from scripts.main import doctor, history
+from click.testing import Result
+from typer.testing import CliRunner
+
+from scripts.main import app
 from scripts.runtime_config import ensure_runtime_layout, mark_runtime_setup_complete
 from scripts.services.doctor import DOCTOR_FAIL, DOCTOR_OK, build_doctor_report
 from scripts.services.runtime import (
     RUNTIME_RUN_RECORD_SCHEMA_VERSION,
     write_runtime_run_record,
 )
+
+CLI_RUNNER = CliRunner()
+
+
+def invoke_envmgr(*args: str, envmgr_home: Path | None = None) -> Result:
+    env = None if envmgr_home is None else {"ENVMGR_HOME": str(envmgr_home)}
+    return CLI_RUNNER.invoke(app, list(args), prog_name="envmgr", env=env)
 
 
 def check_history_text_output() -> None:
@@ -88,14 +95,14 @@ def check_history_text_output() -> None:
         for filename, payload in records:
             write_runtime_run_record(runtime_paths.runs_log_dir / filename, payload)
 
-        captured_output = io.StringIO()
-        with (
-            patch("sys.stdout", new=captured_output),
-            patch.dict(os.environ, {"ENVMGR_HOME": str(envmgr_home)}, clear=False),
-        ):
-            history(["--limit", "2"])
+        result = invoke_envmgr("history", "--limit", "2", envmgr_home=envmgr_home)
+        if result.exit_code != 0:
+            raise AssertionError(
+                "expected history text output to exit successfully"
+                f"\noutput:\n{result.output}"
+            )
 
-        output = captured_output.getvalue()
+        output = result.output
         if "Envmgr History" not in output:
             raise AssertionError("expected history text output to include a title")
         if "Showing 2 of 3 recorded runtime commands" not in output:
@@ -145,14 +152,14 @@ def check_history_json_output() -> None:
             },
         )
 
-        captured_output = io.StringIO()
-        with (
-            patch("sys.stdout", new=captured_output),
-            patch.dict(os.environ, {"ENVMGR_HOME": str(envmgr_home)}, clear=False),
-        ):
-            history(["--json"])
+        result = invoke_envmgr("history", "--json", envmgr_home=envmgr_home)
+        if result.exit_code != 0:
+            raise AssertionError(
+                "expected history --json to exit successfully"
+                f"\noutput:\n{result.output}"
+            )
 
-        payload = json.loads(captured_output.getvalue())
+        payload = json.loads(result.output)
         if payload["count"] != 1 or payload["total"] != 1:
             raise AssertionError("expected history --json to report record counts")
         if payload["runtime"]["home"] != str(runtime_paths.home):
@@ -249,15 +256,14 @@ def check_doctor_text_output() -> None:
         (runtime_paths.galaxy_roles_dir / "gantsign.oh-my-zsh").mkdir()
         (runtime_paths.galaxy_collections_dir / "community").mkdir()
         mark_runtime_setup_complete(runtime_paths)
-        captured_output = io.StringIO()
+        result = invoke_envmgr("doctor", envmgr_home=envmgr_home)
+        if result.exit_code != 0:
+            raise AssertionError(
+                "expected doctor text output to exit successfully"
+                f"\noutput:\n{result.output}"
+            )
 
-        with (
-            patch("sys.stdout", new=captured_output),
-            patch.dict(os.environ, {"ENVMGR_HOME": str(envmgr_home)}, clear=False),
-        ):
-            doctor([])
-
-        output = captured_output.getvalue()
+        output = result.output
         for expected_fragment in (
             "Envmgr Doctor",
             "Runtime home",
@@ -300,15 +306,13 @@ def check_doctor_json_output() -> None:
         (runtime_paths.galaxy_roles_dir / "gantsign.oh-my-zsh").mkdir()
         (runtime_paths.galaxy_collections_dir / "community").mkdir()
         mark_runtime_setup_complete(runtime_paths)
-        captured_output = io.StringIO()
+        result = invoke_envmgr("doctor", "--json", envmgr_home=envmgr_home)
+        if result.exit_code != 0:
+            raise AssertionError(
+                f"expected doctor --json to exit successfully\noutput:\n{result.output}"
+            )
 
-        with (
-            patch("sys.stdout", new=captured_output),
-            patch.dict(os.environ, {"ENVMGR_HOME": str(envmgr_home)}, clear=False),
-        ):
-            doctor(["--json"])
-
-        payload = json.loads(captured_output.getvalue())
+        payload = json.loads(result.output)
         if payload["status"] != DOCTOR_OK:
             raise AssertionError("expected doctor --json to report ok status")
         if payload["runtime"]["home"] != str(envmgr_home.resolve()):

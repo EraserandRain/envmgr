@@ -71,7 +71,8 @@ Repository-local files still keep their original purpose:
 
 - `roles/` stays the source of first-party envmgr roles in this repo
 - `playbooks/` stays the source of scenario playbooks in this repo
-- `scripts/commands/` holds the `envmgr` subcommand handlers and shared CLI helpers
+- `scripts/main.py` defines the Typer-based public `envmgr` CLI used by `uv run envmgr ...`
+- `scripts/commands/` holds command runners and CLI glue shared by the public CLI and helper entrypoints
 - `scripts/services/` holds reusable runtime, install-planning, and doctor logic
 - `scripts/smoke_checks/` stays reserved for smoke-test-only checks
 - `tests/checks/` holds the finer-grained unit-check implementations used by `validate`
@@ -80,6 +81,10 @@ Repository-local files still keep their original purpose:
 `uv run envmgr ...` is the supported runtime command surface for envmgr. Development
 helpers stay separate as dedicated commands like `uv run validate` or `uv run lint`. Direct `ansible-playbook` or
 `ansible-galaxy` usage from the repository is not a supported interface.
+
+The public CLI now uses Typer with Rich-enhanced help and terminal output, but the
+supported command surface stays the same: run envmgr commands as `uv run envmgr ...`
+and keep developer helpers on their existing standalone entrypoints.
 
 Commands that accept `-i/--inventory` only accept inventory aliases defined in `~/.envmgr/config.toml`. envmgr no longer falls back to repository-local inventory files or `./.ansible` caches.
 Inventory alias targets must stay under `~/.envmgr/inventory/`.

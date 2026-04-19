@@ -5,7 +5,9 @@ description = "Quick deployment to install and configure packages with ansible."
 dependencies = [
     "ansible>=10.0.0",
     "kubernetes>=31.0.0",
+    "rich>=13.9.4",
     "tomli>=2.2.1; python_version < '3.11'",
+    "typer>=0.15.1",
 ]
 readme = "README.md"
 requires-python = ">= 3.10"

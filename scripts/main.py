@@ -1,27 +1,30 @@
 from __future__ import annotations
 
-import argparse
 import sys
-from collections.abc import Callable
 from pathlib import Path
+from typing import Annotated, Literal
+
+import typer
 
 from .command_text import CLI_ROOT_COMMAND
-from .commands.doctor import doctor
-from .commands.history import history
-from .commands.install import install
-from .commands.ping import ping
-from .commands.setup import setup
-from .commands.shared import (
-    Colors,
-    build_command_parser,
-    parse_command_args,
-)
+from .commands.doctor import run_doctor
+from .commands.history import run_history
+from .commands.install import run_install
+from .commands.ping import run_ping
+from .commands.setup import run_setup
 from .commands.shared import (
     require_setup_completed as shared_require_setup_completed,
 )
 from .scaffold import ScaffoldError, generate_role
 
-CommandHandler = Callable[[list[str] | None], None]
+app = typer.Typer(
+    no_args_is_help=True,
+    add_completion=False,
+    suggest_commands=True,
+    rich_markup_mode="rich",
+)
+
+Context7Method = Literal["remote", "local"]
 
 
 def require_setup_completed(
@@ -33,12 +36,179 @@ def require_setup_completed(
     shared_require_setup_completed(command_name, envmgr_home=envmgr_home)
 
 
+@app.command("doctor")
+def _doctor_command(
+    json_output: Annotated[
+        bool,
+        typer.Option(
+            "--json",
+            help="Print the doctor report as JSON",
+        ),
+    ] = False,
+) -> None:
+    """Inspect envmgr runtime health."""
+    run_doctor(json_output=json_output)
+
+
+@app.command("history")
+def _history_command(
+    limit: Annotated[
+        int,
+        typer.Option(
+            "--limit",
+            "-n",
+            help="Show at most this many recent records (default: 10)",
+        ),
+    ] = 10,
+    json_output: Annotated[
+        bool,
+        typer.Option(
+            "--json",
+            help="Print recent runtime records as JSON",
+        ),
+    ] = False,
+) -> None:
+    """Show recent runtime subprocess records."""
+    run_history(limit=limit, json_output=json_output)
+
+
+@app.command("install")
+def _install_command(
+    ctx: typer.Context,
+    tags: Annotated[
+        list[str] | None,
+        typer.Argument(
+            help="List of tags: tag1 tag2 ...",
+        ),
+    ] = None,
+    list_tags: Annotated[
+        bool,
+        typer.Option(
+            "--list-tags",
+            "-l",
+            help="List all available tags",
+        ),
+    ] = False,
+    playbook: Annotated[
+        str | None,
+        typer.Option(
+            "--playbook",
+            help="Specify a playbook file explicitly when tags are ambiguous",
+        ),
+    ] = None,
+    inventory: Annotated[
+        str | None,
+        typer.Option(
+            "--inventory",
+            "-i",
+            help="Specify an inventory alias from ~/.envmgr/config.toml",
+        ),
+    ] = None,
+    ask_vault_pass: Annotated[
+        bool,
+        typer.Option(
+            "--ask-vault-pass",
+            help="Ask for vault password",
+        ),
+    ] = False,
+    manage_claude_code: Annotated[
+        bool | None,
+        typer.Option(
+            "--claude-code/--no-claude-code",
+            help="When AI tools are selected, explicitly install Claude Code",
+            show_default=False,
+        ),
+    ] = None,
+    manage_codex: Annotated[
+        bool | None,
+        typer.Option(
+            "--codex/--no-codex",
+            help="When AI tools are selected, explicitly install Codex CLI",
+            show_default=False,
+        ),
+    ] = None,
+    manage_rtk: Annotated[
+        bool | None,
+        typer.Option(
+            "--rtk/--no-rtk",
+            help="When AI tools are selected, explicitly install RTK",
+            show_default=False,
+        ),
+    ] = None,
+    enable_context7: Annotated[
+        bool | None,
+        typer.Option(
+            "--context7/--no-context7",
+            help="When AI tools are selected, enable Context7 integration",
+            show_default=False,
+        ),
+    ] = None,
+    claude_context7_method: Annotated[
+        Context7Method | None,
+        typer.Option(
+            "--claude-context7-method",
+            help="Choose the Context7 transport for Claude Code",
+            show_default=False,
+        ),
+    ] = None,
+    codex_context7_method: Annotated[
+        Context7Method | None,
+        typer.Option(
+            "--codex-context7-method",
+            help="Choose the Context7 transport for Codex CLI",
+            show_default=False,
+        ),
+    ] = None,
+) -> None:
+    """Run Ansible roles and task tags."""
+    if not list_tags and not tags:
+        typer.echo(ctx.get_help())
+        return
+
+    run_install(
+        tags=[] if tags is None else list(tags),
+        list_tags=list_tags,
+        playbook=playbook,
+        inventory=inventory,
+        ask_vault_pass=ask_vault_pass,
+        manage_claude_code=manage_claude_code,
+        manage_codex=manage_codex,
+        manage_rtk=manage_rtk,
+        enable_context7=enable_context7,
+        claude_context7_method=claude_context7_method,
+        codex_context7_method=codex_context7_method,
+    )
+
+
+@app.command("ping")
+def _ping_command(
+    inventory: Annotated[
+        str | None,
+        typer.Option(
+            "--inventory",
+            "-i",
+            help="Specify an inventory alias from ~/.envmgr/config.toml",
+        ),
+    ] = None,
+) -> None:
+    """Test inventory connectivity with ansible ping."""
+    run_ping(inventory=inventory)
+
+
+@app.command("setup")
+def _setup_command() -> None:
+    """Bootstrap the envmgr runtime under ~/.envmgr."""
+    run_setup()
+
+
 def create(
     argv: list[str] | None = None,
     *,
     prog_name: str | None = None,
 ) -> None:
     """Create a new Ansible role by prompting for a role name."""
+    from .commands.legacy_argparse import build_command_parser, parse_command_args
+
     parser = build_command_parser(
         "create",
         description="Create a new Ansible role by prompting the user for a role name and generating the role directory.",
@@ -58,7 +228,7 @@ def create(
         except FileExistsError:
             print(f"Role '{args.role}' already exists.")
         except (FileNotFoundError, ScaffoldError) as error:
-            print(f"{Colors.RED}{error}{Colors.RESET}")
+            print(error)
     else:
         parser.print_help()
 
@@ -118,63 +288,38 @@ def smoke_test(
     smoke_test_command(argv, prog_name=prog_name)
 
 
-COMMAND_SUMMARIES: dict[str, str] = {
-    "doctor": "Inspect envmgr runtime health.",
-    "history": "Show recent runtime subprocess records.",
-    "install": "Run Ansible roles and task tags.",
-    "ping": "Test inventory connectivity with ansible ping.",
-    "setup": "Bootstrap the envmgr runtime under ~/.envmgr.",
-}
-
-COMMAND_HANDLERS: dict[str, CommandHandler] = {
-    "doctor": doctor,
-    "history": history,
-    "install": install,
-    "ping": ping,
-    "setup": setup,
-}
+def doctor(argv: list[str] | None = None) -> None:
+    """Keep the historical `scripts.main.doctor` helper surface."""
+    app(args=["doctor", *(argv or [])], prog_name=CLI_ROOT_COMMAND)
 
 
-def build_dispatcher_parser() -> argparse.ArgumentParser:
-    """Create the top-level `envmgr` dispatcher parser."""
-    commands_text = "\n".join(
-        f"  {command_name:<13} {summary}"
-        for command_name, summary in COMMAND_SUMMARIES.items()
-    )
-    parser = argparse.ArgumentParser(
-        prog=CLI_ROOT_COMMAND,
-        description="envmgr command dispatcher",
-        epilog=(
-            "Available commands:\n"
-            f"{commands_text}\n\n"
-            f"Use `{CLI_ROOT_COMMAND} <command> --help` for command-specific options."
-        ),
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-    )
-    parser.add_argument(
-        "command",
-        nargs="?",
-        choices=sorted(COMMAND_HANDLERS),
-        help="Subcommand to run",
-    )
-    parser.add_argument(
-        "args",
-        nargs=argparse.REMAINDER,
-        help=argparse.SUPPRESS,
-    )
-    return parser
+def history(argv: list[str] | None = None) -> None:
+    """Keep the historical `scripts.main.history` helper surface."""
+    app(args=["history", *(argv or [])], prog_name=CLI_ROOT_COMMAND)
+
+
+def install(argv: list[str] | None = None) -> None:
+    """Keep the historical `scripts.main.install` helper surface."""
+    app(args=["install", *(argv or [])], prog_name=CLI_ROOT_COMMAND)
+
+
+def ping(argv: list[str] | None = None) -> None:
+    """Keep the historical `scripts.main.ping` helper surface."""
+    from .commands.ping import ping as legacy_ping
+
+    legacy_ping(argv)
+
+
+def setup(argv: list[str] | None = None) -> None:
+    """Keep the historical `scripts.main.setup` helper surface."""
+    from .commands.setup import setup as legacy_setup
+
+    legacy_setup(argv)
 
 
 def main(argv: list[str] | None = None) -> None:
-    """Dispatch `envmgr <subcommand>` to the appropriate command handler."""
-    parser = build_dispatcher_parser()
-    parsed_args = parser.parse_args(argv)
-
-    if parsed_args.command is None:
-        parser.print_help()
-        return
-
-    COMMAND_HANDLERS[parsed_args.command](parsed_args.args)
+    """Run the Typer-based `envmgr` root app."""
+    app(args=argv, prog_name=CLI_ROOT_COMMAND)
 
 
 def create_entrypoint() -> None:

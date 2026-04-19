@@ -1,24 +1,58 @@
 from __future__ import annotations
 
-import io
 from unittest.mock import patch
 
-from scripts.main import main
+from click.testing import Result
+from typer.testing import CliRunner
+
+from scripts.main import app
+
+CLI_RUNNER = CliRunner()
+
+
+def invoke_envmgr(*args: str) -> Result:
+    return CLI_RUNNER.invoke(app, list(args), prog_name="envmgr")
 
 
 def check_dispatcher_routes_install_subcommand() -> None:
-    captured_output = io.StringIO()
+    help_result = invoke_envmgr("--help")
+    if help_result.exit_code != 0:
+        raise AssertionError(
+            "expected `envmgr --help` to exit successfully"
+            f"\noutput:\n{help_result.output}"
+        )
 
-    with (
-        patch("sys.stdout", new=captured_output),
-        patch(
-            "scripts.commands.install.load_available_tags",
-            return_value=(["zsh"], ["codex"]),
-        ),
+    help_output = help_result.output
+    for expected_fragment in (
+        "Usage: envmgr",
+        "doctor",
+        "history",
+        "install",
+        "ping",
+        "setup",
     ):
-        main(["install", "-l"])
+        if expected_fragment not in help_output:
+            raise AssertionError(
+                f"expected `envmgr --help` to include {expected_fragment!r}"
+            )
+    if "validate" in help_output:
+        raise AssertionError(
+            "expected `envmgr --help` to omit development-only subcommands"
+        )
 
-    output = captured_output.getvalue()
+    with patch(
+        "scripts.commands.install.load_available_tags",
+        return_value=(["zsh"], ["codex"]),
+    ):
+        result = invoke_envmgr("install", "-l")
+
+    if result.exit_code != 0:
+        raise AssertionError(
+            "expected dispatcher to route to the install subcommand"
+            f"\noutput:\n{result.output}"
+        )
+
+    output = result.output
     if "Envmgr available tags:" not in output:
         raise AssertionError("expected dispatcher to route to the install subcommand")
     if "  - zsh" not in output:
@@ -28,18 +62,19 @@ def check_dispatcher_routes_install_subcommand() -> None:
 
 
 def check_dispatcher_rejects_dev_only_subcommands() -> None:
-    captured_error = io.StringIO()
+    result = invoke_envmgr("validate")
+    if result.exit_code != 2:
+        raise AssertionError(
+            "expected dispatcher to reject dev-only subcommands with exit code 2"
+            f"\noutput:\n{result.output}"
+        )
 
-    with patch("sys.stderr", new=captured_error):
-        try:
-            main(["validate"])
-        except SystemExit as error:
-            if error.code != 2:
-                raise AssertionError(
-                    "expected dispatcher to reject dev-only subcommands with exit code 2"
-                ) from error
-        else:
-            raise AssertionError("expected dispatcher to reject dev-only subcommands")
-
-    if "invalid choice" not in captured_error.getvalue():
-        raise AssertionError("expected dispatcher rejection to come from argparse")
+    output = result.output
+    if "No such command 'validate'" not in output:
+        raise AssertionError(
+            "expected dispatcher rejection to use Click/Typer unknown-command wording"
+        )
+    if "Try 'envmgr --help' for help." not in output:
+        raise AssertionError(
+            "expected dispatcher rejection to point users at `envmgr --help`"
+        )

@@ -1,17 +1,22 @@
 from __future__ import annotations
 
-import io
 import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
-from scripts.commands.install import install, resolve_ai_tools_install_options
+import typer
+from typer.testing import CliRunner
+
+from scripts.commands.install import resolve_ai_tools_install_options, run_install
+from scripts.main import app
 from scripts.runtime_config import ensure_runtime_layout
 from scripts.services.install import (
     AiToolsInstallDefaults,
     InstallPlan,
     build_install_plan,
 )
+
+CLI_RUNNER = CliRunner()
 
 
 def check_ai_tools_install_option_resolution() -> None:
@@ -120,26 +125,36 @@ password = "inventory/password.yaml"
 
 
 def check_install_rejects_unknown_tags_with_exit_code() -> None:
-    captured_output = io.StringIO()
-
     with (
-        patch("sys.stdout", new=captured_output),
+        patch("scripts.commands.shared.error_console.print") as mock_error_print,
         patch(
             "scripts.commands.install.load_available_tags",
             return_value=(["zsh"], ["codex"]),
         ),
     ):
         try:
-            install(["does-not-exist"])
-        except SystemExit as error:
-            if error.code != 1:
+            run_install(
+                tags=["does-not-exist"],
+                list_tags=False,
+                playbook=None,
+                inventory=None,
+                ask_vault_pass=False,
+                manage_claude_code=None,
+                manage_codex=None,
+                manage_rtk=None,
+                enable_context7=None,
+                claude_context7_method=None,
+                codex_context7_method=None,
+            )
+        except typer.Exit as error:
+            if error.exit_code != 1:
                 raise AssertionError(
                     "expected install to exit with code 1 for unknown tags"
                 ) from error
         else:
             raise AssertionError("expected install to reject unknown tags")
 
-    output = captured_output.getvalue()
+    output = mock_error_print.call_args.args[0]
     if "unknown tags: does-not-exist" not in output.lower():
         raise AssertionError("expected install to report the unknown tag")
     if "Use -l or --list-tags to see all available tags" not in output:
@@ -147,20 +162,31 @@ def check_install_rejects_unknown_tags_with_exit_code() -> None:
 
 
 def check_install_rejects_all_plus_other_tags() -> None:
-    captured_output = io.StringIO()
-
-    with patch("sys.stdout", new=captured_output):
+    with patch("scripts.commands.shared.error_console.print") as mock_error_print:
         try:
-            install(["all", "zsh"])
-        except SystemExit as error:
-            if error.code != 1:
+            run_install(
+                tags=["all", "zsh"],
+                list_tags=False,
+                playbook=None,
+                inventory=None,
+                ask_vault_pass=False,
+                manage_claude_code=None,
+                manage_codex=None,
+                manage_rtk=None,
+                enable_context7=None,
+                claude_context7_method=None,
+                codex_context7_method=None,
+            )
+        except typer.Exit as error:
+            if error.exit_code != 1:
                 raise AssertionError(
                     "expected install to exit with code 1 for mixed all-tag selections"
                 ) from error
         else:
             raise AssertionError("expected install to reject mixed all-tag selections")
 
-    if "tag 'all' cannot be combined with other tags" not in captured_output.getvalue():
+    message = mock_error_print.call_args.args[0]
+    if "tag 'all' cannot be combined with other tags" not in message:
         raise AssertionError(
             "expected install to explain that `all` cannot be mixed with other tags"
         )
@@ -205,7 +231,19 @@ def check_install_interrupt_exits_cleanly() -> None:
             ),
         ):
             try:
-                install(["zsh", "--ask-vault-pass"])
+                run_install(
+                    tags=["zsh"],
+                    list_tags=False,
+                    playbook=None,
+                    inventory=None,
+                    ask_vault_pass=True,
+                    manage_claude_code=None,
+                    manage_codex=None,
+                    manage_rtk=None,
+                    enable_context7=None,
+                    claude_context7_method=None,
+                    codex_context7_method=None,
+                )
             except SystemExit as error:
                 if error.code != 130:
                     raise AssertionError(
@@ -217,4 +255,75 @@ def check_install_interrupt_exits_cleanly() -> None:
         if execution_playbook_path.exists():
             raise AssertionError(
                 "expected install to clean up temporary execution playbooks on Ctrl+C"
+            )
+
+
+def check_install_typer_flags_preserve_tri_state_bools() -> None:
+    captured_calls: list[dict[str, object]] = []
+
+    def _capture_run_install(**kwargs: object) -> None:
+        captured_calls.append(kwargs)
+
+    with patch("scripts.main.run_install", side_effect=_capture_run_install):
+        default_result = CLI_RUNNER.invoke(
+            app,
+            ["install", "ai_tools"],
+            prog_name="envmgr",
+        )
+        flagged_result = CLI_RUNNER.invoke(
+            app,
+            [
+                "install",
+                "ai_tools",
+                "--no-claude-code",
+                "--codex",
+                "--no-rtk",
+                "--context7",
+                "--claude-context7-method",
+                "local",
+                "--codex-context7-method",
+                "remote",
+            ],
+            prog_name="envmgr",
+        )
+
+    if default_result.exit_code != 0:
+        raise AssertionError(
+            "expected bare `envmgr install ai_tools` invocation to parse successfully"
+            f"\noutput:\n{default_result.output}"
+        )
+    if flagged_result.exit_code != 0:
+        raise AssertionError(
+            "expected paired install flags to parse successfully"
+            f"\noutput:\n{flagged_result.output}"
+        )
+    if len(captured_calls) != 2:
+        raise AssertionError("expected Typer install wrapper to delegate twice")
+
+    default_call, flagged_call = captured_calls
+    for option_name in (
+        "manage_claude_code",
+        "manage_codex",
+        "manage_rtk",
+        "enable_context7",
+        "claude_context7_method",
+        "codex_context7_method",
+    ):
+        if default_call[option_name] is not None:
+            raise AssertionError(
+                f"expected {option_name} to stay unset when no install flags are provided"
+            )
+
+    expected_flag_values = {
+        "manage_claude_code": False,
+        "manage_codex": True,
+        "manage_rtk": False,
+        "enable_context7": True,
+        "claude_context7_method": "local",
+        "codex_context7_method": "remote",
+    }
+    for option_name, expected_value in expected_flag_values.items():
+        if flagged_call[option_name] != expected_value:
+            raise AssertionError(
+                f"expected {option_name} to resolve to {expected_value!r}"
             )

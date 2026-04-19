@@ -7,7 +7,9 @@ import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
-from scripts.commands.ping import ping
+import typer
+
+from scripts.commands.ping import run_ping
 from scripts.runtime_config import (
     RuntimePaths,
     ensure_runtime_layout,
@@ -40,7 +42,7 @@ def check_ping_uses_selected_inventory_alias() -> None:
                 ),
             ) as mock_run,
         ):
-            ping(["-i", "remote"])
+            run_ping(inventory="remote")
 
         command = mock_run.call_args.args[0]
         if command != [
@@ -83,18 +85,21 @@ def check_ping_surfaces_subprocess_failures() -> None:
                     ["ansible", "-m", "ping", "all"],
                 ),
             ),
+            patch("scripts.commands.shared.error_console.print") as mock_error_print,
         ):
             try:
-                ping([])
-            except SystemExit as error:
-                if error.code != 1:
+                run_ping(inventory=None)
+            except typer.Exit as error:
+                if error.exit_code != 1:
                     raise AssertionError(
                         "expected ping failures to exit with code 1"
                     ) from error
             else:
                 raise AssertionError("expected ping to exit when ansible ping fails")
 
-        if "Ping failed with exit code 7" not in captured_output.getvalue():
+        if not mock_error_print.called:
+            raise AssertionError("expected ping to print a user-facing error message")
+        if "Ping failed with exit code 7" not in str(mock_error_print.call_args):
             raise AssertionError(
                 "expected ping to surface the ansible exit code to the user"
             )
