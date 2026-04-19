@@ -4,6 +4,7 @@ import unittest
 
 from tests.checks.install import (
     check_ai_tools_install_option_resolution,
+    check_install_all_uses_runtime_default_playbook,
     check_install_interrupt_exits_cleanly,
     check_install_rejects_all_plus_other_tags,
     check_install_rejects_unknown_tags_with_exit_code,
@@ -14,6 +15,10 @@ INSTALL_TEST_CHECKS: tuple[Check, ...] = (
     (
         "AI tools install options resolve correctly",
         check_ai_tools_install_option_resolution,
+    ),
+    (
+        "install all uses the runtime default playbook",
+        check_install_all_uses_runtime_default_playbook,
     ),
     (
         "install rejects unknown tags with exit code 1",

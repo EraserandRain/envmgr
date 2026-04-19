@@ -7,7 +7,11 @@ from unittest.mock import patch
 
 from scripts.commands.install import install, resolve_ai_tools_install_options
 from scripts.runtime_config import ensure_runtime_layout
-from scripts.services.install import AiToolsInstallDefaults, InstallPlan
+from scripts.services.install import (
+    AiToolsInstallDefaults,
+    InstallPlan,
+    build_install_plan,
+)
 
 
 def check_ai_tools_install_option_resolution() -> None:
@@ -67,6 +71,52 @@ def check_ai_tools_install_option_resolution() -> None:
     )
     if node_options is not None:
         raise AssertionError("expected node playbook to skip AI tools resolution")
+
+
+def check_install_all_uses_runtime_default_playbook() -> None:
+    with tempfile.TemporaryDirectory() as temp_dir:
+        envmgr_home = Path(temp_dir) / ".envmgr"
+        runtime_paths = ensure_runtime_layout(envmgr_home)
+        runtime_paths.config_file.write_text(
+            """
+[default]
+inventory = "default"
+playbook = "node"
+ask_vault_pass = false
+
+[inventory]
+default = "inventory/default.yaml"
+remote = "inventory/remote.yaml"
+password = "inventory/password.yaml"
+""".lstrip(),
+            encoding="utf-8",
+        )
+
+        install_plan = build_install_plan(
+            ["all"],
+            explicit_playbook=None,
+            inventory_reference=None,
+            role_tags=[],
+            task_tags=[],
+            envmgr_home=envmgr_home,
+        )
+
+        if install_plan.source_playbook_path != "playbooks/node.yml":
+            raise AssertionError(
+                "expected `install all` to use the runtime default playbook"
+            )
+        if install_plan.execution_playbook_path != "playbooks/node.yml":
+            raise AssertionError(
+                "expected `install all` to execute the resolved default playbook"
+            )
+        if install_plan.uses_temporary_execution_playbook:
+            raise AssertionError(
+                "expected `install all` to skip temporary execution playbooks"
+            )
+        if install_plan.inventory_path != runtime_paths.default_inventory_file:
+            raise AssertionError(
+                "expected `install all` to keep using the default inventory alias"
+            )
 
 
 def check_install_rejects_unknown_tags_with_exit_code() -> None:
