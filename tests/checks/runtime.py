@@ -9,6 +9,7 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 
 from scripts.command_text import SETUP_COMMAND
+from scripts.commands.setup import run_setup
 from scripts.main import require_setup_completed
 from scripts.runtime_config import (
     SETUP_SCHEMA_VERSION,
@@ -70,6 +71,43 @@ def check_setup_marker_is_written_after_setup() -> None:
         if 'completed_at = "' not in marker_contents:
             raise AssertionError(
                 "expected setup marker to persist the completion timestamp"
+            )
+
+
+def check_setup_uses_shared_runtime_output() -> None:
+    with tempfile.TemporaryDirectory() as temp_dir:
+        envmgr_home = Path(temp_dir) / ".envmgr"
+        captured_output = io.StringIO()
+
+        with (
+            patch("sys.stdout", new=captured_output),
+            patch.dict(os.environ, {"ENVMGR_HOME": str(envmgr_home)}, clear=False),
+            patch(
+                "scripts.commands.setup.run_runtime_subprocess",
+                return_value=subprocess.CompletedProcess(
+                    ["ansible-galaxy", "--version"],
+                    0,
+                ),
+            ),
+        ):
+            run_setup()
+
+        runtime_paths = ensure_runtime_layout(envmgr_home)
+        output = captured_output.getvalue()
+        expected_fragments = (
+            "Envmgr Setup",
+            "Info: Initializing ~/.envmgr...",
+            f"Runtime config: {runtime_paths.config_file}",
+            f"Ansible log: {runtime_paths.ansible_log_file}",
+            f"Galaxy roles cache: {runtime_paths.galaxy_roles_dir}",
+            f"Galaxy collections cache: {runtime_paths.galaxy_collections_dir}",
+            "Info: Installing Ansible roles and collections...",
+            "Success: Ansible roles and collections installed successfully.",
+            "Success: Setup completed successfully.",
+        )
+        if any(fragment not in output for fragment in expected_fragments):
+            raise AssertionError(
+                "expected setup to use the shared heading, summary, and status output"
             )
 
 

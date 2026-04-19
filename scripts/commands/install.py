@@ -1,8 +1,13 @@
 from __future__ import annotations
 
+import argparse
 import os
 import subprocess
 import sys
+from typing import NoReturn
+
+from rich.prompt import Confirm, Prompt
+from rich.text import Text
 
 from ..catalog import CatalogError
 from ..runtime_config import ConfigError
@@ -24,6 +29,7 @@ from .shared import (
     console,
     exit_with_error,
     load_available_tags,
+    print_warning,
     require_setup_completed,
 )
 
@@ -32,26 +38,54 @@ class WizardCancelled(RuntimeError):
     """Raised when the interactive setup wizard is cancelled by the user."""
 
 
+def _abort_prompt(error: KeyboardInterrupt) -> NoReturn:
+    """Exit like the shared prompt helpers when an interactive prompt is interrupted."""
+    console.print()
+    raise SystemExit(130) from error
+
+
+def _print_section_title(title: str, *, style: str = "bold cyan") -> None:
+    """Render a simple, consistently styled install section heading."""
+    console.print(Text(title, style=style))
+
+
+def _print_bullet_list(title: str, values: list[str]) -> None:
+    """Render a titled bullet list without changing the public text content."""
+    console.print()
+    console.print(Text(title, style="bold"))
+    for value in values:
+        console.print(Text(f"  - {value}"))
+
+
+def _format_enabled_status(enabled: bool) -> Text:
+    """Return a styled enabled/disabled label for setup summaries."""
+    return Text("enabled", style="green") if enabled else Text("disabled", style="dim")
+
+
+def _print_labeled_value(
+    label: str,
+    value: str | Text,
+    *,
+    prefix: str = "  ",
+) -> None:
+    """Render a label/value line while preserving the historical wording."""
+    line = Text()
+    line.append(f"{prefix}{label}: ", style="bold")
+    if isinstance(value, Text):
+        line.append_text(value)
+    else:
+        line.append(value)
+    console.print(line)
+
+
 def prompt_bool(message: str, *, default: bool) -> bool:
     """Prompt for a yes/no decision and return the selected value."""
-    hint = "Y/n" if default else "y/N"
-    while True:
-        try:
-            response = input(f"{message} [{hint}]: ").strip().lower()
-        except EOFError:
-            return default
-        except KeyboardInterrupt as error:
-            print()
-            raise SystemExit(130) from error
-
-        if not response:
-            return default
-        if response in {"y", "yes"}:
-            return True
-        if response in {"n", "no"}:
-            return False
-
-        print("Please answer 'y' or 'n'.")
+    try:
+        return bool(Confirm.ask(message, console=console, default=default))
+    except EOFError:
+        return default
+    except KeyboardInterrupt as error:
+        _abort_prompt(error)
 
 
 def render_context7_method_label(method: str) -> str:
@@ -85,62 +119,67 @@ def prompt_context7_method(tool_name: str, *, default: str) -> str:
         token for token, method, _label, _description in options if method == default
     )
 
-    print(f"\n{tool_name} Context7 connection:")
+    console.print()
+    console.print(Text(f"{tool_name} Context7 connection:", style="bold"))
     for token, method, label, description in options:
-        suffix = " (Recommended)" if method == default else ""
-        print(f"  {token}) {label}{suffix}")
-        print(f"     {description}")
+        option_line = Text()
+        option_line.append(f"  {token}) ", style="bold cyan")
+        option_line.append(label, style="bold")
+        if method == default:
+            option_line.append(" (Recommended)", style="green")
+        console.print(option_line)
+        console.print(Text(f"     {description}", style="dim"))
 
-    while True:
-        try:
-            response = input(f"Choose 1 or 2 [{default_token}]: ").strip().lower()
-        except EOFError:
-            return default
-        except KeyboardInterrupt as error:
-            print()
-            raise SystemExit(130) from error
+    try:
+        response = Prompt.ask(
+            "Choose 1 or 2",
+            console=console,
+            choices=list(option_by_token),
+            case_sensitive=False,
+            show_choices=False,
+            default=default_token,
+        )
+    except EOFError:
+        return default
+    except KeyboardInterrupt as error:
+        _abort_prompt(error)
 
-        if not response:
-            return default
-
-        selected = option_by_token.get(response)
-        if selected is not None:
-            return selected
-
-        print("Please choose 1/2, or type 'remote'/'local'.")
+    return option_by_token[response.lower()]
 
 
 def build_ai_tools_setup_summary(
     options: AiToolsInstallOptions,
     *,
     context7_api_key_present: bool,
-) -> list[str]:
+) -> list[tuple[str, str | Text]]:
     """Build a short setup summary for the interactive AI tools wizard."""
     context7_applicable = options.manage_claude_code or options.manage_codex
-    lines = [
-        "",
-        "AI Tools Setup Summary",
-        f"- Claude Code: {'enabled' if options.manage_claude_code else 'disabled'}",
-        f"- Codex CLI: {'enabled' if options.manage_codex else 'disabled'}",
-        f"- RTK: {'enabled' if options.manage_rtk else 'disabled'}",
+    lines: list[tuple[str, str | Text]] = [
+        ("Claude Code", _format_enabled_status(options.manage_claude_code)),
+        ("Codex CLI", _format_enabled_status(options.manage_codex)),
+        ("RTK", _format_enabled_status(options.manage_rtk)),
     ]
     if context7_applicable:
-        lines.append(
-            f"- Context7: {'enabled' if options.enable_context7 else 'disabled'}"
-        )
+        lines.append(("Context7", _format_enabled_status(options.enable_context7)))
     if options.enable_context7 and context7_applicable:
         if options.manage_claude_code:
             lines.append(
-                "- Claude Code Context7: "
-                f"{render_context7_method_label(options.claude_context7_method)}"
+                (
+                    "Claude Code Context7",
+                    render_context7_method_label(options.claude_context7_method),
+                )
             )
         if options.manage_codex:
             lines.append(
-                "- Codex CLI Context7: "
-                f"{render_context7_method_label(options.codex_context7_method)}"
+                (
+                    "Codex CLI Context7",
+                    render_context7_method_label(options.codex_context7_method),
+                )
             )
         if not context7_api_key_present:
-            lines.append("- Context7 API key: not set; envmgr will continue without it")
+            lines.append(
+                ("Context7 API key", "not set; envmgr will continue without it")
+            )
     return lines
 
 
@@ -156,9 +195,10 @@ def run_ai_tools_setup_wizard(
     context7_api_key_present: bool,
 ) -> AiToolsInstallOptions:
     """Run the interactive AI tools setup wizard and return the selected options."""
-    print("\nAI Tools Setup")
-    print("We'll help you choose which AI tools to install on this machine.")
-    print("Press Ctrl+C at any time to cancel.")
+    console.print()
+    _print_section_title("AI Tools Setup")
+    console.print("We'll help you choose which AI tools to install on this machine.")
+    console.print(Text("Press Ctrl+C at any time to cancel.", style="dim"))
 
     while True:
         resolved_manage_claude_code = (
@@ -199,7 +239,7 @@ def run_ai_tools_setup_wizard(
                 "AI tools selection disabled Claude Code, Codex CLI, and RTK; choose at least one tool"
             )
 
-        print("Select at least one tool to continue.")
+        print_warning("Select at least one tool to continue.")
 
     context7_applicable = resolved_manage_claude_code or resolved_manage_codex
     resolved_enable_context7 = False
@@ -239,11 +279,13 @@ def run_ai_tools_setup_wizard(
         codex_context7_method=resolved_codex_context7_method,
     )
 
-    for line in build_ai_tools_setup_summary(
+    console.print()
+    _print_section_title("AI Tools Setup Summary")
+    for label, value in build_ai_tools_setup_summary(
         options,
         context7_api_key_present=context7_api_key_present,
     ):
-        print(line)
+        _print_labeled_value(label, value, prefix="- ")
 
     if not prompt_bool("Install with these settings?", default=True):
         raise WizardCancelled("AI Tools Setup cancelled before installation.")
@@ -294,7 +336,7 @@ def resolve_ai_tools_install_options(
     )
 
 
-def _build_install_parser():
+def _build_install_parser() -> argparse.ArgumentParser:
     """Create the legacy install parser used by compatibility entrypoints."""
     from .legacy_argparse import build_command_parser
 
@@ -407,13 +449,9 @@ def run_install(
     """Install and configure envmgr using explicit option values."""
     if list_tags:
         role_tags, task_tags = load_available_tags()
-        print("Envmgr available tags:")
-        print("\nRole level tags:")
-        for tag in role_tags:
-            print(f"  - {tag}")
-        print("\nTask level tags:")
-        for tag in task_tags:
-            print(f"  - {tag}")
+        _print_section_title("Envmgr available tags:")
+        _print_bullet_list("Role level tags:", role_tags)
+        _print_bullet_list("Task level tags:", task_tags)
         return
 
     try:
@@ -475,7 +513,7 @@ def run_install(
             interactive=use_ai_tools_wizard,
         )
     except WizardCancelled as error:
-        print(error)
+        console.print(Text(str(error), style="yellow"))
         cleanup_install_plan(install_plan)
         return
     except CatalogError as error:
@@ -484,49 +522,69 @@ def run_install(
 
     try:
         if not install_plan.ai_tools_defaults.applicable and ai_tools_flags_provided:
-            console.print(
-                "[yellow]Warning:[/yellow] AI-tools flags were ignored because this run does not include the ai_tools role"
+            print_warning(
+                "AI-tools flags were ignored because this run does not include the ai_tools role"
             )
 
-        print("\nRunning Ansible playbook with:")
-        print(f"  Playbook: {install_plan.source_playbook_path}")
+        console.print()
+        _print_section_title("Running Ansible playbook with:")
+        _print_labeled_value("Playbook", install_plan.source_playbook_path)
         if install_plan.execution_playbook_path != install_plan.source_playbook_path:
-            print(f"  Execution playbook: {install_plan.execution_playbook_path}")
-        print(
-            f"  Inventory: {install_plan.inventory_label} -> {install_plan.inventory_path}"
+            _print_labeled_value(
+                "Execution playbook",
+                install_plan.execution_playbook_path,
+            )
+        _print_labeled_value(
+            "Inventory",
+            f"{install_plan.inventory_label} -> {install_plan.inventory_path}",
         )
         if is_all_tag_selection(install_plan.selected_tags):
-            console.print("[green]  All tags will be executed[/green]")
+            _print_labeled_value(
+                "Tags",
+                Text("All tags will be executed", style="green"),
+            )
         else:
-            rendered_tags = [
-                f"[Role: {tag}]" if tag in install_plan.role_tags else f"[Task: {tag}]"
-                for tag in install_plan.selected_tags
-            ]
-            console.print(f"  Tags: {' '.join(rendered_tags)}")
+            rendered_tags = Text()
+            for index, tag in enumerate(install_plan.selected_tags):
+                if index:
+                    rendered_tags.append(" ")
+                label = "Role" if tag in install_plan.role_tags else "Task"
+                style = "green" if label == "Role" else "cyan"
+                rendered_tags.append(f"[{label}: {tag}]", style=style)
+            _print_labeled_value("Tags", rendered_tags)
         if ai_tools_options is not None:
-            print(
-                f"  AI tools: Claude Code={ai_tools_options.manage_claude_code}, "
-                f"Codex CLI={ai_tools_options.manage_codex}, "
-                f"RTK={ai_tools_options.manage_rtk}"
+            _print_labeled_value(
+                "AI tools",
+                (
+                    "Claude Code="
+                    f"{ai_tools_options.manage_claude_code}, "
+                    "Codex CLI="
+                    f"{ai_tools_options.manage_codex}, "
+                    f"RTK={ai_tools_options.manage_rtk}"
+                ),
             )
             if ai_tools_options.manage_claude_code or ai_tools_options.manage_codex:
                 context7_status = (
                     "enabled" if ai_tools_options.enable_context7 else "disabled"
                 )
-                print(f"  Context7: {context7_status}")
+                _print_labeled_value("Context7", context7_status)
             if ai_tools_options.enable_context7:
                 if ai_tools_options.manage_claude_code:
-                    print(
-                        "  Claude Code Context7 method: "
-                        f"{ai_tools_options.claude_context7_method}"
+                    _print_labeled_value(
+                        "Claude Code Context7 method",
+                        ai_tools_options.claude_context7_method,
                     )
                 if ai_tools_options.manage_codex:
-                    print(
-                        f"  Codex Context7 method: {ai_tools_options.codex_context7_method}"
+                    _print_labeled_value(
+                        "Codex Context7 method",
+                        ai_tools_options.codex_context7_method,
                     )
                 if not os.environ.get("CONTEXT7_API_KEY"):
-                    print("  Context7 API key: not set (continuing without it)")
-        print()
+                    _print_labeled_value(
+                        "Context7 API key",
+                        "not set (continuing without it)",
+                    )
+        console.print()
 
         command = build_install_command(
             install_plan,

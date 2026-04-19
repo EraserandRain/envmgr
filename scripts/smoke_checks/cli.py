@@ -1,16 +1,49 @@
 from __future__ import annotations
 
 import json
+import os
+import re
 import tempfile
 from pathlib import Path
 
-from ..runtime_config import ensure_runtime_layout
+from ..runtime_config import ensure_runtime_layout, get_runtime_paths
 from ..services.doctor import DOCTOR_OK
 from ..services.runtime import (
     RUNTIME_RUN_RECORD_SCHEMA_VERSION,
     write_runtime_run_record,
 )
 from .helpers import REPO_ROOT, bootstrap_cli_runtime, run_envmgr_cli
+
+_ANSI_ESCAPE_RE = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
+
+
+def _strip_ansi(text: str) -> str:
+    """Normalize subprocess output before asserting on human-readable content."""
+    return _ANSI_ESCAPE_RE.sub("", text)
+
+
+def _combined_cli_output(stdout: str, stderr: str) -> str:
+    """Normalize both streams because Click/Typer may route help text differently."""
+    normalized_parts = [
+        _strip_ansi(stream).replace("\r\n", "\n")
+        for stream in (stdout, stderr)
+        if stream
+    ]
+    return "\n".join(normalized_parts)
+
+
+def _write_fake_command(command_path: Path, body: str) -> None:
+    """Create a small executable used to stub ansible binaries in smoke tests."""
+    command_path.write_text(body, encoding="utf-8")
+    command_path.chmod(0o755)
+
+
+def _prepend_path(fake_bin_dir: Path) -> str:
+    """Put a temporary bin directory ahead of the current PATH."""
+    current_path = os.environ.get("PATH", "")
+    if not current_path:
+        return str(fake_bin_dir)
+    return f"{fake_bin_dir}{os.pathsep}{current_path}"
 
 
 def check_envmgr_help_contract() -> None:
@@ -21,7 +54,7 @@ def check_envmgr_help_contract() -> None:
             f"\nstdout:\n{result.stdout}\nstderr:\n{result.stderr}"
         )
 
-    output = result.stdout
+    output = _combined_cli_output(result.stdout, result.stderr)
     for expected_fragment in (
         "Usage: envmgr",
         "doctor",
@@ -38,8 +71,6 @@ def check_envmgr_help_contract() -> None:
         raise AssertionError(
             "expected `envmgr --help` to omit development-only subcommands"
         )
-    if result.stderr:
-        raise AssertionError("expected `envmgr --help` to keep stderr empty")
 
 
 def check_envmgr_invalid_command_contract() -> None:
@@ -50,12 +81,12 @@ def check_envmgr_invalid_command_contract() -> None:
             f"\nstdout:\n{result.stdout}\nstderr:\n{result.stderr}"
         )
 
-    stderr = result.stderr
-    if "No such command 'validate'" not in stderr:
+    output = _combined_cli_output(result.stdout, result.stderr)
+    if "No such command 'validate'" not in output:
         raise AssertionError(
             "expected invalid subcommands to surface the Click/Typer unknown-command error"
         )
-    if "Try 'envmgr --help' for help." not in stderr:
+    if "Try 'envmgr --help' for help." not in output:
         raise AssertionError(
             "expected invalid subcommands to point users at `envmgr --help`"
         )
@@ -201,13 +232,80 @@ def check_install_list_tags_cli_contract() -> None:
         )
 
 
+def check_setup_cli_contract() -> None:
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_root = Path(temp_dir)
+        envmgr_home = temp_root / ".envmgr"
+        fake_bin_dir = temp_root / "bin"
+        fake_bin_dir.mkdir()
+        _write_fake_command(
+            fake_bin_dir / "ansible-galaxy",
+            "#!/bin/sh\nexit 0\n",
+        )
+
+        result = run_envmgr_cli(
+            "setup",
+            env_overrides={
+                "ENVMGR_HOME": str(envmgr_home),
+                "PATH": _prepend_path(fake_bin_dir),
+            },
+        )
+
+        if result.returncode != 0:
+            raise AssertionError(
+                "expected `envmgr setup` to succeed with a fake ansible-galaxy binary"
+                f"\nstdout:\n{result.stdout}\nstderr:\n{result.stderr}"
+            )
+        if result.stderr:
+            raise AssertionError("expected `envmgr setup` to keep stderr empty")
+
+        runtime_paths = get_runtime_paths(envmgr_home)
+        output = _strip_ansi(result.stdout)
+        for expected_fragment in (
+            "Envmgr Setup",
+            "Bootstrap the envmgr runtime under ~/.envmgr.",
+            "Info: Initializing ~/.envmgr...",
+            f"Runtime config: {runtime_paths.config_file}",
+            f"Ansible log: {runtime_paths.ansible_log_file}",
+            f"Galaxy roles cache: {runtime_paths.galaxy_roles_dir}",
+            f"Galaxy collections cache: {runtime_paths.galaxy_collections_dir}",
+            "Info: Installing Ansible roles and collections...",
+            "Success: Ansible roles and collections installed successfully.",
+            "Success: Setup completed successfully.",
+        ):
+            if expected_fragment not in output:
+                raise AssertionError(
+                    f"expected `envmgr setup` to include {expected_fragment!r}"
+                )
+
+        if not runtime_paths.setup_marker_file.exists():
+            raise AssertionError(
+                "expected `envmgr setup` to mark the runtime as bootstrapped"
+            )
+
+
 def check_ping_cli_contract() -> None:
     with tempfile.TemporaryDirectory() as temp_dir:
-        envmgr_home = Path(temp_dir) / ".envmgr"
+        temp_root = Path(temp_dir)
+        envmgr_home = temp_root / ".envmgr"
         runtime_paths = bootstrap_cli_runtime(envmgr_home)
+        fake_bin_dir = temp_root / "bin"
+        fake_bin_dir.mkdir()
+        _write_fake_command(
+            fake_bin_dir / "ansible",
+            (
+                "#!/bin/sh\n"
+                "printf 'localhost | SUCCESS => {\\n'\n"
+                'printf \'    "ping": "pong"\\n\'\n'
+                "printf '}\\n'\n"
+            ),
+        )
         result = run_envmgr_cli(
             "ping",
-            env_overrides={"ENVMGR_HOME": str(runtime_paths.home)},
+            env_overrides={
+                "ENVMGR_HOME": str(runtime_paths.home),
+                "PATH": _prepend_path(fake_bin_dir),
+            },
         )
 
         if result.returncode != 0:
@@ -218,12 +316,18 @@ def check_ping_cli_contract() -> None:
         if result.stderr:
             raise AssertionError("expected `envmgr ping` to keep stderr empty")
 
-        output = result.stdout
-        if "Testing connection with inventory: default ->" not in output:
-            raise AssertionError(
-                "expected `envmgr ping` to print the selected default inventory"
-            )
-        if "localhost" not in output or "SUCCESS" not in output:
-            raise AssertionError(
-                "expected `envmgr ping` to report a successful localhost ansible ping"
-            )
+        output = _strip_ansi(result.stdout)
+        for expected_fragment in (
+            "Envmgr Ping",
+            "Test inventory connectivity with ansible ping.",
+            "Inventory: default",
+            f"Inventory path: {runtime_paths.default_inventory_file}",
+            "Info: Running ansible ping against all hosts...",
+            "localhost | SUCCESS =>",
+            '"ping": "pong"',
+            "Success: Ping completed successfully.",
+        ):
+            if expected_fragment not in output:
+                raise AssertionError(
+                    f"expected `envmgr ping` to include {expected_fragment!r}"
+                )
