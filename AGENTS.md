@@ -7,7 +7,7 @@ This guide helps contributors work effectively on envmgr (Ansible-driven environ
 - `playbooks/` — scenario playbooks (`workstation.yml`, `node.yml`).
 - `roles/` — one folder per tool (`tasks/main.yml`, `vars/`, etc.).
 - `scripts/` — Python CLI entrypoints plus `commands/` and `services/` modules used by `uv`.
-- `tests/` — Python `unittest` modules split by domain plus a dedicated smoke suite exercised by `uv run smoke-test`.
+- `tests/` — Python `unittest` modules split by domain; `tests/checks/` holds unit-check implementations and `tests/test_smoke.py` remains the dedicated smoke suite exercised by `uv run smoke-test`.
 - `vars/` — shared variables; `ansible.cfg` — repository Ansible defaults; runtime state lives under `~/.envmgr/`.
 
 ## Build, Test, and Development Commands
@@ -22,7 +22,7 @@ This guide helps contributors work effectively on envmgr (Ansible-driven environ
 - `uv run pre-commit run --hook-stage manual validate --all-files` — run the full validation suite through `pre-commit`.
 - `uv run pre-commit run --hook-stage manual smoke-test --all-files` — run the smoke suite through `pre-commit`.
 - `uv run lint`, `uv run ansible-check`, and `uv run typecheck` are rare direct entrypoints for debugging one tool in isolation.
-- `uv run validate` and `uv run smoke-test` remain the direct full-suite entrypoints for CI or more targeted troubleshooting; `validate` runs the split unit modules while `smoke-test` runs the smoke suite.
+- `uv run validate` and `uv run smoke-test` remain the direct full-suite entrypoints for CI or more targeted troubleshooting; `validate` discovers the split unit modules automatically while `smoke-test` runs the smoke suite.
 
 ## Coding Style & Naming Conventions
 

@@ -35,7 +35,8 @@ Run `uv run envmgr setup` before `uv run envmgr install`, `uv run envmgr ping`, 
 or `uv run smoke-test` on a fresh machine or a fresh `ENVMGR_HOME`. The command
 is safe to re-run and does not overwrite existing runtime config files. `uv run
 validate` now checks both `scripts/` and `tests/`, runs the split
-`tests/test_*.py` unit modules, and `uv run smoke-test` runs only the
+`tests/test_*.py` unit modules automatically while excluding `tests.test_smoke`,
+and `uv run smoke-test` runs only the
 `tests.test_smoke` suite before the playbook `--list-tags` checks.
 
 `uv run envmgr doctor` performs a read-only health check for the current runtime. It is
@@ -72,6 +73,8 @@ Repository-local files still keep their original purpose:
 - `playbooks/` stays the source of scenario playbooks in this repo
 - `scripts/commands/` holds the `envmgr` subcommand handlers and shared CLI helpers
 - `scripts/services/` holds reusable runtime, install-planning, and doctor logic
+- `scripts/smoke_checks/` stays reserved for smoke-test-only checks
+- `tests/checks/` holds the finer-grained unit-check implementations used by `validate`
 - `ansible.cfg` remains repository metadata used by envmgr internals and project checks
 
 `uv run envmgr ...` is the supported runtime command surface for envmgr. Development

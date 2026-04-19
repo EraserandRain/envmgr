@@ -1,16 +1,68 @@
 from __future__ import annotations
 
 import sys
+import unittest
+from collections.abc import Iterator
 from pathlib import Path
 
 from ..runtime_config import ensure_runtime_layout
-from .dev_shared import PYTHON_CHECK_PATHS, UNIT_TEST_MODULES, run_command_step
+from .dev_shared import PYTHON_CHECK_PATHS, run_command_step
 from .shared import (
     build_command_parser,
     parse_command_args,
     require_setup_completed,
     resolve_inventory_option,
 )
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+TESTS_DIR = REPO_ROOT / "tests"
+UNIT_TEST_PATTERN = "test_*.py"
+SMOKE_TEST_CLASS_MODULE_PREFIX = "scripts.smoke_checks."
+
+
+def _iter_test_cases(suite: unittest.TestSuite) -> Iterator[unittest.TestCase]:
+    for test in suite:
+        if isinstance(test, unittest.TestSuite):
+            yield from _iter_test_cases(test)
+            continue
+        yield test
+
+
+def build_unit_test_suite() -> unittest.TestSuite:
+    loader = unittest.TestLoader()
+    discovered_suite = loader.discover(
+        start_dir=str(TESTS_DIR),
+        pattern=UNIT_TEST_PATTERN,
+        top_level_dir=str(REPO_ROOT),
+    )
+
+    unit_suite = unittest.TestSuite()
+    for test in _iter_test_cases(discovered_suite):
+        if test.__class__.__module__.startswith(SMOKE_TEST_CLASS_MODULE_PREFIX):
+            continue
+        unit_suite.addTest(test)
+    return unit_suite
+
+
+def run_unit_test_step() -> bool:
+    print(
+        "\n[unittest] "
+        f"discover {TESTS_DIR.name} -p '{UNIT_TEST_PATTERN}' "
+        "(excluding tests.test_smoke)"
+    )
+    suite = build_unit_test_suite()
+    test_count = suite.countTestCases()
+    if test_count == 0:
+        print("✗ unittest failed because no unit tests were discovered")
+        return False
+
+    result = unittest.TextTestRunner(stream=sys.stdout, verbosity=2).run(suite)
+    if result.wasSuccessful():
+        print(f"✓ unittest passed ({test_count} tests)")
+        return True
+
+    print("✗ unittest failed")
+    return False
 
 
 def validate(
@@ -55,10 +107,7 @@ def validate(
             "ruff format",
             ["ruff", "format", "--check", *PYTHON_CHECK_PATHS],
         ),
-        run_command_step(
-            "unittest",
-            [sys.executable, "-m", "unittest", *UNIT_TEST_MODULES],
-        ),
+        run_unit_test_step(),
         run_command_step("mypy", ["mypy", *PYTHON_CHECK_PATHS]),
         run_command_step(
             "ansible-lint",

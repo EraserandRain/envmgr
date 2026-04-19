@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 
-from scripts.smoke_checks.doctor_history import (
+from tests.checks.doctor_history import (
     check_doctor_ignores_non_default_inventory_aliases,
     check_doctor_json_output,
     check_doctor_report_detects_unbootstrapped_runtime,
@@ -11,8 +11,7 @@ from scripts.smoke_checks.doctor_history import (
     check_history_json_output,
     check_history_text_output,
 )
-
-from .support import Check, build_check_suite, build_check_test_case
+from tests.support import Check, build_check_suite, build_check_test_case
 
 DOCTOR_HISTORY_TEST_CHECKS: tuple[Check, ...] = (
     ("history renders readable text output", check_history_text_output),
