@@ -6,7 +6,7 @@ This guide helps contributors work effectively on envmgr (Ansible-driven environ
 
 - `playbooks/` — scenario playbooks (`workstation.yml`, `node.yml`).
 - `roles/` — one folder per tool (`tasks/main.yml`, `vars/`, etc.).
-- `scripts/` — Python CLI entrypoints used by `uv`.
+- `scripts/` — Python CLI entrypoints plus `commands/` and `services/` modules used by `uv`.
 - `tests/` — Python `unittest` smoke coverage exercised by `uv run smoke-test`.
 - `vars/` — shared variables; `ansible.cfg` — repository Ansible defaults; runtime state lives under `~/.envmgr/`.
 
