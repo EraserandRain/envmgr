@@ -3,6 +3,7 @@ from __future__ import annotations
 import unittest
 
 from tests.checks.cli import (
+    check_dev_helper_entrypoints_use_typer_help,
     check_dispatcher_rejects_dev_only_subcommands,
     check_dispatcher_routes_install_subcommand,
     check_dispatcher_routes_ping_subcommand,
@@ -19,6 +20,10 @@ CLI_CONTRACT_TEST_CHECKS: tuple[Check, ...] = (
     (
         "public runtime subcommands keep Typer Rich help output",
         check_runtime_subcommands_use_typer_help,
+    ),
+    (
+        "dedicated dev-helper entrypoints keep Typer Rich help output",
+        check_dev_helper_entrypoints_use_typer_help,
     ),
     (
         "public CLI routes setup to the shared Rich runtime summary",

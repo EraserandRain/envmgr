@@ -43,17 +43,7 @@ def run_ping(*, inventory: str | None) -> None:
 
 
 def ping(argv: list[str] | None = None) -> None:
-    """Test connection to all hosts using ansible ping module."""
-    from .legacy_argparse import build_command_parser, parse_command_args
+    """Test connection to all hosts using the Typer-based root CLI."""
+    from ..main import main as root_main
 
-    parser = build_command_parser(
-        "ping", description="Test connection to all hosts using ansible ping module"
-    )
-    parser.add_argument(
-        "-i",
-        "--inventory",
-        help="Specify an inventory alias from ~/.envmgr/config.toml",
-    )
-
-    args = parse_command_args(parser, argv)
-    run_ping(inventory=args.inventory)
+    root_main(["ping", *(argv or [])])

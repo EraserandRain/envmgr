@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import re
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
 from unittest.mock import patch
@@ -14,6 +15,7 @@ from scripts.main import app
 from scripts.runtime_config import ensure_runtime_layout, mark_runtime_setup_complete
 
 CLI_RUNNER = CliRunner()
+REPO_ROOT = Path(__file__).resolve().parents[2]
 _ANSI_ESCAPE_RE = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
 
 
@@ -29,6 +31,28 @@ def _normalize_cli_output(*streams: str) -> str:
         if stream
     ]
     return "\n".join(normalized_parts)
+
+
+def _collapse_whitespace(text: str) -> str:
+    """Keep help assertions stable even when Rich reflows text across lines."""
+    return " ".join(text.split())
+
+
+def _invoke_dev_helper_entrypoint_help(
+    module_name: str,
+) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            f"from scripts.commands.{module_name} import main; main()",
+            "--help",
+        ],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
 
 
 def _bootstrap_runtime(envmgr_home: Path) -> None:
@@ -128,6 +152,86 @@ def check_runtime_subcommands_use_typer_help() -> None:
             if expected_fragment not in output:
                 raise AssertionError(
                     f"expected `{' '.join(args)}` to include {expected_fragment!r}"
+                )
+
+
+def check_dev_helper_entrypoints_use_typer_help() -> None:
+    help_expectations = (
+        (
+            "create",
+            "create",
+            (
+                "Usage: create [OPTIONS] [ROLE]",
+                "Create a new Ansible role by generating the role directory.",
+                "The name of the role to create",
+                "--help",
+            ),
+        ),
+        (
+            "lint",
+            "lint",
+            (
+                "Usage: lint [OPTIONS]",
+                "Run ruff linting and formatting on Python code.",
+                "--help",
+            ),
+        ),
+        (
+            "ansible-check",
+            "ansible_check",
+            (
+                "Usage: ansible-check [OPTIONS]",
+                "Run ansible-lint on the roles directory.",
+                "--help",
+            ),
+        ),
+        (
+            "typecheck",
+            "typecheck",
+            (
+                "Usage: typecheck [OPTIONS]",
+                "Run mypy type checking on the Python source directories.",
+                "--help",
+            ),
+        ),
+        (
+            "validate",
+            "validate",
+            (
+                "Usage: validate [OPTIONS]",
+                "Run lint, typecheck, ansible lint, and playbook syntax checks.",
+                "--inventory",
+                "--playbook",
+            ),
+        ),
+        (
+            "smoke-test",
+            "smoke_test",
+            (
+                "Usage: smoke-test [OPTIONS]",
+                "Run lightweight smoke tests for metadata, scaffolds, and playbooks.",
+                "--inventory",
+                "--playbook",
+            ),
+        ),
+    )
+
+    for command_name, module_name, expected_fragments in help_expectations:
+        result = _invoke_dev_helper_entrypoint_help(module_name)
+        if result.returncode != 0:
+            raise AssertionError(
+                f"expected `uv run {command_name} --help` to exit successfully"
+                f"\nstdout:\n{result.stdout}\nstderr:\n{result.stderr}"
+            )
+
+        output = _collapse_whitespace(
+            _normalize_cli_output(result.stdout, result.stderr)
+        )
+        for expected_fragment in expected_fragments:
+            if expected_fragment not in output:
+                raise AssertionError(
+                    f"expected `uv run {command_name} --help` to include "
+                    f"{expected_fragment!r}\noutput:\n{output}"
                 )
 
 
