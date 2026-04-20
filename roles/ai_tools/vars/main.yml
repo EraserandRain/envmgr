@@ -30,5 +30,6 @@ ai_tools_config:
     binary: "rtk"
     description: "RTK CLI proxy"
     install_dir: "{{ ai_tools_user_bin_path }}"
-    install_script_url: "https://raw.githubusercontent.com/rtk-ai/rtk/master/install.sh"
-    release_api_url: "https://api.github.com/repos/rtk-ai/rtk/releases/latest"
+    latest_release_url: "https://github.com/rtk-ai/rtk/releases/latest"
+    latest_download_base_url: "https://github.com/rtk-ai/rtk/releases/latest/download"
+    release_download_base_url: "https://github.com/rtk-ai/rtk/releases/download"

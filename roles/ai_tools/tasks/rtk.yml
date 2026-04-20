@@ -1,11 +1,17 @@
 ---
+- name: Check whether RTK exists at the managed path
+  stat:
+    path: "{{ ai_tools_config.rtk.install_dir }}/{{ ai_tools_config.rtk.binary }}"
+  register: rtk_managed_binary_stat
+  changed_when: false
+
 - name: Check current RTK version
   shell: |
     set -o pipefail
-    if command -v {{ ai_tools_config.rtk.binary }} >/dev/null 2>&1; then
-      {{ ai_tools_config.rtk.binary }} --version 2>&1 | head -n1
-    elif [ -x "{{ ai_tools_config.rtk.install_dir }}/{{ ai_tools_config.rtk.binary }}" ]; then
+    if [ -x "{{ ai_tools_config.rtk.install_dir }}/{{ ai_tools_config.rtk.binary }}" ]; then
       "{{ ai_tools_config.rtk.install_dir }}/{{ ai_tools_config.rtk.binary }}" --version 2>&1 | head -n1
+    elif command -v {{ ai_tools_config.rtk.binary }} >/dev/null 2>&1; then
+      {{ ai_tools_config.rtk.binary }} --version 2>&1 | head -n1
     else
       echo "not_installed"
     fi
@@ -14,60 +20,164 @@
   register: rtk_current_version_result
   changed_when: false
 
-- name: Get latest RTK release version
+- name: Determine RTK release target
+  set_fact:
+    rtk_release_target: >-
+      {{
+        {
+          'linux/x86_64': 'x86_64-unknown-linux-musl',
+          'linux/amd64': 'x86_64-unknown-linux-musl',
+          'linux/aarch64': 'aarch64-unknown-linux-gnu',
+          'linux/arm64': 'aarch64-unknown-linux-gnu',
+          'darwin/x86_64': 'x86_64-apple-darwin',
+          'darwin/amd64': 'x86_64-apple-darwin',
+          'darwin/aarch64': 'aarch64-apple-darwin',
+          'darwin/arm64': 'aarch64-apple-darwin'
+        }.get((ansible_system | lower) ~ '/' ~ (ansible_architecture | lower), '')
+      }}
+
+- name: Fail if RTK does not publish a binary for this platform
+  fail:
+    msg: "RTK does not publish a release archive for {{ ansible_system }} {{ ansible_architecture }}"
+  when: rtk_release_target == ''
+
+- name: Resolve latest RTK release via GitHub redirects
   uri:
-    url: "{{ ai_tools_config.rtk.release_api_url }}"
-    return_content: true
-    headers:
-      Accept: "application/vnd.github+json"
-  register: rtk_latest_release_result
+    url: "{{ ai_tools_config.rtk.latest_release_url }}"
+    method: HEAD
+    follow_redirects: none
+    return_content: false
+    status_code:
+      - 200
+      - 301
+      - 302
+      - 303
+      - 307
+      - 308
+    timeout: 30
+  register: rtk_latest_release_redirect
   changed_when: false
+  failed_when: false
+
+- name: Record RTK release metadata
+  set_fact:
+    rtk_current_version: "{{ rtk_current_version_result.stdout.strip() }}"
+    rtk_latest_version: >-
+      {{
+        (
+          (rtk_latest_release_redirect.location | default(''))
+          | regex_replace('^.*/tag/', '')
+          | regex_replace('[/?#].*$', '')
+        )
+        if '/tag/' in (rtk_latest_release_redirect.location | default(''))
+        else 'unknown'
+      }}
 
 - name: Determine if RTK needs update
   set_fact:
-    rtk_current_version: "{{ rtk_current_version_result.stdout.strip() }}"
-    rtk_latest_version: "{{ rtk_latest_release_result.json.tag_name | default('unknown') }}"
+    rtk_extract_dir: >-
+      {{
+        installers_cache_dir
+        ~ '/rtk-'
+        ~ rtk_release_target
+        ~ '-'
+        ~ (
+          (rtk_latest_version if rtk_latest_version != 'unknown' else 'latest')
+          | regex_replace('[^A-Za-z0-9._-]', '_')
+        )
+      }}
+    rtk_archive_path: >-
+      {{
+        installers_cache_dir
+        ~ '/rtk-'
+        ~ rtk_release_target
+        ~ '-'
+        ~ (
+          (rtk_latest_version if rtk_latest_version != 'unknown' else 'latest')
+          | regex_replace('[^A-Za-z0-9._-]', '_')
+        )
+        ~ '.tar.gz'
+      }}
+    rtk_release_download_url: >-
+      {{
+        ai_tools_config.rtk.latest_download_base_url ~ '/rtk-' ~ rtk_release_target ~ '.tar.gz'
+        if rtk_latest_version == 'unknown'
+        else ai_tools_config.rtk.release_download_base_url ~ '/' ~ rtk_latest_version ~ '/rtk-' ~ rtk_release_target ~ '.tar.gz'
+      }}
     rtk_needs_update: >-
       {{
-        rtk_current_version_result.stdout.strip() == 'not_installed'
+        not (rtk_managed_binary_stat.stat.exists | default(false))
+        or rtk_current_version_result.stdout.strip() == 'not_installed'
         or (
-          (rtk_latest_release_result.json.tag_name | default('unknown')) != 'unknown'
+          rtk_latest_version != 'unknown'
           and (
-            (rtk_latest_release_result.json.tag_name | default('unknown') | regex_replace('^v', ''))
+            (rtk_latest_version | regex_replace('^v', ''))
             not in rtk_current_version_result.stdout.strip()
           )
         )
       }}
+
+- name: Warn when latest RTK version could not be resolved
+  debug:
+    msg: >-
+      Could not resolve the latest RTK release tag from GitHub.
+      {{
+        'Installing from the latest download URL because the managed RTK binary is missing.'
+        if (rtk_needs_update | bool)
+        else 'Keeping the current managed RTK binary and skipping the update check.'
+      }}
+  when: rtk_latest_version == 'unknown'
 
 - name: Display RTK version information
   debug:
     msg:
       - "=== RTK Version Check ==="
       - "Current version: {{ rtk_current_version }}"
-      - "Latest version: {{ rtk_latest_version }}"
+      - "Latest version: {{ rtk_latest_version if rtk_latest_version != 'unknown' else 'unavailable (redirect lookup failed)' }}"
       - "Action: {{ 'Install/Update needed' if (rtk_needs_update | bool) else 'Already up-to-date, skipping' }}"
       - "========================="
 
 - block:
-    - name: Download RTK installer if update is needed
-      get_url:
-        url: "{{ ai_tools_config.rtk.install_script_url }}"
-        dest: "{{ installers_cache_dir }}/rtk-installer"
+    - name: Ensure RTK install directory exists
+      file:
+        path: "{{ ai_tools_config.rtk.install_dir }}"
+        state: directory
         mode: "0755"
-        force: true
-        timeout: 30
-      register: rtk_installer_download
-      retries: 3
-      delay: 5
-      until: rtk_installer_download is succeeded
       when: rtk_needs_update | bool
 
-    - name: Install or update RTK
-      command: "{{ installers_cache_dir }}/rtk-installer"
-      environment:
-        RTK_INSTALL_DIR: "{{ ai_tools_config.rtk.install_dir }}"
-      register: rtk_install_result
-      changed_when: rtk_needs_update | bool
+    - name: Download RTK release archive if update is needed
+      get_url:
+        url: "{{ rtk_release_download_url }}"
+        dest: "{{ rtk_archive_path }}"
+        mode: "0644"
+        force: true
+        timeout: 30
+      register: rtk_archive_download
+      retries: 3
+      delay: 5
+      until: rtk_archive_download is succeeded
+      when: rtk_needs_update | bool
+
+    - name: Prepare RTK extraction directory
+      file:
+        path: "{{ rtk_extract_dir }}"
+        state: directory
+        mode: "0755"
+      when: rtk_needs_update | bool
+
+    - name: Extract RTK release archive
+      unarchive:
+        src: "{{ rtk_archive_path }}"
+        dest: "{{ rtk_extract_dir }}"
+        remote_src: true
+      when: rtk_needs_update | bool
+
+    - name: Install or update RTK binary
+      copy:
+        src: "{{ rtk_extract_dir }}/{{ ai_tools_config.rtk.binary }}"
+        dest: "{{ ai_tools_config.rtk.install_dir }}/{{ ai_tools_config.rtk.binary }}"
+        mode: "0755"
+        remote_src: true
       when: rtk_needs_update | bool
 
     - name: Verify RTK binary exists
@@ -83,13 +193,15 @@
   rescue:
     - name: Handle RTK installation failure
       debug:
-        msg: "RTK installation failed: {{ rtk_install_result.stderr | default('Unknown error') }}"
+        msg: "RTK installation failed: {{ ansible_failed_result.msg | default(ansible_failed_result.stderr | default('Unknown error')) }}"
 
     - name: Clean up failed RTK installation
       file:
         path: "{{ ai_tools_config.rtk.install_dir }}/{{ ai_tools_config.rtk.binary }}"
         state: absent
-      when: rtk_binary_stat.stat.exists | default(false)
+      when:
+        - not (rtk_managed_binary_stat.stat.exists | default(false))
+        - rtk_binary_stat.stat.exists | default(false)
 
     - name: Re-raise RTK installation failure
       fail:
