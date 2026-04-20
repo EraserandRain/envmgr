@@ -1,15 +1,22 @@
 from __future__ import annotations
 
 import json
+import os
 import tempfile
 from pathlib import Path
+from unittest.mock import patch
 
 from click.testing import Result
 from typer.testing import CliRunner
 
 from scripts.main import app
 from scripts.runtime_config import ensure_runtime_layout, mark_runtime_setup_complete
-from scripts.services.doctor import DOCTOR_FAIL, DOCTOR_OK, build_doctor_report
+from scripts.services.doctor import (
+    DOCTOR_COMMANDS,
+    DOCTOR_FAIL,
+    DOCTOR_OK,
+    build_doctor_report,
+)
 from scripts.services.runtime import (
     RUNTIME_RUN_RECORD_SCHEMA_VERSION,
     write_runtime_run_record,
@@ -18,9 +25,32 @@ from scripts.services.runtime import (
 CLI_RUNNER = CliRunner()
 
 
-def invoke_envmgr(*args: str, envmgr_home: Path | None = None) -> Result:
-    env = None if envmgr_home is None else {"ENVMGR_HOME": str(envmgr_home)}
+def invoke_envmgr(
+    *args: str,
+    envmgr_home: Path | None = None,
+    env_overrides: dict[str, str] | None = None,
+) -> Result:
+    env: dict[str, str] | None = None
+    if envmgr_home is not None or env_overrides is not None:
+        env = {}
+        if env_overrides is not None:
+            env.update(env_overrides)
+        if envmgr_home is not None:
+            env["ENVMGR_HOME"] = str(envmgr_home)
     return CLI_RUNNER.invoke(app, list(args), prog_name="envmgr", env=env)
+
+
+def _write_fake_command(command_path: Path) -> None:
+    command_path.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    command_path.chmod(0o755)
+
+
+def _create_fake_tool_bin(root: Path) -> Path:
+    tool_bin = root / "tool-env" / "bin"
+    tool_bin.mkdir(parents=True, exist_ok=True)
+    for command_name in DOCTOR_COMMANDS:
+        _write_fake_command(tool_bin / command_name)
+    return tool_bin.resolve()
 
 
 def check_history_text_output() -> None:
@@ -190,11 +220,20 @@ def check_doctor_report_passes_bootstrapped_runtime() -> None:
     with tempfile.TemporaryDirectory() as temp_dir:
         envmgr_home = Path(temp_dir) / ".envmgr"
         runtime_paths = ensure_runtime_layout(envmgr_home)
+        tool_bin = _create_fake_tool_bin(Path(temp_dir))
         (runtime_paths.galaxy_roles_dir / "gantsign.oh-my-zsh").mkdir()
         (runtime_paths.galaxy_collections_dir / "community").mkdir()
         mark_runtime_setup_complete(runtime_paths)
 
-        report = build_doctor_report(envmgr_home)
+        with (
+            patch.dict(os.environ, {"PATH": ""}, clear=False),
+            patch(
+                "scripts.services.runtime.sysconfig.get_path",
+                return_value=str(tool_bin),
+            ),
+            patch("scripts.services.runtime.sys.executable", str(tool_bin / "python3")),
+        ):
+            report = build_doctor_report(envmgr_home)
         failures = [
             check.name for check in report.checks if check.status == DOCTOR_FAIL
         ]
@@ -303,10 +342,24 @@ def check_doctor_json_output() -> None:
     with tempfile.TemporaryDirectory() as temp_dir:
         envmgr_home = Path(temp_dir) / ".envmgr"
         runtime_paths = ensure_runtime_layout(envmgr_home)
+        tool_bin = _create_fake_tool_bin(Path(temp_dir))
         (runtime_paths.galaxy_roles_dir / "gantsign.oh-my-zsh").mkdir()
         (runtime_paths.galaxy_collections_dir / "community").mkdir()
         mark_runtime_setup_complete(runtime_paths)
-        result = invoke_envmgr("doctor", "--json", envmgr_home=envmgr_home)
+        with (
+            patch.dict(os.environ, {"PATH": ""}, clear=False),
+            patch(
+                "scripts.services.runtime.sysconfig.get_path",
+                return_value=str(tool_bin),
+            ),
+            patch("scripts.services.runtime.sys.executable", str(tool_bin / "python3")),
+        ):
+            result = invoke_envmgr(
+                "doctor",
+                "--json",
+                envmgr_home=envmgr_home,
+                env_overrides={"PATH": ""},
+            )
         if result.exit_code != 0:
             raise AssertionError(
                 f"expected doctor --json to exit successfully\noutput:\n{result.output}"
@@ -345,6 +398,10 @@ def check_doctor_json_output() -> None:
         if payload["checks"][0]["name"] != "commands":
             raise AssertionError(
                 "expected doctor --json to summarize command checks into one row"
+            )
+        if payload["checks"][0]["status"] != DOCTOR_OK:
+            raise AssertionError(
+                "expected doctor --json to treat tool-environment commands as healthy"
             )
         if any(check["name"] == "default playbook" for check in payload["checks"]):
             raise AssertionError(

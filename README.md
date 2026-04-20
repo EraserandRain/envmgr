@@ -10,42 +10,78 @@ Envmgr requires Python 3.10 or later and the uv package.
 
 Please install `uv` first 【[uv installation](https://docs.astral.sh/uv/getting-started/installation/)】.
 
-### First-Time Setup
+### Global Editable Install (Phase 1)
 
-`uv run envmgr setup` is the required bootstrap step on a new machine. It initializes
-`~/.envmgr/` and installs the Galaxy roles and collections that envmgr
-playbooks expect. For contributor workflows, run `uv sync` separately when you
-want to install or refresh the local Python environment and dev tools.
+After installing `uv`, install this checkout as an editable global tool so
+`envmgr ...` is available directly in your shell:
 
 ```bash
 # Install uv
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# Bootstrap envmgr on this machine
-uv run envmgr setup
+# Install envmgr from this repo checkout as an editable global tool
+uv tool install --editable /home/eraserrain/envmgr
 
-# Verify the bootstrap completed successfully
-uv run envmgr doctor
-uv run envmgr doctor --json
-uv run envmgr ping
-uv run envmgr install -l
+# Show the directory that contains uv-managed tool shims
+uv tool dir --bin
+
+# Add the uv tool bin directory to your shell startup if needed
+uv tool update-shell
 ```
 
-Run `uv run envmgr setup` before `uv run envmgr install`, `uv run envmgr ping`, `uv run validate`,
-or `uv run smoke-test` on a fresh machine or a fresh `ENVMGR_HOME`. The command
-is safe to re-run and does not overwrite existing runtime config files. `uv run
-validate` now checks both `scripts/` and `tests/`, runs the split
+To refresh the editable global install after pulling changes in this checkout,
+run `uv tool install --editable --force /home/eraserrain/envmgr`.
+To remove the global tool shim entirely, run `uv tool uninstall envmgr`.
+If your shell still reports `envmgr: command not found`, check the uv-managed
+bin directory with `uv tool dir --bin`, then run `uv tool update-shell` and
+start a new shell session so that directory is added to your `PATH`.
+
+The editable install makes `envmgr ...` the primary runtime command surface for
+Phase 1. It also exposes the other console scripts defined by this project, but
+those extra entry points remain helper/developer interfaces rather than a new
+recommended day-to-day workflow.
+
+Phase 1 support is intentionally repo-root-only for this checkout: use the
+installed `envmgr ...` command while your shell is at the repo root, and do not
+expect from-anywhere execution yet. If you are already at the repo root and
+need an explicit fallback without relying on the installed shim, use
+`uv run envmgr ...`.
+
+### First-Time Setup
+
+`envmgr setup` is the required bootstrap step on a new machine. It initializes
+`~/.envmgr/` and installs the Galaxy roles and collections that envmgr
+playbooks expect. For contributor workflows, run `uv sync` separately when you
+want to install or refresh the local Python environment and dev tools.
+
+```bash
+# Bootstrap envmgr on this machine
+envmgr setup
+
+# Verify the bootstrap completed successfully
+envmgr doctor
+envmgr doctor --json
+envmgr ping
+envmgr install -l
+```
+
+Run `envmgr setup` before `envmgr install`, `envmgr ping`, `uv run validate`,
+or `uv run smoke-test` on a fresh machine or a fresh `ENVMGR_HOME`. Inside the
+repo root, `uv run envmgr setup` is the fallback form of the same runtime
+command. The bootstrap step is safe to re-run and does not overwrite existing
+runtime config files. `uv run validate` now checks both `scripts/` and
+`tests/`, runs the split
 `tests/test_*.py` unit modules automatically while excluding `tests.test_smoke`,
 and `uv run smoke-test` runs only the
 `tests.test_smoke` suite before the playbook `--list-tags` checks.
 
-`uv run envmgr doctor` performs a read-only health check for the current runtime. It is
+`envmgr doctor` performs a read-only health check for the current runtime. It is
 safe to run before or after setup when you want to inspect what is missing
 under `~/.envmgr/`.
-Use `uv run envmgr doctor --json` when you want a machine-readable report for scripts
+Use `envmgr doctor --json` when you want a machine-readable report for scripts
 or CI.
-Use `uv run envmgr history` to inspect the most recent runtime subprocess records, or
-`uv run envmgr history -n 5` to focus on the latest few commands.
+Use `envmgr history` to inspect the most recent runtime subprocess records, or
+`envmgr history -n 5` to focus on the latest few commands.
 The public runtime CLI uses Typer with Rich help plus shared Rich headings,
 summary lines, and prompts for `setup`, `install`, and `ping`. Development
 helpers such as `uv run validate` and `uv run smoke-test` also use dedicated
@@ -54,7 +90,7 @@ subcommands.
 
 ### Host Settings
 
-Runtime configuration is saved under `~/.envmgr/`. By default, `uv run envmgr setup`
+Runtime configuration is saved under `~/.envmgr/`. By default, `envmgr setup`
 creates:
 
 - `~/.envmgr/config.toml`
@@ -64,7 +100,7 @@ creates:
 - `~/.envmgr/log/`
 - `~/.envmgr/cache/`
 
-For `uv run envmgr` commands, envmgr now uses these runtime paths consistently:
+For `envmgr` runtime commands, envmgr now uses these runtime paths consistently:
 
 - Ansible logs are written to `~/.envmgr/log/ansible.log`
 - Runtime subprocess records are written to `~/.envmgr/log/runs/*.json`
@@ -76,16 +112,22 @@ Repository-local files still keep their original purpose:
 
 - `roles/` stays the source of first-party envmgr roles in this repo
 - `playbooks/` stays the source of scenario playbooks in this repo
-- `scripts/main.py` defines the Typer-based public `envmgr` CLI used by `uv run envmgr ...`, with Rich help plus shared Rich runtime summaries/prompts
+- `scripts/main.py` defines the Typer-based public `envmgr` CLI used by the
+  installed `envmgr ...` command and the repo-root fallback `uv run envmgr ...`,
+  with Rich help plus shared Rich runtime summaries/prompts
 - `scripts/commands/` holds command runners plus the dedicated helper entrypoints and CLI glue shared by the public CLI and helper commands
 - `scripts/services/` holds reusable runtime, install-planning, and doctor logic
 - `scripts/smoke_checks/` stays reserved for smoke-test-only checks
 - `tests/checks/` holds the finer-grained unit-check implementations used by `validate`
 - `ansible.cfg` remains repository metadata used by envmgr internals and project checks
 
-`uv run envmgr ...` is the supported runtime command surface for envmgr. Development
-helpers stay separate as dedicated commands like `uv run validate` or `uv run lint`. Direct `ansible-playbook` or
-`ansible-galaxy` usage from the repository is not a supported interface.
+The installed `envmgr ...` command is the supported runtime command surface for
+envmgr. During Phase 1, that support stays repo-root-only for this checkout;
+from-anywhere execution is not supported yet. Development helpers stay separate
+as dedicated commands like `uv run validate` or `uv run lint`, and
+`uv run envmgr ...` remains the explicit fallback when you are already inside
+the repo root. Direct `ansible-playbook` or `ansible-galaxy` usage from the
+repository is not a supported interface.
 Repository-internal Python import paths under `scripts/` are implementation
 details; any conservative compatibility re-exports or root-command shims are
 not a supported public API.
@@ -93,9 +135,9 @@ not a supported public API.
 The public runtime CLI now uses Typer with Rich-enhanced help plus shared Rich
 runtime summaries, status lines, and interactive prompts where applicable, and
 the dedicated developer helper commands also use Typer-based help. The
-supported command surfaces stay intentionally split: run envmgr commands as
-`uv run envmgr ...` and keep developer helpers on their existing standalone
-entrypoints.
+supported command surfaces stay intentionally split: run runtime commands as
+`envmgr ...` (or `uv run envmgr ...` as a repo-root fallback) and keep
+developer helpers on their existing standalone entrypoints.
 
 Commands that accept `-i/--inventory` only accept inventory aliases defined in `~/.envmgr/config.toml`. envmgr no longer falls back to repository-local inventory files or `./.ansible` caches.
 Inventory alias targets must stay under `~/.envmgr/inventory/`.
@@ -133,8 +175,8 @@ all:
               ansible_python_interpreter: "{{ ansible_playbook_python }}"
 ```
 
-> **Note:** `uv run envmgr install <tags>` now resolves the scenario playbook from the selected tags. If the tags are valid in more than one scenario, pass `--playbook playbooks/workstation.yml` or `--playbook playbooks/node.yml` explicitly.
-> `uv run envmgr install all` uses the `playbook` value from `~/.envmgr/config.toml` by default.
+> **Note:** `envmgr install <tags>` now resolves the scenario playbook from the selected tags. If the tags are valid in more than one scenario, pass `--playbook playbooks/workstation.yml` or `--playbook playbooks/node.yml` explicitly.
+> `envmgr install all` uses the `playbook` value from `~/.envmgr/config.toml` by default.
 
 **For Remote Hosts:**
 
@@ -174,39 +216,39 @@ all:
 
 Setup specified tools using role-level or task-level tags:
 
-Run `uv run envmgr setup` first on a new machine so the runtime inventory, Galaxy
+Run `envmgr setup` first on a new machine so the runtime inventory, Galaxy
 dependencies, and cache directories already exist.
 
 **Local execution (default):**
 
 ```bash
 # List all available tags
-uv run envmgr install -l
+envmgr install -l
 
 # Install specified tools
-uv run envmgr install [tag1 tag2 ...]
+envmgr install [tag1 tag2 ...]
 
 # Install all roles in one scenario
-uv run envmgr install all
+envmgr install all
 
 # Examples:
-uv run envmgr install init             # Apply the baseline host bootstrap bundle
-uv run envmgr install zsh              # Install zsh with oh-my-zsh and aliases
-uv run envmgr install kubeadm          # Install kubeadm on node targets
-uv run envmgr install golang dotnet    # Install multiple tools (space-separated)
-uv run envmgr install kubernetes_tools # Install kubectl, helm, crictl, CNI plugins
-uv run envmgr install ai_tools         # Launch the interactive AI Tools Setup wizard in a TTY
-uv run envmgr install ai_tools --codex # Install default AI tools and explicitly manage Codex CLI
-uv run envmgr install ai_tools --no-rtk # RTK is enabled by default; use this to skip it
+envmgr install init              # Apply the baseline host bootstrap bundle
+envmgr install zsh               # Install zsh with oh-my-zsh and aliases
+envmgr install kubeadm           # Install kubeadm on node targets
+envmgr install golang dotnet     # Install multiple tools (space-separated)
+envmgr install kubernetes_tools  # Install kubectl, helm, crictl, CNI plugins
+envmgr install ai_tools          # Launch the interactive AI Tools Setup wizard in a TTY
+envmgr install ai_tools --codex  # Install default AI tools and explicitly manage Codex CLI
+envmgr install ai_tools --no-rtk # RTK is enabled by default; use this to skip it
 
 # Use an explicit scenario playbook for ambiguous tags or full-scenario runs
-uv run envmgr install --playbook playbooks/workstation.yml zsh node ai_tools
-uv run envmgr install --playbook playbooks/node.yml docker kubeadm
+envmgr install --playbook playbooks/workstation.yml zsh node ai_tools
+envmgr install --playbook playbooks/node.yml docker kubeadm
 
 # Use a scenario-specific playbook for a common preset
-uv run envmgr install --playbook playbooks/workstation.yml init zsh java node golang ruby dotnet cloud
-uv run envmgr install --playbook playbooks/workstation.yml init docker kubernetes_tools minikube
-uv run envmgr install --playbook playbooks/node.yml docker kubeadm monitoring
+envmgr install --playbook playbooks/workstation.yml init zsh java node golang ruby dotnet cloud
+envmgr install --playbook playbooks/workstation.yml init docker kubernetes_tools minikube
+envmgr install --playbook playbooks/node.yml docker kubeadm monitoring
 
 `playbooks/node.yml` installs shared node prerequisites on every cluster node,
 then applies cluster management tools only on the `master` group.
@@ -216,36 +258,36 @@ then applies cluster management tools only on the `master` group.
 
 ```bash
 # Using SSH key authentication
-uv run envmgr install -i remote zsh
+envmgr install -i remote zsh
 
 # Use a scenario-specific playbook on remote hosts
-uv run envmgr install -i remote --playbook playbooks/node.yml docker kubeadm
+envmgr install -i remote --playbook playbooks/node.yml docker kubeadm
 
 # Using password authentication (with vault)
-uv run envmgr install -i password --playbook playbooks/node.yml --ask-vault-pass docker kubeadm
+envmgr install -i password --playbook playbooks/node.yml --ask-vault-pass docker kubeadm
 
 # List tags (inventory-independent)
-uv run envmgr install -l
+envmgr install -l
 
 # Install multiple components on remote hosts
-uv run envmgr install -i remote zsh docker kubernetes_tools
+envmgr install -i remote zsh docker kubernetes_tools
 ```
 
 **Test connection:**
 
 ```bash
 # Test local connection
-uv run envmgr ping
+envmgr ping
 
 # Inspect runtime health
-uv run envmgr doctor
-uv run envmgr doctor --json
+envmgr doctor
+envmgr doctor --json
 
 # Test remote connection
-uv run envmgr ping -i remote
+envmgr ping -i remote
 
 # Test with password authentication
-uv run envmgr ping -i password
+envmgr ping -i password
 ```
 
 #### Available Tags
@@ -283,7 +325,8 @@ Task-level tags execute specific configuration tasks:
 - terraform (install Terraform)
 - tf (alias for Terraform tasks)
 
-You can use `uv run envmgr install -l` to see the complete list of available tags.
+You can use `envmgr install -l` to see the complete list of available tags. From
+the repo root, `uv run envmgr install -l` remains the fallback form.
 
 Supported Setup Items:
 
@@ -326,7 +369,8 @@ The AI tools role installs Claude Code plus RTK by default, with optional Codex 
 - Node.js (will be installed via the `node` role if not present)
 - Volta package manager (will be installed via the `node` role)
 
-When you run `uv run envmgr install ai_tools` in a TTY without AI-tools flags, envmgr launches an `AI Tools Setup` wizard that:
+When you run `envmgr install ai_tools` in a TTY without AI-tools flags, envmgr
+launches an `AI Tools Setup` wizard that:
 
 - lets you choose Claude Code, Codex CLI, and/or RTK
 - asks whether to enable Context7 integration
@@ -337,14 +381,15 @@ When you run `uv run envmgr install ai_tools` in a TTY without AI-tools flags, e
 You can also skip the wizard and drive the same choices with CLI flags:
 
 ```bash
-uv run envmgr install ai_tools --codex
-uv run envmgr install ai_tools --no-rtk
-uv run envmgr install ai_tools --no-context7
-uv run envmgr install ai_tools --codex --codex-context7-method remote
-uv run envmgr install ai_tools --claude-code --codex --rtk --claude-context7-method local
+envmgr install ai_tools --codex
+envmgr install ai_tools --no-rtk
+envmgr install ai_tools --no-context7
+envmgr install ai_tools --codex --codex-context7-method remote
+envmgr install ai_tools --claude-code --codex --rtk --claude-context7-method local
 ```
 
-If your Context7 setup needs an API key, export `CONTEXT7_API_KEY` before running `uv run envmgr install ...`.
+If your Context7 setup needs an API key, export `CONTEXT7_API_KEY` before
+running `envmgr install ...`.
 
 RTK is enabled by default for `ai_tools` installs and is placed into `~/.local/bin`. When Claude Code is also selected, envmgr runs `rtk init --global --auto-patch`. When Codex CLI is also selected, envmgr runs `rtk init --global --codex`. envmgr resolves RTK releases through GitHub release redirects instead of the REST API, so anonymous GitHub API rate limits do not block the default install path.
 
@@ -352,27 +397,28 @@ RTK is enabled by default for `ai_tools` installs and is placed into `~/.local/b
 
 ```bash
 # Install AI tools (requires node role as prerequisite)
-uv run envmgr install node ai_tools
+envmgr install node ai_tools
 
 # Or install everything at once
-uv run envmgr install init node ai_tools
+envmgr install init node ai_tools
 
 # Install Claude Code, Codex, and RTK together
-uv run envmgr install ai_tools --codex
+envmgr install ai_tools --codex
 
 # Install Codex only, without Context7
-uv run envmgr install ai_tools --no-claude-code --codex --no-context7
+envmgr install ai_tools --no-claude-code --codex --no-context7
 
 # Install RTK only
-uv run envmgr install rtk
+envmgr install rtk
 ```
 
 ### Development Commands
 
 Run `uv sync` when you want to populate or refresh the local development
-virtualenv. Run `uv run envmgr setup` before `uv run validate` or `uv run smoke-test`
-on a fresh machine; those commands execute playbook checks that rely on the
-runtime inventory and Galaxy content installed during bootstrap.
+virtualenv. Run `envmgr setup` before `uv run validate` or `uv run smoke-test`
+on a fresh machine; `uv run envmgr setup` remains the repo-root fallback for
+the same bootstrap step. Those commands execute playbook checks that rely on
+the runtime inventory and Galaxy content installed during bootstrap.
 
 ```bash
 # Install or refresh the local dev environment
@@ -410,8 +456,8 @@ uv run python -m unittest discover tests -p 'test_*.py'
 uv run python -m unittest tests.test_smoke
 
 # GitHub Actions also runs a containerized 1 master + 2 workers e2e that
-# drives `uv run envmgr install zsh` and `uv run envmgr install ai_tools --codex` from the
-# master node against the full workstation group.
+# covers the same `envmgr install zsh` and `envmgr install ai_tools --codex`
+# runtime flows from the master node against the full workstation group.
 
 # Rare direct entrypoints for debugging one tool in isolation
 # Most day-to-day local checks should go through pre-commit instead.

@@ -32,6 +32,11 @@ def _combined_cli_output(stdout: str, stderr: str) -> str:
     return "\n".join(normalized_parts)
 
 
+def _collapse_whitespace(text: str) -> str:
+    """Keep help and setup-hint assertions stable even when Rich wraps lines."""
+    return " ".join(text.split())
+
+
 def _write_fake_command(command_path: Path, body: str) -> None:
     """Create a small executable used to stub ansible binaries in smoke tests."""
     command_path.write_text(body, encoding="utf-8")
@@ -54,9 +59,10 @@ def check_envmgr_help_contract() -> None:
             f"\nstdout:\n{result.stdout}\nstderr:\n{result.stderr}"
         )
 
-    output = _combined_cli_output(result.stdout, result.stderr)
+    output = _collapse_whitespace(_combined_cli_output(result.stdout, result.stderr))
     for expected_fragment in (
         "Usage: envmgr",
+        "Direct runtime commands for envmgr.",
         "doctor",
         "history",
         "install",
@@ -288,6 +294,32 @@ def check_ping_cli_contract() -> None:
     with tempfile.TemporaryDirectory() as temp_dir:
         temp_root = Path(temp_dir)
         envmgr_home = temp_root / ".envmgr"
+        missing_runtime_result = run_envmgr_cli(
+            "ping",
+            env_overrides={"ENVMGR_HOME": str(envmgr_home)},
+        )
+        if missing_runtime_result.returncode != 1:
+            raise AssertionError(
+                "expected `envmgr ping` to exit with code 1 before setup"
+                f"\nstdout:\n{missing_runtime_result.stdout}"
+                f"\nstderr:\n{missing_runtime_result.stderr}"
+            )
+
+        missing_runtime_output = _collapse_whitespace(
+            _combined_cli_output(
+                missing_runtime_result.stdout,
+                missing_runtime_result.stderr,
+            )
+        )
+        if "Please run `envmgr setup` first." not in missing_runtime_output:
+            raise AssertionError(
+                "expected `envmgr ping` to point users at `envmgr setup` before setup"
+            )
+        if "uv run envmgr" in missing_runtime_output:
+            raise AssertionError(
+                "expected `envmgr ping` setup guidance to avoid `uv run envmgr`"
+            )
+
         runtime_paths = bootstrap_cli_runtime(envmgr_home)
         fake_bin_dir = temp_root / "bin"
         fake_bin_dir.mkdir()

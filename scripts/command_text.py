@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 CLI_ROOT_COMMAND = "envmgr"
-CLI_COMMAND_PREFIX = f"uv run {CLI_ROOT_COMMAND}"
+CLI_COMMAND_PREFIX = CLI_ROOT_COMMAND
+CLI_APP_HELP = "Direct runtime commands for envmgr."
 
 
 def render_cli_command(*parts: str) -> str:

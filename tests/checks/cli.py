@@ -71,9 +71,12 @@ def check_dispatcher_routes_install_subcommand() -> None:
             f"\noutput:\n{help_result.output}"
         )
 
-    help_output = _normalize_cli_output(help_result.stdout, help_result.stderr)
+    help_output = _collapse_whitespace(
+        _normalize_cli_output(help_result.stdout, help_result.stderr)
+    )
     for expected_fragment in (
         "Usage: envmgr",
+        "Direct runtime commands for envmgr.",
         "doctor",
         "history",
         "install",
@@ -279,6 +282,30 @@ def check_dispatcher_routes_setup_subcommand() -> None:
 def check_dispatcher_routes_ping_subcommand() -> None:
     with tempfile.TemporaryDirectory() as temp_dir:
         envmgr_home = Path(temp_dir) / ".envmgr"
+        with patch.dict(os.environ, {"ENVMGR_HOME": str(envmgr_home)}, clear=False):
+            missing_runtime_result = invoke_envmgr("ping")
+
+        if missing_runtime_result.exit_code != 1:
+            raise AssertionError(
+                "expected `envmgr ping` to exit with code 1 before setup"
+                f"\noutput:\n{missing_runtime_result.output}"
+            )
+
+        missing_runtime_output = _collapse_whitespace(
+            _normalize_cli_output(
+                missing_runtime_result.stdout,
+                missing_runtime_result.stderr,
+            )
+        )
+        if "Please run `envmgr setup` first." not in missing_runtime_output:
+            raise AssertionError(
+                "expected `envmgr ping` to point users at `envmgr setup` before setup"
+            )
+        if "uv run envmgr" in missing_runtime_output:
+            raise AssertionError(
+                "expected `envmgr ping` setup guidance to avoid `uv run envmgr`"
+            )
+
         _bootstrap_runtime(envmgr_home)
 
         with (
