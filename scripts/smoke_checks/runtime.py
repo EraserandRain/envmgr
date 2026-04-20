@@ -62,6 +62,52 @@ def check_setup_logs_ansible_galaxy_runs() -> None:
             )
 
 
+def check_setup_succeeds_outside_repo_cwd() -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    with tempfile.TemporaryDirectory() as temp_dir:
+        workspace = Path(temp_dir)
+        envmgr_home = workspace / ".envmgr"
+        original_cwd = Path.cwd()
+        try:
+            os.chdir(workspace)
+            with (
+                patch.dict(os.environ, {"ENVMGR_HOME": str(envmgr_home)}, clear=False),
+                patch(
+                    "scripts.commands.setup.run_runtime_subprocess",
+                    return_value=subprocess.CompletedProcess(
+                        ["ansible-galaxy", "--version"],
+                        0,
+                    ),
+                ) as mock_run_runtime_subprocess,
+            ):
+                setup()
+        finally:
+            os.chdir(original_cwd)
+
+        runtime_paths = get_runtime_paths(envmgr_home)
+        if not runtime_paths.setup_marker_file.exists():
+            raise AssertionError(
+                "expected non-repo-cwd setup to keep writing the setup marker"
+            )
+        if mock_run_runtime_subprocess.call_count != 2:
+            raise AssertionError(
+                "expected setup outside the repo cwd to run both Galaxy installs"
+            )
+
+        expected_requirements = str(repo_root / "requirements.yaml")
+        for call in mock_run_runtime_subprocess.call_args_list:
+            command = call.args[0]
+            if "-r" not in command:
+                raise AssertionError(
+                    "expected setup to pass the requirements file to ansible-galaxy"
+                )
+            if command[command.index("-r") + 1] != expected_requirements:
+                raise AssertionError(
+                    "expected setup outside the repo cwd to resolve requirements.yaml "
+                    "from the packaged runtime assets"
+                )
+
+
 def check_multi_node_inventory_topology() -> None:
     with tempfile.TemporaryDirectory() as temp_dir:
         envmgr_home = Path(temp_dir) / ".envmgr"

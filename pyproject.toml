@@ -28,8 +28,25 @@ dev = [
 [tool.hatch.metadata]
 allow-direct-references = true
 
+[tool.hatch.build.targets.sdist]
+include = [
+    "/scripts",
+    "/playbooks",
+    "/roles",
+    "/vars",
+    "/ansible.cfg",
+    "/requirements.yaml",
+]
+
 [tool.hatch.build.targets.wheel]
 packages = ["scripts"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"ansible.cfg" = "scripts/_assets/ansible.cfg"
+"requirements.yaml" = "scripts/_assets/requirements.yaml"
+"playbooks" = "scripts/_assets/playbooks"
+"roles" = "scripts/_assets/roles"
+"vars" = "scripts/_assets/vars"
 
 [project.scripts]
 envmgr = "scripts.main:main"

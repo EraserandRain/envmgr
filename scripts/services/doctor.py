@@ -13,7 +13,7 @@ from ..runtime_config import (
     get_runtime_setup_status,
     load_runtime_config,
 )
-from .install import resolve_default_playbook_path
+from .assets import RuntimeAssetError, RuntimeAssets, resolve_runtime_assets
 from .runtime import build_effective_command_path
 
 DOCTOR_COMMANDS = ("uv", "ansible", "ansible-playbook", "ansible-galaxy")
@@ -53,9 +53,15 @@ def build_doctor_report(envmgr_home: str | Path | None = None) -> DoctorReport:
     checks: list[DoctorCheck] = []
     default_inventory: str | None = None
     default_playbook_path: str | None = None
+    runtime_assets: RuntimeAssets | None = None
 
     def add_check(name: str, status: str, detail: str) -> None:
         checks.append(DoctorCheck(name=name, status=status, detail=detail))
+
+    try:
+        runtime_assets = resolve_runtime_assets(runtime_paths=paths)
+    except RuntimeAssetError as error:
+        add_check("runtime assets", DOCTOR_FAIL, str(error))
 
     effective_path = build_effective_command_path()
     missing_commands = [
@@ -108,8 +114,28 @@ def build_doctor_report(envmgr_home: str | Path | None = None) -> DoctorReport:
             add_check("runtime config", DOCTOR_FAIL, str(error))
         else:
             default_inventory = config.default_inventory
-            default_playbook_path = resolve_default_playbook_path(config)
-            if not Path(default_playbook_path).exists():
+            if runtime_assets is not None:
+                try:
+                    default_playbook_path = str(
+                        runtime_assets.resolve_playbook(config.default_playbook)
+                    )
+                except RuntimeAssetError as error:
+                    add_check("runtime config", DOCTOR_FAIL, str(error))
+            elif Path(config.default_playbook).is_absolute():
+                default_playbook_path = str(
+                    Path(config.default_playbook).expanduser().resolve()
+                )
+
+            if default_playbook_path is None:
+                add_check(
+                    "runtime config",
+                    DOCTOR_FAIL,
+                    (
+                        "default playbook could not be resolved because runtime "
+                        "assets are unavailable"
+                    ),
+                )
+            elif not Path(default_playbook_path).exists():
                 add_check(
                     "runtime config",
                     DOCTOR_FAIL,

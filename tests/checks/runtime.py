@@ -21,6 +21,7 @@ from scripts.runtime_config import (
     mark_runtime_setup_complete,
     resolve_inventory_reference,
 )
+from scripts.services.assets import resolve_runtime_assets
 from scripts.services.runtime import (
     build_ansible_runtime_env,
     popen_runtime_subprocess,
@@ -112,6 +113,54 @@ def check_setup_uses_shared_runtime_output() -> None:
             )
 
 
+def check_setup_uses_resolved_runtime_assets() -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    with tempfile.TemporaryDirectory() as temp_dir:
+        envmgr_home = Path(temp_dir) / ".envmgr"
+        runtime_paths = ensure_runtime_layout(envmgr_home)
+        expected_requirements = str(repo_root / "requirements.yaml")
+        original_cwd = Path.cwd()
+
+        try:
+            os.chdir(temp_dir)
+            with (
+                patch.dict(os.environ, {"ENVMGR_HOME": str(envmgr_home)}, clear=False),
+                patch(
+                    "scripts.commands.setup.run_runtime_subprocess",
+                    return_value=subprocess.CompletedProcess(
+                        ["ansible-galaxy", "--version"],
+                        0,
+                    ),
+                ) as mock_run_runtime_subprocess,
+            ):
+                run_setup()
+        finally:
+            os.chdir(original_cwd)
+
+        if mock_run_runtime_subprocess.call_count != 2:
+            raise AssertionError("expected setup to install both roles and collections")
+
+        for call in mock_run_runtime_subprocess.call_args_list:
+            command = call.args[0]
+            if command[command.index("-r") + 1] != expected_requirements:
+                raise AssertionError(
+                    "expected setup to pass the resolved requirements file path"
+                )
+            if call.kwargs.get("runtime_paths") != runtime_paths:
+                raise AssertionError(
+                    "expected setup to install against the resolved runtime paths"
+                )
+            runtime_assets = call.kwargs.get("assets")
+            if runtime_assets is None:
+                raise AssertionError(
+                    "expected setup to reuse shared runtime assets for subprocess env"
+                )
+            if str(runtime_assets.requirements_file) != expected_requirements:
+                raise AssertionError(
+                    "expected setup to pass runtime assets resolved outside the cwd"
+                )
+
+
 def check_unbootstrapped_runtime_surfaces_setup_guidance() -> None:
     with tempfile.TemporaryDirectory() as temp_dir:
         envmgr_home = Path(temp_dir) / ".envmgr"
@@ -174,6 +223,55 @@ def check_unknown_inventory_alias_is_rejected() -> None:
         raise AssertionError("expected unknown inventory aliases to raise ConfigError")
 
 
+def check_runtime_assets_resolve_outside_repo_cwd() -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    with tempfile.TemporaryDirectory() as temp_dir:
+        envmgr_home = Path(temp_dir) / ".envmgr"
+        original_cwd = Path.cwd()
+        os.chdir(temp_dir)
+        try:
+            assets = resolve_runtime_assets(envmgr_home=envmgr_home)
+        finally:
+            os.chdir(original_cwd)
+
+        if assets.root != repo_root:
+            raise AssertionError(
+                "expected runtime assets to resolve from the repo root"
+            )
+        if assets.resolve_playbook("workstation") != (
+            repo_root / "playbooks" / "workstation.yml"
+        ):
+            raise AssertionError(
+                "expected logical scenario names to resolve to absolute playbook paths"
+            )
+        if assets.resolve_playbook("playbooks/node.yml") != (
+            repo_root / "playbooks" / "node.yml"
+        ):
+            raise AssertionError(
+                "expected repo-relative playbook paths to resolve outside the repo cwd"
+            )
+        if assets.roles_dir != (repo_root / "roles"):
+            raise AssertionError(
+                "expected runtime assets to expose an absolute roles dir"
+            )
+        if assets.ansible_config_file != (repo_root / "ansible.cfg"):
+            raise AssertionError(
+                "expected runtime assets to expose an absolute ansible.cfg path"
+            )
+        if assets.requirements_file != (repo_root / "requirements.yaml"):
+            raise AssertionError(
+                "expected runtime assets to expose an absolute requirements file path"
+            )
+        if assets.vars_dir != (repo_root / "vars"):
+            raise AssertionError(
+                "expected runtime assets to expose an absolute vars dir"
+            )
+        if assets.scratch_dir != (envmgr_home / "cache" / "tmp"):
+            raise AssertionError(
+                "expected runtime assets scratch dir to follow the runtime home"
+            )
+
+
 def check_runtime_env_uses_runtime_paths_only() -> None:
     with tempfile.TemporaryDirectory() as temp_dir:
         runtime_paths = ensure_runtime_layout(Path(temp_dir) / ".envmgr")
@@ -214,6 +312,11 @@ def check_runtime_env_uses_runtime_paths_only() -> None:
         if ".ansible/collections" in env["ANSIBLE_COLLECTIONS_PATH"]:
             raise AssertionError(
                 "expected runtime collections path to exclude .ansible/collections"
+            )
+        expected_ansible_config = Path(__file__).resolve().parents[2] / "ansible.cfg"
+        if env["ANSIBLE_CONFIG"] != str(expected_ansible_config):
+            raise AssertionError(
+                "expected runtime ansible config to resolve independently of the cwd"
             )
         if env["ANSIBLE_LOG_PATH"] != str(runtime_paths.ansible_log_file):
             raise AssertionError("expected ansible log path to point to ~/.envmgr")

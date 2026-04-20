@@ -7,6 +7,8 @@ from typing import Any
 
 import yaml
 
+from .services.assets import resolve_runtime_assets
+
 
 class CatalogError(ValueError):
     """Raised when role metadata is missing or invalid."""
@@ -87,9 +89,23 @@ def load_role_metadata(metadata_path: str | Path) -> RoleMetadata:
     )
 
 
-def load_role_catalog(roles_dir: str | Path = "roles") -> list[RoleMetadata]:
+def resolve_catalog_roles_dir(
+    roles_dir: str | Path | None = None,
+) -> Path:
+    assets = resolve_runtime_assets()
+    if roles_dir is None:
+        return assets.roles_dir
+    return assets.resolve_repo_path(roles_dir)
+
+
+def resolve_catalog_playbook_path(playbook_path: str | Path) -> Path:
+    assets = resolve_runtime_assets()
+    return assets.resolve_playbook(playbook_path)
+
+
+def load_role_catalog(roles_dir: str | Path | None = None) -> list[RoleMetadata]:
     catalog: list[RoleMetadata] = []
-    roles_path = Path(roles_dir)
+    roles_path = resolve_catalog_roles_dir(roles_dir)
 
     if not roles_path.exists():
         raise CatalogError(f"roles directory not found: {roles_path}")
@@ -102,7 +118,9 @@ def load_role_catalog(roles_dir: str | Path = "roles") -> list[RoleMetadata]:
     return catalog
 
 
-def get_available_tags(roles_dir: str | Path = "roles") -> tuple[list[str], list[str]]:
+def get_available_tags(
+    roles_dir: str | Path | None = None,
+) -> tuple[list[str], list[str]]:
     role_tags: set[str] = set()
     task_tags: set[str] = set()
 
@@ -133,9 +151,9 @@ def _read_playbook_tag_list(
 
 def load_playbook_tags(
     playbook_path: str | Path,
-    roles_dir: str | Path = "roles",
+    roles_dir: str | Path | None = None,
 ) -> set[str]:
-    path = Path(playbook_path)
+    path = resolve_catalog_playbook_path(playbook_path)
     if not path.exists():
         raise CatalogError(f"playbook not found: {path}")
 
@@ -191,9 +209,12 @@ def load_playbook_tags(
 
 def build_playbook_tag_index(
     playbook_paths: Iterable[str | Path],
-    roles_dir: str | Path = "roles",
+    roles_dir: str | Path | None = None,
 ) -> dict[str, set[str]]:
     return {
-        str(Path(playbook_path)): load_playbook_tags(playbook_path, roles_dir)
+        str(resolve_catalog_playbook_path(playbook_path)): load_playbook_tags(
+            playbook_path,
+            roles_dir,
+        )
         for playbook_path in playbook_paths
     }

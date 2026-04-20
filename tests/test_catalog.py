@@ -2,11 +2,18 @@ from __future__ import annotations
 
 import unittest
 
-from tests.checks.catalog import check_playbook_resolution
+from tests.checks.catalog import (
+    check_catalog_defaults_resolve_outside_repo_cwd,
+    check_playbook_resolution,
+)
 from tests.support import Check, build_check_suite, build_check_test_case
 
 CATALOG_TEST_CHECKS: tuple[Check, ...] = (
     ("playbook resolution", check_playbook_resolution),
+    (
+        "catalog defaults resolve outside the repo cwd",
+        check_catalog_defaults_resolve_outside_repo_cwd,
+    ),
 )
 
 CatalogTests, CATALOG_TEST_METHODS = build_check_test_case(

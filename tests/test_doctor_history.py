@@ -7,6 +7,7 @@ from tests.checks.doctor_history import (
     check_doctor_json_output,
     check_doctor_report_detects_unbootstrapped_runtime,
     check_doctor_report_passes_bootstrapped_runtime,
+    check_doctor_resolves_default_playbook_outside_repo_cwd,
     check_doctor_text_output,
     check_history_json_output,
     check_history_text_output,
@@ -27,6 +28,10 @@ DOCTOR_HISTORY_TEST_CHECKS: tuple[Check, ...] = (
     (
         "doctor ignores non-default inventory aliases",
         check_doctor_ignores_non_default_inventory_aliases,
+    ),
+    (
+        "doctor resolves the default playbook outside the repo cwd",
+        check_doctor_resolves_default_playbook_outside_repo_cwd,
     ),
     ("doctor renders readable text output", check_doctor_text_output),
     ("doctor emits json output", check_doctor_json_output),

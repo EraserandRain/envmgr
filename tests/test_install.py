@@ -10,6 +10,7 @@ from tests.checks.install import (
     check_install_list_tags_uses_rich_console,
     check_install_rejects_all_plus_other_tags,
     check_install_rejects_unknown_tags_with_exit_code,
+    check_install_scoped_runs_use_runtime_scratch_outside_repo_cwd,
     check_install_summary_uses_rich_console_and_keeps_raw_subprocess_output,
     check_install_typer_flags_preserve_tri_state_bools,
     check_install_wizard_cancellation_reports_via_rich_console,
@@ -28,6 +29,10 @@ INSTALL_TEST_CHECKS: tuple[Check, ...] = (
     (
         "install all uses the runtime default playbook",
         check_install_all_uses_runtime_default_playbook,
+    ),
+    (
+        "scoped installs use the runtime scratch directory outside the repo cwd",
+        check_install_scoped_runs_use_runtime_scratch_outside_repo_cwd,
     ),
     (
         "install list-tags uses Rich console output",

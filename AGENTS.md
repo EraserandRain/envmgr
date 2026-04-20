@@ -10,13 +10,13 @@ This guide helps contributors work effectively on envmgr (Ansible-driven environ
 - `scripts/commands/` — command runners plus the dedicated helper entrypoints and CLI glue shared by the public CLI and helper commands.
 - `tests/` — Python `unittest` modules split by domain; `tests/checks/` holds unit-check implementations and `tests/test_smoke.py` remains the dedicated smoke suite exercised by `uv run smoke-test`.
 - `vars/` — shared variables; `ansible.cfg` — repository Ansible defaults; runtime state lives under `~/.envmgr/`.
-- Treat the CLI entrypoints as the supported surface: use the installed `envmgr ...` command for runtime work, keep `uv run envmgr ...` as the repo-root fallback during Phase 1, and use the standalone helper commands for developer workflows. Python import paths under `scripts/` remain implementation details, even where conservative compatibility shims still exist.
+- Treat the CLI entrypoints as the supported surface: use the installed `envmgr ...` command for runtime work from any cwd, whether the tool was installed editably from a checkout or from a built wheel. Use `uv run envmgr ...` as the repo-root fallback when working directly from a checkout, and keep the standalone helper commands for developer workflows. Python import paths under `scripts/` remain implementation details, even where conservative compatibility shims still exist.
 
 ## Build, Test, and Development Commands
 
 - `uv sync` — install or refresh the local Python environment for development work.
-- `envmgr setup` — initialize `~/.envmgr/` and install Galaxy roles/collections for runtime use; `uv run envmgr setup` remains the repo-root fallback during Phase 1.
-- `envmgr install -l` — list tags; `envmgr install <tag ...>` — apply tags; add `--playbook <path>` when tags are ambiguous, plus `-i <alias>` or `--ask-vault-pass` as needed. Use `uv run envmgr ...` only as the repo-root fallback.
+- `envmgr setup` — initialize `~/.envmgr/` and install Galaxy roles/collections for runtime use; installed runtime commands work outside the repo, while `uv run envmgr setup` remains the repo-root fallback for a live checkout.
+- `envmgr install -l` — list tags; `envmgr install <tag ...>` — apply tags; add `--playbook <path>` when tags are ambiguous, plus `-i <alias>` or `--ask-vault-pass` as needed. Use `uv run envmgr ...` only as the repo-root fallback when running from the checkout.
 - `envmgr ping [-i remote]` — connectivity check; `uv run envmgr ping ...` is the matching fallback.
 - `uv run pre-commit install` — install `pre-commit` and `pre-push` Git hooks.
 - `uv run pre-commit run --all-files` — run the standard commit-time checks (YAML hygiene + Ruff).
@@ -35,7 +35,7 @@ This guide helps contributors work effectively on envmgr (Ansible-driven environ
 ## Testing Guidelines
 
 - Treat `pre-commit` as the primary local workflow; direct commands are mostly for rerunning one tool by itself or reproducing a CI failure more directly.
-- Run `uv sync` when you need the local development environment or tooling refreshed; run `envmgr setup` when you need the user runtime inventory and Galaxy content bootstrapped, or `uv run envmgr setup` as the repo-root fallback during Phase 1.
+- Run `uv sync` when you need the local development environment or tooling refreshed; run `envmgr setup` when you need the user runtime inventory and Galaxy content bootstrapped, or `uv run envmgr setup` as the repo-root fallback for an uninstalled checkout.
 - Use `uv run validate --playbook <path>` and `uv run smoke-test --playbook <path>` for scenario-level checks against the runtime inventory managed under `~/.envmgr/`.
 - Run `uv run python -m unittest discover tests -p 'test_*.py'` when you want the full Python test matrix, or `uv run python -m unittest tests.test_smoke` when you want just the Python smoke suite without the CLI wrapper.
 - Ensure tasks are idempotent (second run reports no changes) and scoping via tags works as expected.

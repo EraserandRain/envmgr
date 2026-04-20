@@ -288,6 +288,49 @@ def check_doctor_ignores_non_default_inventory_aliases() -> None:
             )
 
 
+def check_doctor_resolves_default_playbook_outside_repo_cwd() -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    with tempfile.TemporaryDirectory() as temp_dir:
+        envmgr_home = Path(temp_dir) / ".envmgr"
+        runtime_paths = ensure_runtime_layout(envmgr_home)
+        tool_bin = _create_fake_tool_bin(Path(temp_dir))
+        (runtime_paths.galaxy_roles_dir / "gantsign.oh-my-zsh").mkdir()
+        (runtime_paths.galaxy_collections_dir / "community").mkdir()
+        mark_runtime_setup_complete(runtime_paths)
+        original_cwd = Path.cwd()
+
+        try:
+            os.chdir(temp_dir)
+            with (
+                patch.dict(os.environ, {"PATH": ""}, clear=False),
+                patch(
+                    "scripts.services.runtime.sysconfig.get_path",
+                    return_value=str(tool_bin),
+                ),
+                patch(
+                    "scripts.services.runtime.sys.executable",
+                    str(tool_bin / "python3"),
+                ),
+            ):
+                report = build_doctor_report(envmgr_home)
+        finally:
+            os.chdir(original_cwd)
+
+        expected_playbook = str(repo_root / "playbooks" / "workstation.yml")
+        if report.default_playbook_path != expected_playbook:
+            raise AssertionError(
+                "expected doctor to resolve the default playbook independently of the cwd"
+            )
+        failures = [
+            check.name for check in report.checks if check.status == DOCTOR_FAIL
+        ]
+        if failures:
+            raise AssertionError(
+                "expected doctor to keep the default playbook healthy outside "
+                "the repo cwd, got failures: " + ", ".join(failures)
+            )
+
+
 def check_doctor_text_output() -> None:
     with tempfile.TemporaryDirectory() as temp_dir:
         envmgr_home = Path(temp_dir) / ".envmgr"
@@ -389,7 +432,10 @@ def check_doctor_json_output() -> None:
             raise AssertionError(
                 "expected doctor --json to expose the default inventory"
             )
-        if payload["defaults"]["playbook"] != "playbooks/workstation.yml":
+        expected_playbook = str(
+            Path(__file__).resolve().parents[2] / "playbooks" / "workstation.yml"
+        )
+        if payload["defaults"]["playbook"] != expected_playbook:
             raise AssertionError(
                 "expected doctor --json to expose the resolved default playbook"
             )
