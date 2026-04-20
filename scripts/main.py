@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-import sys
+from importlib import import_module
 from pathlib import Path
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
 import typer
 
@@ -15,7 +15,6 @@ from .commands.setup import run_setup
 from .commands.shared import (
     require_setup_completed as shared_require_setup_completed,
 )
-from .scaffold import ScaffoldError, generate_role
 
 app = typer.Typer(
     no_args_is_help=True,
@@ -26,14 +25,47 @@ app = typer.Typer(
 
 Context7Method = Literal["remote", "local"]
 
+# Only the Typer app, its root-command shims, and the setup guard remain the
+# intentional public surface here. Legacy helper names stay available only via
+# `__getattr__` because `scripts.__init__` still imports them.
+__all__ = [
+    "app",
+    "doctor",
+    "history",
+    "install",
+    "main",
+    "ping",
+    "require_setup_completed",
+    "setup",
+]
+
+_LEGACY_HELPER_EXPORTS: dict[str, tuple[str, str]] = {
+    "ansible_lint": (".commands.ansible_check", "ansible_lint"),
+    "create": (".commands.create", "create"),
+    "lint": (".commands.lint", "lint"),
+    "smoke_test": (".commands.smoke_test", "smoke_test"),
+    "typecheck": (".commands.typecheck", "typecheck"),
+    "validate": (".commands.validate", "validate"),
+}
+
 
 def require_setup_completed(
     command_name: str,
     *,
     envmgr_home: str | Path | None = None,
 ) -> None:
-    """Keep the historical `scripts.main` helper surface for existing callers."""
+    """Retain the historical setup guard import path used by runtime helpers."""
     shared_require_setup_completed(command_name, envmgr_home=envmgr_home)
+
+
+def __getattr__(name: str) -> Any:
+    """Resolve legacy helper imports without keeping wrapper functions here."""
+    target = _LEGACY_HELPER_EXPORTS.get(name)
+    if target is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+    module_name, attr_name = target
+    return getattr(import_module(module_name, __package__), attr_name)
 
 
 @app.command("doctor")
@@ -201,152 +233,40 @@ def _setup_command() -> None:
     run_setup()
 
 
-def create(
-    argv: list[str] | None = None,
-    *,
-    prog_name: str | None = None,
-) -> None:
-    """Create a new Ansible role by prompting for a role name."""
-    from .commands.legacy_argparse import build_command_parser, parse_command_args
-
-    parser = build_command_parser(
-        "create",
-        description="Create a new Ansible role by prompting the user for a role name and generating the role directory.",
-        prog_name=prog_name,
-    )
-    parser.add_argument("role", nargs="?", help="The name of the role to create")
-
-    args = parse_command_args(parser, argv)
-
-    if args.role:
-        try:
-            generate_role(args.role)
-            print(f"Role '{args.role}' generated successfully.")
-            print(
-                f"Update roles/{args.role}/meta/envmgr.yml and add the role to the appropriate playbook."
-            )
-        except FileExistsError:
-            print(f"Role '{args.role}' already exists.")
-        except (FileNotFoundError, ScaffoldError) as error:
-            print(error)
-    else:
-        parser.print_help()
-
-
-def lint(
-    argv: list[str] | None = None,
-    *,
-    prog_name: str | None = None,
-) -> None:
-    """Run ruff linting and formatting on Python code."""
-    from .commands.lint import lint as lint_command
-
-    lint_command(argv, prog_name=prog_name)
-
-
-def ansible_lint(
-    argv: list[str] | None = None,
-    *,
-    prog_name: str | None = None,
-) -> None:
-    """Run ansible-lint on the roles directory."""
-    from .commands.ansible_check import ansible_lint as ansible_lint_command
-
-    ansible_lint_command(argv, prog_name=prog_name)
-
-
-def typecheck(
-    argv: list[str] | None = None,
-    *,
-    prog_name: str | None = None,
-) -> None:
-    """Run mypy type checking on the Python source directories."""
-    from .commands.typecheck import typecheck as typecheck_command
-
-    typecheck_command(argv, prog_name=prog_name)
-
-
-def validate(
-    argv: list[str] | None = None,
-    *,
-    prog_name: str | None = None,
-) -> None:
-    """Run the project validation suite in one command."""
-    from .commands.validate import validate as validate_command
-
-    validate_command(argv, prog_name=prog_name)
-
-
-def smoke_test(
-    argv: list[str] | None = None,
-    *,
-    prog_name: str | None = None,
-) -> None:
-    """Run lightweight integration checks without installing software."""
-    from .commands.smoke_test import smoke_test as smoke_test_command
-
-    smoke_test_command(argv, prog_name=prog_name)
+def _run_root_command(command_name: str, argv: list[str] | None = None) -> None:
+    """Route retained root-command shims through the Typer app."""
+    try:
+        app(args=[command_name, *(argv or [])], prog_name=CLI_ROOT_COMMAND)
+    except SystemExit as error:
+        if error.code not in (0, None):
+            raise
 
 
 def doctor(argv: list[str] | None = None) -> None:
-    """Keep the historical `scripts.main.doctor` helper surface."""
-    app(args=["doctor", *(argv or [])], prog_name=CLI_ROOT_COMMAND)
+    """Retain backwards-compatible access to `envmgr doctor`."""
+    _run_root_command("doctor", argv)
 
 
 def history(argv: list[str] | None = None) -> None:
-    """Keep the historical `scripts.main.history` helper surface."""
-    app(args=["history", *(argv or [])], prog_name=CLI_ROOT_COMMAND)
+    """Retain backwards-compatible access to `envmgr history`."""
+    _run_root_command("history", argv)
 
 
 def install(argv: list[str] | None = None) -> None:
-    """Keep the historical `scripts.main.install` helper surface."""
-    app(args=["install", *(argv or [])], prog_name=CLI_ROOT_COMMAND)
+    """Retain backwards-compatible access to `envmgr install`."""
+    _run_root_command("install", argv)
 
 
 def ping(argv: list[str] | None = None) -> None:
-    """Keep the historical `scripts.main.ping` helper surface."""
-    from .commands.ping import ping as legacy_ping
-
-    legacy_ping(argv)
+    """Retain backwards-compatible access to `envmgr ping`."""
+    _run_root_command("ping", argv)
 
 
 def setup(argv: list[str] | None = None) -> None:
-    """Keep the historical `scripts.main.setup` helper surface."""
-    from .commands.setup import setup as legacy_setup
-
-    legacy_setup(argv)
+    """Retain backwards-compatible access to `envmgr setup`."""
+    _run_root_command("setup", argv)
 
 
 def main(argv: list[str] | None = None) -> None:
     """Run the Typer-based `envmgr` root app."""
     app(args=argv, prog_name=CLI_ROOT_COMMAND)
-
-
-def create_entrypoint() -> None:
-    """Run the role-scaffolding helper from its dedicated development command."""
-    create(sys.argv[1:], prog_name="create")
-
-
-def lint_entrypoint() -> None:
-    """Run the Ruff helper from its dedicated development command."""
-    lint(sys.argv[1:], prog_name="lint")
-
-
-def ansible_lint_entrypoint() -> None:
-    """Run the ansible-lint helper from its dedicated development command."""
-    ansible_lint(sys.argv[1:], prog_name="ansible-check")
-
-
-def typecheck_entrypoint() -> None:
-    """Run the mypy helper from its dedicated development command."""
-    typecheck(sys.argv[1:], prog_name="typecheck")
-
-
-def validate_entrypoint() -> None:
-    """Run the full validation helper from its dedicated development command."""
-    validate(sys.argv[1:], prog_name="validate")
-
-
-def smoke_test_entrypoint() -> None:
-    """Run the smoke helper from its dedicated development command."""
-    smoke_test(sys.argv[1:], prog_name="smoke-test")

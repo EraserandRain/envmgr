@@ -47,9 +47,10 @@ or CI.
 Use `uv run envmgr history` to inspect the most recent runtime subprocess records, or
 `uv run envmgr history -n 5` to focus on the latest few commands.
 The public runtime CLI uses Typer with Rich help plus shared Rich headings,
-summary lines, and prompts for `setup`, `install`, and `ping`, while
-development helpers such as `uv run validate` and `uv run smoke-test` remain
-separate entrypoints.
+summary lines, and prompts for `setup`, `install`, and `ping`. Development
+helpers such as `uv run validate` and `uv run smoke-test` also use dedicated
+Typer-based help, but they remain separate entrypoints rather than runtime
+subcommands.
 
 ### Host Settings
 
@@ -76,7 +77,7 @@ Repository-local files still keep their original purpose:
 - `roles/` stays the source of first-party envmgr roles in this repo
 - `playbooks/` stays the source of scenario playbooks in this repo
 - `scripts/main.py` defines the Typer-based public `envmgr` CLI used by `uv run envmgr ...`, with Rich help plus shared Rich runtime summaries/prompts
-- `scripts/commands/` holds command runners and CLI glue shared by the public CLI and helper entrypoints
+- `scripts/commands/` holds command runners plus the dedicated helper entrypoints and CLI glue shared by the public CLI and helper commands
 - `scripts/services/` holds reusable runtime, install-planning, and doctor logic
 - `scripts/smoke_checks/` stays reserved for smoke-test-only checks
 - `tests/checks/` holds the finer-grained unit-check implementations used by `validate`
@@ -86,9 +87,10 @@ Repository-local files still keep their original purpose:
 helpers stay separate as dedicated commands like `uv run validate` or `uv run lint`. Direct `ansible-playbook` or
 `ansible-galaxy` usage from the repository is not a supported interface.
 
-The public CLI now uses Typer with Rich-enhanced help plus shared Rich runtime
-summaries, status lines, and interactive prompts where applicable, but the
-supported command surface stays the same: run envmgr commands as
+The public runtime CLI now uses Typer with Rich-enhanced help plus shared Rich
+runtime summaries, status lines, and interactive prompts where applicable, and
+the dedicated developer helper commands also use Typer-based help. The
+supported command surfaces stay intentionally split: run envmgr commands as
 `uv run envmgr ...` and keep developer helpers on their existing standalone
 entrypoints.
 

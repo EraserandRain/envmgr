@@ -2,26 +2,18 @@ from __future__ import annotations
 
 import subprocess
 
+import typer
+
+from ..command_text import CLI_ROOT_COMMAND
 from .dev_shared import PYTHON_CHECK_PATHS
-from .legacy_argparse import build_command_parser, parse_command_args
 from .shared import exit_with_error
 
+COMMAND_NAME = "typecheck"
+app = typer.Typer(add_completion=False, rich_markup_mode="rich")
 
-def typecheck(
-    argv: list[str] | None = None,
-    *,
-    prog_name: str | None = None,
-) -> None:
+
+def run_typecheck() -> None:
     """Run mypy type checking on the Python source directories."""
-    parse_command_args(
-        build_command_parser(
-            "typecheck",
-            "Run mypy type checking on the Python source directories.",
-            prog_name=prog_name,
-        ),
-        argv,
-    )
-
     command = ["mypy", *PYTHON_CHECK_PATHS]
 
     print("Running type checking with mypy...")
@@ -35,3 +27,26 @@ def typecheck(
         exit_with_error(
             "Error: mypy command not found. Please ensure mypy is installed."
         )
+
+
+@app.command()
+def _typecheck_command() -> None:
+    """Run mypy type checking on the Python source directories."""
+    run_typecheck()
+
+
+def typecheck(
+    argv: list[str] | None = None,
+    *,
+    prog_name: str | None = None,
+) -> None:
+    """Run mypy type checking on the Python source directories."""
+    app(
+        args=[] if argv is None else argv,
+        prog_name=prog_name or f"{CLI_ROOT_COMMAND} {COMMAND_NAME}",
+    )
+
+
+def main() -> None:
+    """Run the mypy helper from its dedicated development command."""
+    app(prog_name=COMMAND_NAME)

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import argparse
 import os
 import subprocess
 import sys
@@ -12,7 +11,6 @@ from rich.text import Text
 from ..catalog import CatalogError
 from ..runtime_config import ConfigError
 from ..services.install import (
-    AI_TOOLS_CONTEXT7_METHODS,
     AiToolsInstallDefaults,
     AiToolsInstallOptions,
     build_ai_tools_install_defaults,
@@ -336,102 +334,6 @@ def resolve_ai_tools_install_options(
     )
 
 
-def _build_install_parser() -> argparse.ArgumentParser:
-    """Create the legacy install parser used by compatibility entrypoints."""
-    from .legacy_argparse import build_command_parser
-
-    parser = build_command_parser(
-        "install", description="Install and Configure envmgr with ansible"
-    )
-    parser.add_argument("tags", nargs="*", help="List of tags: tag1 tag2 ...")
-    parser.add_argument(
-        "-l", "--list-tags", action="store_true", help="List all available tags"
-    )
-    parser.add_argument(
-        "--playbook",
-        help="Specify a playbook file explicitly when tags are ambiguous",
-    )
-    parser.add_argument(
-        "-i",
-        "--inventory",
-        help="Specify an inventory alias from ~/.envmgr/config.toml",
-    )
-    parser.add_argument(
-        "--ask-vault-pass", action="store_true", help="Ask for vault password"
-    )
-    parser.add_argument(
-        "--claude-code",
-        dest="ai_tools_manage_claude_code",
-        action="store_const",
-        const=True,
-        default=None,
-        help="When AI tools are selected, explicitly install Claude Code",
-    )
-    parser.add_argument(
-        "--no-claude-code",
-        dest="ai_tools_manage_claude_code",
-        action="store_const",
-        const=False,
-        help="When AI tools are selected, skip Claude Code",
-    )
-    parser.add_argument(
-        "--codex",
-        dest="ai_tools_manage_codex",
-        action="store_const",
-        const=True,
-        default=None,
-        help="When AI tools are selected, explicitly install Codex CLI",
-    )
-    parser.add_argument(
-        "--no-codex",
-        dest="ai_tools_manage_codex",
-        action="store_const",
-        const=False,
-        help="When AI tools are selected, skip Codex CLI",
-    )
-    parser.add_argument(
-        "--rtk",
-        dest="ai_tools_manage_rtk",
-        action="store_const",
-        const=True,
-        default=None,
-        help="When AI tools are selected, explicitly install RTK",
-    )
-    parser.add_argument(
-        "--no-rtk",
-        dest="ai_tools_manage_rtk",
-        action="store_const",
-        const=False,
-        help="When AI tools are selected, skip RTK",
-    )
-    parser.add_argument(
-        "--context7",
-        dest="ai_tools_context7",
-        action="store_const",
-        const=True,
-        default=None,
-        help="When AI tools are selected, enable Context7 integration",
-    )
-    parser.add_argument(
-        "--no-context7",
-        dest="ai_tools_context7",
-        action="store_const",
-        const=False,
-        help="When AI tools are selected, skip Context7 integration",
-    )
-    parser.add_argument(
-        "--claude-context7-method",
-        choices=AI_TOOLS_CONTEXT7_METHODS,
-        help="Choose the Context7 transport for Claude Code",
-    )
-    parser.add_argument(
-        "--codex-context7-method",
-        choices=AI_TOOLS_CONTEXT7_METHODS,
-        help="Choose the Context7 transport for Codex CLI",
-    )
-    return parser
-
-
 def run_install(
     *,
     tags: list[str],
@@ -622,25 +524,6 @@ def run_install(
 
 def install(argv: list[str] | None = None) -> None:
     """Install and configure the envmgr project using Ansible."""
-    from .legacy_argparse import parse_command_args
+    from ..main import main as root_main
 
-    parser = _build_install_parser()
-    args = parse_command_args(parser, argv)
-
-    if not args.tags and not args.list_tags:
-        parser.print_help()
-        return
-
-    run_install(
-        tags=list(args.tags),
-        list_tags=args.list_tags,
-        playbook=args.playbook,
-        inventory=args.inventory,
-        ask_vault_pass=args.ask_vault_pass,
-        manage_claude_code=args.ai_tools_manage_claude_code,
-        manage_codex=args.ai_tools_manage_codex,
-        manage_rtk=args.ai_tools_manage_rtk,
-        enable_context7=args.ai_tools_context7,
-        claude_context7_method=args.claude_context7_method,
-        codex_context7_method=args.codex_context7_method,
-    )
+    root_main(["install", *(argv or [])])

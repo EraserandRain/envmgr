@@ -33,12 +33,12 @@ packages = ["scripts"]
 
 [project.scripts]
 envmgr = "scripts.main:main"
-create = "scripts.main:create_entrypoint"
-lint = "scripts.main:lint_entrypoint"
-ansible-check = "scripts.main:ansible_lint_entrypoint"
-typecheck = "scripts.main:typecheck_entrypoint"
-validate = "scripts.main:validate_entrypoint"
-smoke-test = "scripts.main:smoke_test_entrypoint"
+create = "scripts.commands.create:main"
+lint = "scripts.commands.lint:main"
+ansible-check = "scripts.commands.ansible_check:main"
+typecheck = "scripts.commands.typecheck:main"
+validate = "scripts.commands.validate:main"
+smoke-test = "scripts.commands.smoke_test:main"
 
 [tool.mypy]
 python_version = "3.10"

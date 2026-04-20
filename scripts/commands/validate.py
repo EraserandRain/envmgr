@@ -4,19 +4,21 @@ import sys
 import unittest
 from collections.abc import Iterator
 from pathlib import Path
+from typing import Annotated
 
+import typer
+
+from ..command_text import CLI_ROOT_COMMAND
 from ..runtime_config import ensure_runtime_layout
 from .dev_shared import PYTHON_CHECK_PATHS, run_command_step
-from .legacy_argparse import build_command_parser, parse_command_args
-from .shared import (
-    require_setup_completed,
-    resolve_inventory_option,
-)
+from .shared import require_setup_completed, resolve_inventory_option
 
+COMMAND_NAME = "validate"
 REPO_ROOT = Path(__file__).resolve().parents[2]
 TESTS_DIR = REPO_ROOT / "tests"
 UNIT_TEST_PATTERN = "test_*.py"
 SMOKE_TEST_CLASS_MODULE_PREFIX = "scripts.smoke_checks."
+app = typer.Typer(add_completion=False, rich_markup_mode="rich")
 
 
 def _iter_test_cases(suite: unittest.TestSuite) -> Iterator[unittest.TestCase]:
@@ -64,38 +66,16 @@ def run_unit_test_step() -> bool:
     return False
 
 
-def validate(
-    argv: list[str] | None = None,
-    *,
-    prog_name: str | None = None,
-) -> None:
+def run_validate(*, inventory: str | None, playbooks: list[str] | None) -> None:
     """Run the project validation suite in one command."""
-    parser = build_command_parser(
-        "validate",
-        description="Run lint, typecheck, ansible lint, and playbook syntax checks",
-        prog_name=prog_name,
-    )
-    parser.add_argument(
-        "-i",
-        "--inventory",
-        help="Specify an inventory alias from ~/.envmgr/config.toml",
-    )
-    parser.add_argument(
-        "--playbook",
-        action="append",
-        help="Specify a playbook file to syntax-check (can be used multiple times)",
-    )
+    require_setup_completed(COMMAND_NAME)
 
-    args = parse_command_args(parser, argv)
-
-    require_setup_completed("validate")
-
-    playbooks = args.playbook or [
+    selected_playbooks = playbooks or [
         playbook
         for playbook in ["playbooks/workstation.yml", "playbooks/node.yml"]
         if Path(playbook).exists()
     ]
-    inventory_path, _inventory_label = resolve_inventory_option(args.inventory)
+    inventory_path, _inventory_label = resolve_inventory_option(inventory)
     runtime_paths = ensure_runtime_layout()
 
     print("Running project validation...")
@@ -115,10 +95,10 @@ def validate(
         ),
     ]
 
-    if not playbooks:
+    if not selected_playbooks:
         print("No playbooks selected for syntax checks.")
 
-    for playbook in playbooks:
+    for playbook in selected_playbooks:
         if not Path(playbook).exists():
             print(f"✗ syntax-check failed because playbook was not found: {playbook}")
             results.append(False)
@@ -143,3 +123,46 @@ def validate(
 
     print("\n✗ Validation failed")
     raise SystemExit(1)
+
+
+@app.command()
+def _validate_command(
+    inventory: Annotated[
+        str | None,
+        typer.Option(
+            "--inventory",
+            "-i",
+            help="Specify an inventory alias from ~/.envmgr/config.toml",
+        ),
+    ] = None,
+    playbook: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--playbook",
+            help="Specify a playbook file to syntax-check (can be used multiple times)",
+            show_default=False,
+        ),
+    ] = None,
+) -> None:
+    """Run lint, typecheck, ansible lint, and playbook syntax checks."""
+    run_validate(
+        inventory=inventory,
+        playbooks=None if playbook is None else list(playbook),
+    )
+
+
+def validate(
+    argv: list[str] | None = None,
+    *,
+    prog_name: str | None = None,
+) -> None:
+    """Run the project validation suite in one command."""
+    app(
+        args=[] if argv is None else argv,
+        prog_name=prog_name or f"{CLI_ROOT_COMMAND} {COMMAND_NAME}",
+    )
+
+
+def main() -> None:
+    """Run the full validation helper from its dedicated development command."""
+    app(prog_name=COMMAND_NAME)

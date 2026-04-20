@@ -80,14 +80,7 @@ def run_setup() -> None:
 
 
 def setup(argv: list[str] | None = None) -> None:
-    """Initialize ~/.envmgr and install the Ansible content envmgr needs."""
-    from .legacy_argparse import build_command_parser, parse_command_args
+    """Initialize ~/.envmgr using the Typer-based root CLI."""
+    from ..main import main as root_main
 
-    parse_command_args(
-        build_command_parser(
-            "setup",
-            "Initialize ~/.envmgr and install the Ansible content envmgr needs at runtime.",
-        ),
-        argv,
-    )
-    run_setup()
+    root_main(["setup", *(argv or [])])

@@ -1,13 +1,13 @@
 # Repository Guidelines
 
-This guide helps contributors work effectively on envmgr (Ansible-driven environment setup with a small Typer + Rich runtime CLI plus separate development helpers).
+This guide helps contributors work effectively on envmgr (Ansible-driven environment setup with a small Typer + Rich public runtime CLI plus separate development helpers that keep their own dedicated entrypoints).
 
 ## Project Structure & Module Organization
 
 - `playbooks/` — scenario playbooks (`workstation.yml`, `node.yml`).
 - `roles/` — one folder per tool (`tasks/main.yml`, `vars/`, etc.).
-- `scripts/` — Python CLI entrypoints plus shared `commands/` and `services/` modules used by `uv`; `scripts/main.py` defines the Typer-based public `envmgr` CLI with Rich-enhanced help plus shared Rich runtime summaries/prompts, while development helpers remain separate entrypoints.
-- `scripts/commands/` — command runners and CLI glue shared by the public CLI and helper entrypoints.
+- `scripts/` — Python CLI entrypoints plus shared `commands/` and `services/` modules used by `uv`; `scripts/main.py` defines the Typer-based public `envmgr` CLI with Rich-enhanced help plus shared Rich runtime summaries/prompts, while development helpers remain separate Typer-based entrypoints.
+- `scripts/commands/` — command runners plus the dedicated helper entrypoints and CLI glue shared by the public CLI and helper commands.
 - `tests/` — Python `unittest` modules split by domain; `tests/checks/` holds unit-check implementations and `tests/test_smoke.py` remains the dedicated smoke suite exercised by `uv run smoke-test`.
 - `vars/` — shared variables; `ansible.cfg` — repository Ansible defaults; runtime state lives under `~/.envmgr/`.
 
