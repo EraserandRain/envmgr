@@ -40,10 +40,3 @@ def run_ping(*, inventory: str | None) -> None:
         )
 
     print_status("Ping completed successfully.", tone="success")
-
-
-def ping(argv: list[str] | None = None) -> None:
-    """Test connection to all hosts using the Typer-based root CLI."""
-    from ..main import main as root_main
-
-    root_main(["ping", *(argv or [])])

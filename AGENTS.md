@@ -10,6 +10,7 @@ This guide helps contributors work effectively on envmgr (Ansible-driven environ
 - `scripts/commands/` — command runners plus the dedicated helper entrypoints and CLI glue shared by the public CLI and helper commands.
 - `tests/` — Python `unittest` modules split by domain; `tests/checks/` holds unit-check implementations and `tests/test_smoke.py` remains the dedicated smoke suite exercised by `uv run smoke-test`.
 - `vars/` — shared variables; `ansible.cfg` — repository Ansible defaults; runtime state lives under `~/.envmgr/`.
+- Treat the CLI entrypoints as the supported surface: use `uv run envmgr ...` for runtime commands and the standalone helper commands for developer workflows. Python import paths under `scripts/` remain implementation details, even where conservative compatibility shims still exist.
 
 ## Build, Test, and Development Commands
 

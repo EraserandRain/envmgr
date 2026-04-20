@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib
 import io
 import json
 import os
@@ -292,6 +293,73 @@ def check_runtime_subprocess_helpers_use_runtime_paths() -> None:
         if popen_payload["return_code"] != 0:
             raise AssertionError(
                 "expected popen helper to persist the child return code"
+            )
+
+
+def check_package_root_helper_exports_resolve_to_command_modules() -> None:
+    expected_exports = {
+        "create": ("scripts.commands.create", "create"),
+        "lint": ("scripts.commands.lint", "lint"),
+        "ansible_lint": ("scripts.commands.ansible_check", "ansible_lint"),
+        "typecheck": ("scripts.commands.typecheck", "typecheck"),
+        "validate": ("scripts.commands.validate", "validate"),
+        "smoke_test": ("scripts.commands.smoke_test", "smoke_test"),
+    }
+    package = __import__("scripts", fromlist=list(expected_exports))
+    package_all = getattr(package, "__all__", None)
+    if not isinstance(package_all, list):
+        raise AssertionError("expected scripts.__all__ to remain a list of exports")
+
+    for export_name, (module_name, attr_name) in expected_exports.items():
+        exported = getattr(package, export_name, None)
+        target = getattr(importlib.import_module(module_name), attr_name)
+        if exported is not target:
+            raise AssertionError(
+                f"expected scripts.{export_name} to resolve to "
+                f"{module_name}.{attr_name}"
+            )
+        if export_name not in package_all:
+            raise AssertionError(
+                f"expected scripts.__all__ to keep {export_name!r} available"
+            )
+
+
+def check_scripts_main_keeps_only_root_command_exports() -> None:
+    expected_exports = [
+        "app",
+        "doctor",
+        "history",
+        "install",
+        "main",
+        "ping",
+        "require_setup_completed",
+        "setup",
+    ]
+    removed_helper_exports = (
+        "create",
+        "lint",
+        "ansible_lint",
+        "typecheck",
+        "validate",
+        "smoke_test",
+    )
+    main_module = importlib.import_module("scripts.main")
+    if getattr(main_module, "__all__", None) != expected_exports:
+        raise AssertionError(
+            "expected scripts.main.__all__ to describe only the retained "
+            "root-command surface"
+        )
+
+    for export_name in expected_exports:
+        if not hasattr(main_module, export_name):
+            raise AssertionError(
+                f"expected scripts.main to keep {export_name!r} available"
+            )
+
+    for export_name in removed_helper_exports:
+        if hasattr(main_module, export_name):
+            raise AssertionError(
+                f"expected scripts.main to stop exposing {export_name!r}"
             )
 
 

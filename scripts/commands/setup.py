@@ -77,10 +77,3 @@ def run_setup() -> None:
         "Ansible roles and collections installed successfully.", tone="success"
     )
     print_status("Setup completed successfully.", tone="success")
-
-
-def setup(argv: list[str] | None = None) -> None:
-    """Initialize ~/.envmgr using the Typer-based root CLI."""
-    from ..main import main as root_main
-
-    root_main(["setup", *(argv or [])])
