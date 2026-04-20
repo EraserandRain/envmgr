@@ -520,10 +520,3 @@ def run_install(
         raise SystemExit(130) from error
     finally:
         cleanup_install_plan(install_plan)
-
-
-def install(argv: list[str] | None = None) -> None:
-    """Install and configure the envmgr project using Ansible."""
-    from ..main import main as root_main
-
-    root_main(["install", *(argv or [])])

@@ -1,16 +1,10 @@
-from .main import (
-    ansible_lint,
-    create,
-    doctor,
-    history,
-    install,
-    lint,
-    ping,
-    setup,
-    smoke_test,
-    typecheck,
-    validate,
-)
+from .commands.ansible_check import ansible_lint
+from .commands.create import create
+from .commands.lint import lint
+from .commands.smoke_test import smoke_test
+from .commands.typecheck import typecheck
+from .commands.validate import validate
+from .main import doctor, history, install, ping, setup
 
 __all__: list[str] = [
     "install",

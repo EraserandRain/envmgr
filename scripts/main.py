@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-from importlib import import_module
 from pathlib import Path
-from typing import Annotated, Any, Literal
+from typing import Annotated, Literal
 
 import typer
 
@@ -26,8 +25,7 @@ app = typer.Typer(
 Context7Method = Literal["remote", "local"]
 
 # Only the Typer app, its root-command shims, and the setup guard remain the
-# intentional public surface here. Legacy helper names stay available only via
-# `__getattr__` because `scripts.__init__` still imports them.
+# intentional public surface here.
 __all__ = [
     "app",
     "doctor",
@@ -39,15 +37,6 @@ __all__ = [
     "setup",
 ]
 
-_LEGACY_HELPER_EXPORTS: dict[str, tuple[str, str]] = {
-    "ansible_lint": (".commands.ansible_check", "ansible_lint"),
-    "create": (".commands.create", "create"),
-    "lint": (".commands.lint", "lint"),
-    "smoke_test": (".commands.smoke_test", "smoke_test"),
-    "typecheck": (".commands.typecheck", "typecheck"),
-    "validate": (".commands.validate", "validate"),
-}
-
 
 def require_setup_completed(
     command_name: str,
@@ -56,16 +45,6 @@ def require_setup_completed(
 ) -> None:
     """Retain the historical setup guard import path used by runtime helpers."""
     shared_require_setup_completed(command_name, envmgr_home=envmgr_home)
-
-
-def __getattr__(name: str) -> Any:
-    """Resolve legacy helper imports without keeping wrapper functions here."""
-    target = _LEGACY_HELPER_EXPORTS.get(name)
-    if target is None:
-        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-
-    module_name, attr_name = target
-    return getattr(import_module(module_name, __package__), attr_name)
 
 
 @app.command("doctor")

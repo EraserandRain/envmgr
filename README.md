@@ -86,6 +86,9 @@ Repository-local files still keep their original purpose:
 `uv run envmgr ...` is the supported runtime command surface for envmgr. Development
 helpers stay separate as dedicated commands like `uv run validate` or `uv run lint`. Direct `ansible-playbook` or
 `ansible-galaxy` usage from the repository is not a supported interface.
+Repository-internal Python import paths under `scripts/` are implementation
+details; any conservative compatibility re-exports or root-command shims are
+not a supported public API.
 
 The public runtime CLI now uses Typer with Rich-enhanced help plus shared Rich
 runtime summaries, status lines, and interactive prompts where applicable, and
