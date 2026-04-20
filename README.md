@@ -341,7 +341,7 @@ uv run envmgr install ai_tools --claude-code --codex --rtk --claude-context7-met
 
 If your Context7 setup needs an API key, export `CONTEXT7_API_KEY` before running `uv run envmgr install ...`.
 
-RTK is enabled by default for `ai_tools` installs and is placed into `~/.local/bin`. When Claude Code is also selected, envmgr runs `rtk init --global --auto-patch`. When Codex CLI is also selected, envmgr runs `rtk init --global --codex`.
+RTK is enabled by default for `ai_tools` installs and is placed into `~/.local/bin`. When Claude Code is also selected, envmgr runs `rtk init --global --auto-patch`. When Codex CLI is also selected, envmgr runs `rtk init --global --codex`. envmgr resolves RTK releases through GitHub release redirects instead of the REST API, so anonymous GitHub API rate limits do not block the default install path.
 
 **Installation:**
 
