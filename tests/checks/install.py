@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import tempfile
 from io import StringIO
 from pathlib import Path
@@ -15,10 +16,12 @@ from scripts.commands.install import (
 )
 from scripts.main import app
 from scripts.runtime_config import ensure_runtime_layout
+from scripts.services.assets import resolve_runtime_assets
 from scripts.services.install import (
     AiToolsInstallDefaults,
     InstallPlan,
     build_install_plan,
+    cleanup_install_plan,
 )
 
 CLI_RUNNER = CliRunner()
@@ -149,6 +152,7 @@ def check_install_all_uses_runtime_default_playbook() -> None:
     with tempfile.TemporaryDirectory() as temp_dir:
         envmgr_home = Path(temp_dir) / ".envmgr"
         runtime_paths = ensure_runtime_layout(envmgr_home)
+        assets = resolve_runtime_assets(runtime_paths=runtime_paths)
         runtime_paths.config_file.write_text(
             """
 [default]
@@ -164,20 +168,26 @@ password = "inventory/password.yaml"
             encoding="utf-8",
         )
 
-        install_plan = build_install_plan(
-            ["all"],
-            explicit_playbook=None,
-            inventory_reference=None,
-            role_tags=[],
-            task_tags=[],
-            envmgr_home=envmgr_home,
-        )
+        original_cwd = Path.cwd()
+        os.chdir(temp_dir)
+        try:
+            install_plan = build_install_plan(
+                ["all"],
+                explicit_playbook=None,
+                inventory_reference=None,
+                role_tags=[],
+                task_tags=[],
+                envmgr_home=envmgr_home,
+            )
+        finally:
+            os.chdir(original_cwd)
 
-        if install_plan.source_playbook_path != "playbooks/node.yml":
+        expected_playbook_path = str(assets.resolve_playbook("node"))
+        if install_plan.source_playbook_path != expected_playbook_path:
             raise AssertionError(
                 "expected `install all` to use the runtime default playbook"
             )
-        if install_plan.execution_playbook_path != "playbooks/node.yml":
+        if install_plan.execution_playbook_path != expected_playbook_path:
             raise AssertionError(
                 "expected `install all` to execute the resolved default playbook"
             )
@@ -188,6 +198,50 @@ password = "inventory/password.yaml"
         if install_plan.inventory_path != runtime_paths.default_inventory_file:
             raise AssertionError(
                 "expected `install all` to keep using the default inventory alias"
+            )
+
+
+def check_install_scoped_runs_use_runtime_scratch_outside_repo_cwd() -> None:
+    with tempfile.TemporaryDirectory() as temp_dir:
+        envmgr_home = Path(temp_dir) / ".envmgr"
+        runtime_paths = ensure_runtime_layout(envmgr_home)
+        assets = resolve_runtime_assets(runtime_paths=runtime_paths)
+
+        original_cwd = Path.cwd()
+        os.chdir(temp_dir)
+        try:
+            install_plan = build_install_plan(
+                ["zsh"],
+                explicit_playbook=None,
+                inventory_reference=None,
+                envmgr_home=envmgr_home,
+            )
+        finally:
+            os.chdir(original_cwd)
+
+        execution_playbook_path = Path(install_plan.execution_playbook_path)
+        expected_source_playbook = str(assets.resolve_playbook("workstation"))
+        if install_plan.source_playbook_path != expected_source_playbook:
+            raise AssertionError(
+                "expected scoped installs to resolve the workstation playbook outside the repo cwd"
+            )
+        if not install_plan.uses_temporary_execution_playbook:
+            raise AssertionError(
+                "expected scoped installs to build a temporary execution playbook"
+            )
+        if execution_playbook_path.parent != runtime_paths.tmp_dir:
+            raise AssertionError(
+                "expected scoped installs to write execution playbooks under the runtime scratch directory"
+            )
+        if not execution_playbook_path.exists():
+            raise AssertionError(
+                "expected scoped installs to materialize the temp playbook"
+            )
+
+        cleanup_install_plan(install_plan)
+        if execution_playbook_path.exists():
+            raise AssertionError(
+                "expected cleanup_install_plan to remove runtime scratch playbooks"
             )
 
 

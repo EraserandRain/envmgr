@@ -22,6 +22,7 @@ from .install import check_ai_tools_setup_wizard_flow
 from .runtime import (
     check_multi_node_inventory_topology,
     check_setup_logs_ansible_galaxy_runs,
+    check_setup_succeeds_outside_repo_cwd,
 )
 
 SmokeCheck = tuple[str, Callable[[], None]]
@@ -39,6 +40,7 @@ SMOKE_TEST_CHECKS: tuple[SmokeCheck, ...] = (
     ("ping CLI contract", check_ping_cli_contract),
     ("setup CLI contract", check_setup_cli_contract),
     ("setup logs ansible-galaxy runtime runs", check_setup_logs_ansible_galaxy_runs),
+    ("setup succeeds outside the repo cwd", check_setup_succeeds_outside_repo_cwd),
     ("multi-node inventory topology", check_multi_node_inventory_topology),
 )
 

@@ -9,6 +9,7 @@ from tests.checks.runtime import (
     check_outdated_setup_stamp_requires_setup,
     check_runtime_config_bootstrap,
     check_setup_marker_is_written_after_setup,
+    check_setup_uses_resolved_runtime_assets,
     check_setup_uses_shared_runtime_output,
     check_unbootstrapped_runtime_surfaces_setup_guidance,
     check_unknown_inventory_alias_is_rejected,
@@ -19,6 +20,7 @@ RUNTIME_CONFIG_TEST_CHECKS: tuple[Check, ...] = (
     ("runtime config bootstrap", check_runtime_config_bootstrap),
     ("setup marker is written after setup", check_setup_marker_is_written_after_setup),
     ("setup uses shared runtime output", check_setup_uses_shared_runtime_output),
+    ("setup uses resolved runtime assets", check_setup_uses_resolved_runtime_assets),
     (
         "unbootstrapped runtime surfaces setup guidance",
         check_unbootstrapped_runtime_surfaces_setup_guidance,

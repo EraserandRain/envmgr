@@ -7,6 +7,7 @@ from ..runtime_config import (
     ensure_runtime_layout,
     mark_runtime_setup_complete,
 )
+from ..services.assets import RuntimeAssetError, resolve_runtime_assets
 from ..services.runtime import run_runtime_subprocess
 from .shared import (
     exit_with_error,
@@ -37,6 +38,11 @@ def run_setup() -> None:
         "Galaxy collections cache",
         runtime_paths.galaxy_collections_dir,
     )
+    try:
+        runtime_assets = resolve_runtime_assets(runtime_paths=runtime_paths)
+    except RuntimeAssetError as error:
+        exit_with_error(f"Failed to locate envmgr runtime assets: {error}")
+
     print_status("Installing Ansible roles and collections...")
     try:
         run_runtime_subprocess(
@@ -47,10 +53,11 @@ def run_setup() -> None:
                 "-p",
                 str(runtime_paths.galaxy_roles_dir),
                 "-r",
-                "requirements.yaml",
+                str(runtime_assets.requirements_file),
             ],
             check=True,
             runtime_paths=runtime_paths,
+            assets=runtime_assets,
         )
         run_runtime_subprocess(
             [
@@ -60,10 +67,11 @@ def run_setup() -> None:
                 "-p",
                 str(runtime_paths.galaxy_collections_dir),
                 "-r",
-                "requirements.yaml",
+                str(runtime_assets.requirements_file),
             ],
             check=True,
             runtime_paths=runtime_paths,
+            assets=runtime_assets,
         )
         mark_runtime_setup_complete(runtime_paths)
     except subprocess.CalledProcessError as error:

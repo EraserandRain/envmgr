@@ -12,6 +12,7 @@ from typing import Any
 from uuid import uuid4
 
 from ..runtime_config import RuntimePaths
+from .assets import RuntimeAssets, resolve_runtime_assets
 
 RUNTIME_RUN_RECORD_SCHEMA_VERSION = 1
 
@@ -102,15 +103,23 @@ def build_effective_command_path(env: dict[str, str] | None = None) -> str:
     return merge_path_entries(path_entries)
 
 
-def build_ansible_runtime_env(paths: RuntimePaths) -> dict[str, str]:
+def build_ansible_runtime_env(
+    paths: RuntimePaths,
+    *,
+    assets: RuntimeAssets | None = None,
+) -> dict[str, str]:
     """Build a consistent Ansible runtime environment rooted in ~/.envmgr."""
+    resolved_assets = (
+        resolve_runtime_assets(runtime_paths=paths) if assets is None else assets
+    )
     env = os.environ.copy()
     env["PATH"] = build_effective_command_path(env)
     env["ANSIBLE_FORCE_COLOR"] = "true"
+    env["ANSIBLE_CONFIG"] = str(resolved_assets.ansible_config_file)
     env["ANSIBLE_LOG_PATH"] = str(paths.ansible_log_file)
     env["ANSIBLE_ROLES_PATH"] = merge_path_entries(
         [
-            str(Path("roles").resolve()),
+            str(resolved_assets.roles_dir),
             str(paths.galaxy_roles_dir),
         ]
     )
@@ -262,6 +271,7 @@ def run_runtime_subprocess(
     *,
     runtime_paths: RuntimePaths,
     extra_env: dict[str, str] | None = None,
+    assets: RuntimeAssets | None = None,
     **kwargs: Any,
 ) -> subprocess.CompletedProcess[Any]:
     """Run a subprocess with the envmgr Ansible runtime environment."""
@@ -271,7 +281,7 @@ def run_runtime_subprocess(
         mode="run",
         cwd=resolve_runtime_subprocess_cwd(kwargs.get("cwd")),
     )
-    env = build_ansible_runtime_env(runtime_paths)
+    env = build_ansible_runtime_env(runtime_paths, assets=assets)
     if extra_env is not None:
         env.update(extra_env)
         env["PATH"] = build_effective_command_path(env)
@@ -317,6 +327,7 @@ def popen_runtime_subprocess(
     *,
     runtime_paths: RuntimePaths,
     extra_env: dict[str, str] | None = None,
+    assets: RuntimeAssets | None = None,
     **kwargs: Any,
 ) -> RuntimePopenProcess:
     """Start a subprocess with the envmgr Ansible runtime environment."""
@@ -326,7 +337,7 @@ def popen_runtime_subprocess(
         mode="popen",
         cwd=resolve_runtime_subprocess_cwd(kwargs.get("cwd")),
     )
-    env = build_ansible_runtime_env(runtime_paths)
+    env = build_ansible_runtime_env(runtime_paths, assets=assets)
     if extra_env is not None:
         env.update(extra_env)
         env["PATH"] = build_effective_command_path(env)

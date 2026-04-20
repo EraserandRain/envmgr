@@ -10,10 +10,12 @@ Envmgr requires Python 3.10 or later and the uv package.
 
 Please install `uv` first 【[uv installation](https://docs.astral.sh/uv/getting-started/installation/)】.
 
-### Global Editable Install (Phase 1)
+### Install envmgr
 
-After installing `uv`, install this checkout as an editable global tool so
-`envmgr ...` is available directly in your shell:
+After installing `uv`, choose one runtime install mode so `envmgr ...` is
+available directly in your shell from any working directory.
+
+**Editable install from a checkout:**
 
 ```bash
 # Install uv
@@ -29,23 +31,36 @@ uv tool dir --bin
 uv tool update-shell
 ```
 
-To refresh the editable global install after pulling changes in this checkout,
-run `uv tool install --editable --force /home/eraserrain/envmgr`.
-To remove the global tool shim entirely, run `uv tool uninstall envmgr`.
-If your shell still reports `envmgr: command not found`, check the uv-managed
-bin directory with `uv tool dir --bin`, then run `uv tool update-shell` and
-start a new shell session so that directory is added to your `PATH`.
+To refresh the editable tool after pulling changes in this checkout, run
+`uv tool install --editable --force /home/eraserrain/envmgr`.
 
-The editable install makes `envmgr ...` the primary runtime command surface for
-Phase 1. It also exposes the other console scripts defined by this project, but
-those extra entry points remain helper/developer interfaces rather than a new
-recommended day-to-day workflow.
+**Wheel install from a built artifact:**
 
-Phase 1 support is intentionally repo-root-only for this checkout: use the
-installed `envmgr ...` command while your shell is at the repo root, and do not
-expect from-anywhere execution yet. If you are already at the repo root and
-need an explicit fallback without relying on the installed shim, use
-`uv run envmgr ...`.
+```bash
+# Build wheel + sdist artifacts
+uv build
+
+# Install the built wheel as a global tool
+uv tool install dist/envmgr-*.whl
+```
+
+Wheel builds bundle the runtime assets that `envmgr` needs at execution time,
+including `playbooks/`, `roles/`, `vars/`, `ansible.cfg`, and
+`requirements.yaml`, under the installed Python package. Editable installs keep
+using the checkout copy of those same assets. In both cases, the installed
+`envmgr ...` command is the supported runtime surface and works outside the
+repo root.
+
+The project still exposes the other console scripts defined by this package,
+but those remain helper/developer entry points rather than the recommended
+day-to-day runtime workflow. When you are working directly from this checkout
+without installing a tool shim, `uv run envmgr ...` remains the repo-root
+fallback.
+
+To remove the global tool shim entirely, run `uv tool uninstall envmgr`. If
+your shell still reports `envmgr: command not found`, check the uv-managed bin
+directory with `uv tool dir --bin`, then run `uv tool update-shell` and start a
+new shell session so that directory is added to your `PATH`.
 
 ### First-Time Setup
 
@@ -113,8 +128,8 @@ Repository-local files still keep their original purpose:
 - `roles/` stays the source of first-party envmgr roles in this repo
 - `playbooks/` stays the source of scenario playbooks in this repo
 - `scripts/main.py` defines the Typer-based public `envmgr` CLI used by the
-  installed `envmgr ...` command and the repo-root fallback `uv run envmgr ...`,
-  with Rich help plus shared Rich runtime summaries/prompts
+  installed `envmgr ...` command plus the checkout-local fallback
+  `uv run envmgr ...`, with Rich help plus shared Rich runtime summaries/prompts
 - `scripts/commands/` holds command runners plus the dedicated helper entrypoints and CLI glue shared by the public CLI and helper commands
 - `scripts/services/` holds reusable runtime, install-planning, and doctor logic
 - `scripts/smoke_checks/` stays reserved for smoke-test-only checks
@@ -122,12 +137,14 @@ Repository-local files still keep their original purpose:
 - `ansible.cfg` remains repository metadata used by envmgr internals and project checks
 
 The installed `envmgr ...` command is the supported runtime command surface for
-envmgr. During Phase 1, that support stays repo-root-only for this checkout;
-from-anywhere execution is not supported yet. Development helpers stay separate
-as dedicated commands like `uv run validate` or `uv run lint`, and
-`uv run envmgr ...` remains the explicit fallback when you are already inside
-the repo root. Direct `ansible-playbook` or `ansible-galaxy` usage from the
-repository is not a supported interface.
+envmgr. Editable installs from a checkout and wheel installs from built
+artifacts both support running `envmgr ...` outside the repo root because the
+runtime assets are resolved from the installed package or the live checkout.
+Development helpers stay separate as dedicated commands like `uv run validate`
+or `uv run lint`, and `uv run envmgr ...` remains the explicit fallback when
+you are already inside the repo root and want to run the checkout directly.
+Direct `ansible-playbook` or `ansible-galaxy` usage from the repository is not
+a supported interface.
 Repository-internal Python import paths under `scripts/` are implementation
 details; any conservative compatibility re-exports or root-command shims are
 not a supported public API.
@@ -135,9 +152,10 @@ not a supported public API.
 The public runtime CLI now uses Typer with Rich-enhanced help plus shared Rich
 runtime summaries, status lines, and interactive prompts where applicable, and
 the dedicated developer helper commands also use Typer-based help. The
-supported command surfaces stay intentionally split: run runtime commands as
-`envmgr ...` (or `uv run envmgr ...` as a repo-root fallback) and keep
-developer helpers on their existing standalone entrypoints.
+supported command surfaces stay intentionally split: run installed runtime
+commands as `envmgr ...`, use `uv run envmgr ...` only as the repo-root
+fallback for a checkout, and keep developer helpers on their existing
+standalone entrypoints.
 
 Commands that accept `-i/--inventory` only accept inventory aliases defined in `~/.envmgr/config.toml`. envmgr no longer falls back to repository-local inventory files or `./.ansible` caches.
 Inventory alias targets must stay under `~/.envmgr/inventory/`.
@@ -416,9 +434,10 @@ envmgr install rtk
 
 Run `uv sync` when you want to populate or refresh the local development
 virtualenv. Run `envmgr setup` before `uv run validate` or `uv run smoke-test`
-on a fresh machine; `uv run envmgr setup` remains the repo-root fallback for
-the same bootstrap step. Those commands execute playbook checks that rely on
-the runtime inventory and Galaxy content installed during bootstrap.
+on a fresh machine; `uv run envmgr setup` remains the repo-root fallback when
+you are running directly from the checkout. Those commands execute playbook
+checks that rely on the runtime inventory and Galaxy content installed during
+bootstrap.
 
 ```bash
 # Install or refresh the local dev environment

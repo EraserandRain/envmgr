@@ -24,10 +24,11 @@ from ..runtime_config import (
     load_runtime_config,
     resolve_inventory_reference,
 )
+from .assets import resolve_runtime_assets
 
 DEFAULT_PLAYBOOKS = [
-    "playbooks/workstation.yml",
-    "playbooks/node.yml",
+    "workstation",
+    "node",
 ]
 ALL_TAG = "all"
 AI_TOOLS_CONTEXT7_METHODS = ("remote", "local")
@@ -68,15 +69,13 @@ class InstallPlan:
 
 def load_available_tags() -> tuple[list[str], list[str]]:
     """Load role-level and task-level tags from role metadata."""
-    return get_available_tags("roles")
+    return get_available_tags()
 
 
 def resolve_default_playbook_path(config: RuntimeConfig) -> str:
-    """Resolve the configured default playbook name into a repository playbook path."""
-    configured_playbook = Path(config.default_playbook)
-    if configured_playbook.suffix in {".yml", ".yaml"}:
-        return str(configured_playbook)
-    return str(Path("playbooks") / f"{config.default_playbook}.yml")
+    """Resolve the configured default playbook name into a packaged scenario path."""
+    assets = resolve_runtime_assets(runtime_paths=config.paths)
+    return str(assets.resolve_playbook(config.default_playbook))
 
 
 def normalize_selected_tags(raw_tags: list[str]) -> list[str]:
@@ -114,13 +113,18 @@ def is_all_tag_selection(selected_tags: list[str]) -> bool:
 
 
 def get_existing_default_playbooks() -> list[str]:
-    """Return default scenario playbooks that exist in the repository."""
-    return [playbook for playbook in DEFAULT_PLAYBOOKS if Path(playbook).exists()]
+    """Return built-in scenario playbooks that exist in the packaged assets."""
+    assets = resolve_runtime_assets()
+    return [
+        str(assets.resolve_playbook(playbook))
+        for playbook in DEFAULT_PLAYBOOKS
+        if playbook in assets.scenario_playbooks
+    ]
 
 
 def resolve_selected_role_metadata(
     selected_tags: list[str],
-    roles_dir: str | Path = "roles",
+    roles_dir: str | Path | None = None,
 ) -> dict[str, RoleMetadata]:
     """Resolve selected tags into a role closure that includes declared dependencies."""
     catalog = [
@@ -190,7 +194,7 @@ def read_playbook_role_tags(
 
 def playbook_includes_role(source_playbook: str, role_name: str) -> bool:
     """Return whether the playbook references a specific role."""
-    playbook_path = Path(source_playbook)
+    playbook_path = resolve_runtime_assets().resolve_playbook(source_playbook)
     with playbook_path.open(encoding="utf-8") as file:
         playbook_data = yaml.safe_load(file)
 
@@ -306,10 +310,13 @@ def build_ai_tools_extra_vars(options: AiToolsInstallOptions) -> dict[str, Any]:
 def build_execution_playbook(
     source_playbook: str,
     selected_tags: list[str],
-    roles_dir: str | Path = "roles",
+    roles_dir: str | Path | None = None,
+    *,
+    runtime_paths: RuntimePaths | None = None,
 ) -> str:
     """Build a minimal temporary playbook for the selected tags."""
-    playbook_path = Path(source_playbook)
+    assets = resolve_runtime_assets(runtime_paths=runtime_paths)
+    playbook_path = assets.resolve_playbook(source_playbook)
     if not playbook_path.exists():
         raise CatalogError(f"playbook not found: {playbook_path}")
 
@@ -380,12 +387,13 @@ def build_execution_playbook(
     if not any(play.get("roles") for play in generated_playbook):
         raise CatalogError("selected tags did not resolve to any playbook roles")
 
+    assets.scratch_dir.mkdir(parents=True, exist_ok=True)
     temp_file = tempfile.NamedTemporaryFile(
         mode="w",
         encoding="utf-8",
         suffix=".yml",
         prefix=f".envmgr-{playbook_path.stem}-",
-        dir=playbook_path.parent,
+        dir=assets.scratch_dir,
         delete=False,
     )
     try:
@@ -404,16 +412,18 @@ def resolve_install_playbook(
     explicit_playbook: str | None,
 ) -> str:
     """Resolve a playbook for install operations based on explicit input or tag scope."""
+    assets = resolve_runtime_assets()
     if explicit_playbook:
+        resolved_playbook = str(assets.resolve_playbook(explicit_playbook))
         if selected_tags and not is_all_tag_selection(selected_tags):
-            playbook_tags = load_playbook_tags(explicit_playbook)
+            playbook_tags = load_playbook_tags(resolved_playbook)
             requested_tags = set(selected_tags)
             if not requested_tags.issubset(playbook_tags):
                 raise CatalogError(
                     f"selected tags are not valid in {explicit_playbook}; "
                     "choose a matching playbook"
                 )
-        return explicit_playbook
+        return resolved_playbook
 
     if not selected_tags:
         raise CatalogError("no tags selected")
@@ -496,6 +506,7 @@ def build_install_plan(
             execution_playbook_path = build_execution_playbook(
                 source_playbook_path,
                 selected_tags,
+                runtime_paths=runtime_paths,
             )
             uses_temporary_execution_playbook = True
         ai_tools_defaults = build_ai_tools_install_defaults(
