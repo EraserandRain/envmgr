@@ -7,6 +7,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import typer
+import yaml
 from typer.testing import CliRunner
 
 from scripts.commands.install import (
@@ -242,6 +243,50 @@ def check_install_scoped_runs_use_runtime_scratch_outside_repo_cwd() -> None:
         if execution_playbook_path.exists():
             raise AssertionError(
                 "expected cleanup_install_plan to remove runtime scratch playbooks"
+            )
+
+
+def check_install_scoped_runs_rewrite_vars_files_to_absolute_paths() -> None:
+    with tempfile.TemporaryDirectory() as temp_dir:
+        envmgr_home = Path(temp_dir) / ".envmgr"
+        runtime_paths = ensure_runtime_layout(envmgr_home)
+        assets = resolve_runtime_assets(runtime_paths=runtime_paths)
+
+        original_cwd = Path.cwd()
+        install_plan: InstallPlan | None = None
+        generated_playbook: object | None = None
+        try:
+            os.chdir(temp_dir)
+            install_plan = build_install_plan(
+                ["init"],
+                explicit_playbook="playbooks/workstation.yml",
+                inventory_reference=None,
+                envmgr_home=envmgr_home,
+            )
+            generated_playbook = yaml.safe_load(
+                Path(install_plan.execution_playbook_path).read_text(encoding="utf-8")
+            )
+        finally:
+            os.chdir(original_cwd)
+            if install_plan is not None:
+                cleanup_install_plan(install_plan)
+
+        if not isinstance(generated_playbook, list) or not generated_playbook:
+            raise AssertionError("expected scoped installs to generate a play list")
+
+        vars_files = generated_playbook[0].get("vars_files")
+        expected_vars_files = [
+            str((assets.playbooks_dir / "../vars/global.yml").resolve()),
+            str(
+                (
+                    assets.playbooks_dir / "../roles/zsh/vars/gantsign.oh-my-zsh.yml"
+                ).resolve()
+            ),
+            str((assets.playbooks_dir / "../roles/ruby/vars/rvm.ruby.yml").resolve()),
+        ]
+        if vars_files != expected_vars_files:
+            raise AssertionError(
+                "expected scoped installs to rewrite vars_files relative to the source playbook"
             )
 
 

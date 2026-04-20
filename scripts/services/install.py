@@ -192,6 +192,26 @@ def read_playbook_role_tags(
     )
 
 
+def resolve_playbook_file_reference(value: Any, *, playbook_path: Path) -> Any:
+    """Resolve static playbook file references relative to the source playbook."""
+    if isinstance(value, list):
+        return [
+            resolve_playbook_file_reference(item, playbook_path=playbook_path)
+            for item in value
+        ]
+
+    if not isinstance(value, str):
+        return value
+
+    if value.startswith(("{{", "{%")) or "{{" in value or "{%" in value:
+        return value
+
+    path = Path(value).expanduser()
+    if path.is_absolute():
+        return str(path.resolve())
+    return str((playbook_path.parent / path).resolve())
+
+
 def playbook_includes_role(source_playbook: str, role_name: str) -> bool:
     """Return whether the playbook references a specific role."""
     playbook_path = resolve_runtime_assets().resolve_playbook(source_playbook)
@@ -381,6 +401,11 @@ def build_execution_playbook(
                 filtered_roles.append(filtered_role_entry)
 
         filtered_play = deepcopy(play)
+        if "vars_files" in filtered_play:
+            filtered_play["vars_files"] = resolve_playbook_file_reference(
+                filtered_play["vars_files"],
+                playbook_path=playbook_path,
+            )
         filtered_play["roles"] = filtered_roles
         generated_playbook.append(filtered_play)
 
