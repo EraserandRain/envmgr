@@ -14,6 +14,7 @@ from ..runtime_config import (
     load_runtime_config,
 )
 from .install import resolve_default_playbook_path
+from .runtime import build_effective_command_path
 
 DOCTOR_COMMANDS = ("uv", "ansible", "ansible-playbook", "ansible-galaxy")
 DOCTOR_OK = "ok"
@@ -56,10 +57,11 @@ def build_doctor_report(envmgr_home: str | Path | None = None) -> DoctorReport:
     def add_check(name: str, status: str, detail: str) -> None:
         checks.append(DoctorCheck(name=name, status=status, detail=detail))
 
+    effective_path = build_effective_command_path()
     missing_commands = [
         command_name
         for command_name in DOCTOR_COMMANDS
-        if shutil.which(command_name) is None
+        if shutil.which(command_name, path=effective_path) is None
     ]
     if missing_commands:
         add_check(

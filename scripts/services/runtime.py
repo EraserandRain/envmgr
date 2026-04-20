@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import sys
+import sysconfig
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -81,9 +83,29 @@ def merge_path_entries(entries: list[str]) -> str:
     return os.pathsep.join(unique_entries)
 
 
+def build_effective_command_path(env: dict[str, str] | None = None) -> str:
+    """Build PATH so envmgr can discover executables from its current tool env."""
+    source_env = os.environ if env is None else env
+    path_entries: list[str] = []
+
+    scripts_dir = sysconfig.get_path("scripts")
+    if scripts_dir:
+        path_entries.append(str(Path(scripts_dir).expanduser().resolve()))
+
+    if sys.executable:
+        path_entries.append(str(Path(sys.executable).expanduser().resolve().parent))
+
+    inherited_path = source_env.get("PATH")
+    if inherited_path:
+        path_entries.extend(inherited_path.split(os.pathsep))
+
+    return merge_path_entries(path_entries)
+
+
 def build_ansible_runtime_env(paths: RuntimePaths) -> dict[str, str]:
     """Build a consistent Ansible runtime environment rooted in ~/.envmgr."""
     env = os.environ.copy()
+    env["PATH"] = build_effective_command_path(env)
     env["ANSIBLE_FORCE_COLOR"] = "true"
     env["ANSIBLE_LOG_PATH"] = str(paths.ansible_log_file)
     env["ANSIBLE_ROLES_PATH"] = merge_path_entries(
@@ -252,6 +274,7 @@ def run_runtime_subprocess(
     env = build_ansible_runtime_env(runtime_paths)
     if extra_env is not None:
         env.update(extra_env)
+        env["PATH"] = build_effective_command_path(env)
     try:
         result = subprocess.run(command, env=env, **kwargs)
     except subprocess.CalledProcessError as error:
@@ -306,6 +329,7 @@ def popen_runtime_subprocess(
     env = build_ansible_runtime_env(runtime_paths)
     if extra_env is not None:
         env.update(extra_env)
+        env["PATH"] = build_effective_command_path(env)
     try:
         process = subprocess.Popen(command, env=env, **kwargs)
     except FileNotFoundError as error:

@@ -5,7 +5,7 @@ from typing import Annotated, Literal
 
 import typer
 
-from .command_text import CLI_ROOT_COMMAND
+from .command_text import CLI_APP_HELP, CLI_ROOT_COMMAND
 from .commands.doctor import run_doctor
 from .commands.history import run_history
 from .commands.install import run_install
@@ -16,6 +16,7 @@ from .commands.shared import (
 )
 
 app = typer.Typer(
+    help=CLI_APP_HELP,
     no_args_is_help=True,
     add_completion=False,
     suggest_commands=True,

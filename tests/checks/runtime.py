@@ -177,25 +177,35 @@ def check_unknown_inventory_alias_is_rejected() -> None:
 def check_runtime_env_uses_runtime_paths_only() -> None:
     with tempfile.TemporaryDirectory() as temp_dir:
         runtime_paths = ensure_runtime_layout(Path(temp_dir) / ".envmgr")
-        original_roles_path = os.environ.get("ANSIBLE_ROLES_PATH")
-        original_collections_path = os.environ.get("ANSIBLE_COLLECTIONS_PATH")
-        os.environ["ANSIBLE_ROLES_PATH"] = str(
-            Path(temp_dir) / "legacy-roles" / ".ansible" / "roles"
-        )
-        os.environ["ANSIBLE_COLLECTIONS_PATH"] = str(
-            Path(temp_dir) / "legacy-collections" / ".ansible" / "collections"
-        )
-        try:
+        tool_bin = (Path(temp_dir) / "tool-env" / "bin").resolve()
+        inherited_bin = (Path(temp_dir) / "ambient-bin").resolve()
+        extra_bin = (Path(temp_dir) / "fallback-bin").resolve()
+        with (
+            patch.dict(
+                os.environ,
+                {
+                    "ANSIBLE_ROLES_PATH": str(
+                        Path(temp_dir) / "legacy-roles" / ".ansible" / "roles"
+                    ),
+                    "ANSIBLE_COLLECTIONS_PATH": str(
+                        Path(temp_dir)
+                        / "legacy-collections"
+                        / ".ansible"
+                        / "collections"
+                    ),
+                    "PATH": os.pathsep.join(
+                        [str(inherited_bin), str(tool_bin), str(extra_bin)]
+                    ),
+                },
+                clear=False,
+            ),
+            patch(
+                "scripts.services.runtime.sysconfig.get_path",
+                return_value=str(tool_bin),
+            ),
+            patch("scripts.services.runtime.sys.executable", str(tool_bin / "python3")),
+        ):
             env = build_ansible_runtime_env(runtime_paths)
-        finally:
-            if original_roles_path is not None:
-                os.environ["ANSIBLE_ROLES_PATH"] = original_roles_path
-            else:
-                os.environ.pop("ANSIBLE_ROLES_PATH", None)
-            if original_collections_path is not None:
-                os.environ["ANSIBLE_COLLECTIONS_PATH"] = original_collections_path
-            else:
-                os.environ.pop("ANSIBLE_COLLECTIONS_PATH", None)
 
         if ".ansible/roles" in env["ANSIBLE_ROLES_PATH"]:
             raise AssertionError(
@@ -207,19 +217,42 @@ def check_runtime_env_uses_runtime_paths_only() -> None:
             )
         if env["ANSIBLE_LOG_PATH"] != str(runtime_paths.ansible_log_file):
             raise AssertionError("expected ansible log path to point to ~/.envmgr")
+        if env["PATH"].split(os.pathsep) != [
+            str(tool_bin),
+            str(inherited_bin),
+            str(extra_bin),
+        ]:
+            raise AssertionError(
+                "expected runtime PATH to prepend the current tool bin once"
+            )
 
 
 def check_runtime_subprocess_helpers_use_runtime_paths() -> None:
     with tempfile.TemporaryDirectory() as temp_dir:
         runtime_paths = ensure_runtime_layout(Path(temp_dir) / ".envmgr")
+        tool_bin = (Path(temp_dir) / "tool-env" / "bin").resolve()
+        inherited_bin = (Path(temp_dir) / "ambient-bin").resolve()
+        extra_bin = (Path(temp_dir) / "child-bin").resolve()
 
-        with patch(
-            "subprocess.run",
-            return_value=subprocess.CompletedProcess(
-                ["ansible-playbook", "--version"],
-                0,
+        with (
+            patch.dict(
+                os.environ,
+                {"PATH": str(inherited_bin)},
+                clear=False,
             ),
-        ) as mock_run:
+            patch(
+                "scripts.services.runtime.sysconfig.get_path",
+                return_value=str(tool_bin),
+            ),
+            patch("scripts.services.runtime.sys.executable", str(tool_bin / "python3")),
+            patch(
+                "subprocess.run",
+                return_value=subprocess.CompletedProcess(
+                    ["ansible-playbook", "--version"],
+                    0,
+                ),
+            ) as mock_run,
+        ):
             run_runtime_subprocess(
                 ["ansible-playbook", "--version"],
                 runtime_paths=runtime_paths,
@@ -236,6 +269,13 @@ def check_runtime_subprocess_helpers_use_runtime_paths() -> None:
         if run_env.get("ENVMGR_TEST_FLAG") != "run":
             raise AssertionError(
                 "expected run helper to merge extra environment variables"
+            )
+        if run_env.get("PATH", "").split(os.pathsep) != [
+            str(tool_bin),
+            str(inherited_bin),
+        ]:
+            raise AssertionError(
+                "expected run helper to prepend the current tool bin to PATH"
             )
         run_records = sorted(runtime_paths.runs_log_dir.glob("*.json"))
         if len(run_records) != 1:
@@ -258,11 +298,26 @@ def check_runtime_subprocess_helpers_use_runtime_paths() -> None:
         mock_process.poll.return_value = None
         mock_process.returncode = 0
 
-        with patch("subprocess.Popen", return_value=mock_process) as mock_popen:
+        with (
+            patch.dict(
+                os.environ,
+                {"PATH": str(inherited_bin)},
+                clear=False,
+            ),
+            patch(
+                "scripts.services.runtime.sysconfig.get_path",
+                return_value=str(tool_bin),
+            ),
+            patch("scripts.services.runtime.sys.executable", str(tool_bin / "python3")),
+            patch("subprocess.Popen", return_value=mock_process) as mock_popen,
+        ):
             process = popen_runtime_subprocess(
                 ["ansible-playbook", "--version"],
                 runtime_paths=runtime_paths,
-                extra_env={"ENVMGR_TEST_FLAG": "popen"},
+                extra_env={
+                    "ENVMGR_TEST_FLAG": "popen",
+                    "PATH": os.pathsep.join([str(extra_bin), str(inherited_bin)]),
+                },
                 stdout=subprocess.PIPE,
             )
             process.wait()
@@ -277,6 +332,14 @@ def check_runtime_subprocess_helpers_use_runtime_paths() -> None:
         if popen_env.get("ENVMGR_TEST_FLAG") != "popen":
             raise AssertionError(
                 "expected popen helper to merge extra environment variables"
+            )
+        if popen_env.get("PATH", "").split(os.pathsep) != [
+            str(tool_bin),
+            str(extra_bin),
+            str(inherited_bin),
+        ]:
+            raise AssertionError(
+                "expected popen helper to preserve extra PATH entries after the tool bin"
             )
         popen_records = sorted(runtime_paths.runs_log_dir.glob("*.json"))
         if len(popen_records) != 2:
