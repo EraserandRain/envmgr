@@ -272,6 +272,91 @@ def check_runtime_assets_resolve_outside_repo_cwd() -> None:
             )
 
 
+def check_runtime_assets_resolve_from_packaged_assets_outside_repo_cwd() -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    with tempfile.TemporaryDirectory() as temp_dir:
+        workspace = Path(temp_dir)
+        envmgr_home = workspace / ".envmgr"
+        package_dir = workspace / "site-packages" / "scripts"
+        packaged_assets_root = package_dir / "_assets"
+        packaged_playbooks_dir = packaged_assets_root / "playbooks"
+        packaged_roles_dir = packaged_assets_root / "roles"
+        packaged_vars_dir = packaged_assets_root / "vars"
+        packaged_workstation_playbook = packaged_playbooks_dir / "workstation.yml"
+
+        package_dir.mkdir(parents=True)
+        packaged_playbooks_dir.mkdir(parents=True)
+        packaged_roles_dir.mkdir()
+        packaged_vars_dir.mkdir()
+        (packaged_assets_root / "ansible.cfg").write_text(
+            "[defaults]\n",
+            encoding="utf-8",
+        )
+        (packaged_assets_root / "requirements.yaml").write_text(
+            "---\nroles: []\ncollections: []\n",
+            encoding="utf-8",
+        )
+        packaged_workstation_playbook.write_text(
+            "- hosts: localhost\n  gather_facts: false\n  tasks: []\n",
+            encoding="utf-8",
+        )
+
+        outside_cwd = workspace / "outside-cwd"
+        outside_cwd.mkdir()
+        original_cwd = Path.cwd()
+        os.chdir(outside_cwd)
+        try:
+            assets = resolve_runtime_assets(
+                envmgr_home=envmgr_home,
+                package_dir=package_dir,
+            )
+            resolved_workstation_playbook = assets.resolve_playbook("workstation")
+            resolved_repo_relative_playbook = assets.resolve_playbook(
+                "playbooks/workstation.yml"
+            )
+        finally:
+            os.chdir(original_cwd)
+
+        if assets.root != packaged_assets_root.resolve():
+            raise AssertionError(
+                "expected runtime assets to resolve from the packaged _assets dir"
+            )
+        if assets.root == repo_root:
+            raise AssertionError(
+                "expected packaged runtime assets to avoid the live repo root"
+            )
+        if resolved_workstation_playbook != packaged_workstation_playbook:
+            raise AssertionError(
+                "expected scenario playbooks to resolve from packaged assets"
+            )
+        if resolved_repo_relative_playbook != (
+            packaged_playbooks_dir / "workstation.yml"
+        ):
+            raise AssertionError(
+                "expected repo-relative playbook paths to resolve from packaged assets"
+            )
+        if assets.roles_dir != packaged_roles_dir:
+            raise AssertionError(
+                "expected packaged runtime assets to expose the packaged roles dir"
+            )
+        if assets.ansible_config_file != (packaged_assets_root / "ansible.cfg"):
+            raise AssertionError(
+                "expected packaged runtime assets to expose packaged ansible.cfg"
+            )
+        if assets.requirements_file != (packaged_assets_root / "requirements.yaml"):
+            raise AssertionError(
+                "expected packaged runtime assets to expose packaged requirements"
+            )
+        if assets.vars_dir != packaged_vars_dir:
+            raise AssertionError(
+                "expected packaged runtime assets to expose the packaged vars dir"
+            )
+        if assets.scratch_dir != (envmgr_home / "cache" / "tmp"):
+            raise AssertionError(
+                "expected packaged runtime assets scratch dir to follow the runtime home"
+            )
+
+
 def check_runtime_env_uses_runtime_paths_only() -> None:
     with tempfile.TemporaryDirectory() as temp_dir:
         runtime_paths = ensure_runtime_layout(Path(temp_dir) / ".envmgr")

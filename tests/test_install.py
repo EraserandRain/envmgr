@@ -6,6 +6,7 @@ from tests.checks.install import (
     check_ai_tools_install_option_resolution,
     check_ai_tools_setup_wizard_uses_rich_prompt_path,
     check_install_all_uses_runtime_default_playbook,
+    check_install_error_output_preserves_markup_like_text,
     check_install_interrupt_exits_cleanly,
     check_install_list_tags_uses_rich_console,
     check_install_rejects_all_plus_other_tags,
@@ -46,6 +47,10 @@ INSTALL_TEST_CHECKS: tuple[Check, ...] = (
     (
         "install rejects unknown tags with exit code 1",
         check_install_rejects_unknown_tags_with_exit_code,
+    ),
+    (
+        "install error output preserves markup-like text",
+        check_install_error_output_preserves_markup_like_text,
     ),
     (
         "install summary uses Rich output while subprocess passthrough stays raw",
