@@ -4,6 +4,7 @@ import unittest
 
 from tests.checks.runtime import (
     check_package_root_helper_exports_resolve_to_command_modules,
+    check_runtime_assets_resolve_from_packaged_assets_outside_repo_cwd,
     check_runtime_assets_resolve_outside_repo_cwd,
     check_runtime_env_uses_runtime_paths_only,
     check_runtime_subprocess_helpers_use_runtime_paths,
@@ -15,6 +16,10 @@ RUNTIME_SERVICE_TEST_CHECKS: tuple[Check, ...] = (
     (
         "runtime assets resolve outside the repo cwd",
         check_runtime_assets_resolve_outside_repo_cwd,
+    ),
+    (
+        "runtime assets resolve from packaged _assets outside the repo cwd",
+        check_runtime_assets_resolve_from_packaged_assets_outside_repo_cwd,
     ),
     (
         "runtime env uses ~/.envmgr paths only",

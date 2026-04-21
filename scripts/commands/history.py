@@ -5,6 +5,8 @@ import os
 from pathlib import Path
 from typing import Any
 
+from rich.text import Text
+
 from ..runtime_config import get_runtime_paths
 from ..services.runtime import load_runtime_run_history
 from .doctor import abbreviate_home_in_text
@@ -62,8 +64,15 @@ def run_history(*, limit: int, json_output: bool) -> None:
     runtime_home_suffix = " (from ENVMGR_HOME)" if configured_home else " (default)"
 
     console.print("Envmgr History")
-    console.print(f"Runtime home  {runtime_home_value}{runtime_home_suffix}")
-    console.print(f"Runs dir      {abbreviate_home_in_text(str(paths.runs_log_dir))}")
+
+    runtime_home_line = Text("Runtime home  ")
+    runtime_home_line.append(runtime_home_value)
+    runtime_home_line.append(runtime_home_suffix)
+    console.print(runtime_home_line)
+
+    runs_dir_line = Text("Runs dir      ")
+    runs_dir_line.append(abbreviate_home_in_text(str(paths.runs_log_dir)))
+    console.print(runs_dir_line)
 
     if not records:
         console.print()
@@ -79,11 +88,19 @@ def run_history(*, limit: int, json_output: bool) -> None:
         status = str(record.get("status", "unknown"))
         return_code = record.get("return_code")
         return_code_text = "-" if return_code is None else str(return_code)
-        console.print(
-            f"- {record.get('started_at', '<unknown time>')} "
-            f"[{get_runtime_history_status_text(status)}] "
-            f"rc={return_code_text} "
+
+        summary_line = Text("- ")
+        summary_line.append(str(record.get("started_at", "<unknown time>")))
+        summary_line.append(" [")
+        summary_line.append(get_runtime_history_status_text(status))
+        summary_line.append("] ")
+        summary_line.append(f"rc={return_code_text} ")
+        summary_line.append(
             f"dur={get_runtime_history_duration_text(record.get('duration_seconds'))} "
-            f"mode={record.get('mode', '-')}"
         )
-        console.print(f"  {stringify_runtime_history_command(record.get('command'))}")
+        summary_line.append(f"mode={record.get('mode', '-')}")
+        console.print(summary_line)
+
+        command_line = Text("  ")
+        command_line.append(stringify_runtime_history_command(record.get("command")))
+        console.print(command_line)

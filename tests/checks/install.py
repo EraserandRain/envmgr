@@ -8,6 +8,7 @@ from unittest.mock import patch
 
 import typer
 import yaml
+from rich.console import Console
 from typer.testing import CliRunner
 
 from scripts.commands.install import (
@@ -15,6 +16,7 @@ from scripts.commands.install import (
     resolve_ai_tools_install_options,
     run_install,
 )
+from scripts.commands.shared import exit_with_error
 from scripts.main import app
 from scripts.runtime_config import ensure_runtime_layout
 from scripts.services.assets import resolve_runtime_assets
@@ -364,11 +366,36 @@ def check_install_rejects_unknown_tags_with_exit_code() -> None:
         else:
             raise AssertionError("expected install to reject unknown tags")
 
-    output = mock_error_print.call_args.args[0]
+    output = str(mock_error_print.call_args.args[0])
     if "unknown tags: does-not-exist" not in output.lower():
         raise AssertionError("expected install to report the unknown tag")
     if "Use -l or --list-tags to see all available tags" not in output:
         raise AssertionError("expected install to suggest listing available tags")
+
+
+def check_install_error_output_preserves_markup_like_text() -> None:
+    error_output = StringIO()
+    capturing_console = Console(
+        file=error_output,
+        force_terminal=False,
+        color_system=None,
+    )
+
+    with patch("scripts.commands.shared.error_console", capturing_console):
+        try:
+            exit_with_error("Error: unknown tags: [red]boom[/red]")
+        except typer.Exit as error:
+            if error.exit_code != 1:
+                raise AssertionError(
+                    "expected exit_with_error to keep the default exit code"
+                ) from error
+        else:
+            raise AssertionError("expected exit_with_error to raise typer.Exit")
+
+    if error_output.getvalue() != "Error: unknown tags: [red]boom[/red]\n":
+        raise AssertionError(
+            "expected exit_with_error to preserve markup-like text literally"
+        )
 
 
 def check_install_summary_uses_rich_console_and_keeps_raw_subprocess_output() -> None:
@@ -569,7 +596,7 @@ def check_install_rejects_all_plus_other_tags() -> None:
         else:
             raise AssertionError("expected install to reject mixed all-tag selections")
 
-    message = mock_error_print.call_args.args[0]
+    message = str(mock_error_print.call_args.args[0])
     if "tag 'all' cannot be combined with other tags" not in message:
         raise AssertionError(
             "expected install to explain that `all` cannot be mixed with other tags"

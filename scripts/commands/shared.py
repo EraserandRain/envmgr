@@ -90,7 +90,7 @@ confirm_backend: ConfirmBackend = _default_confirm_backend
 
 def exit_with_error(message: str, *, code: int = 1) -> NoReturn:
     """Print a user-facing error message and exit with a non-zero status."""
-    error_console.print(f"[red]{message}[/red]")
+    error_console.print(Text(message, style="red"))
     raise typer.Exit(code=code)
 
 

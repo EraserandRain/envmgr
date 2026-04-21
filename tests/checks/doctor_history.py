@@ -200,6 +200,49 @@ def check_history_json_output() -> None:
             )
 
 
+def check_history_text_output_preserves_markup_like_values() -> None:
+    with tempfile.TemporaryDirectory() as temp_dir:
+        envmgr_home = Path(temp_dir) / ".envmgr"
+        runtime_paths = ensure_runtime_layout(envmgr_home)
+
+        write_runtime_run_record(
+            runtime_paths.runs_log_dir / "20260418T130000000000Z-echo-55555555.json",
+            {
+                "schema_version": RUNTIME_RUN_RECORD_SCHEMA_VERSION,
+                "mode": "run",
+                "command_name": "echo",
+                "command": ["echo", "[red]boom[/red]"],
+                "cwd": str(Path.cwd()),
+                "runtime_home": str(runtime_paths.home),
+                "ansible_log_file": str(runtime_paths.ansible_log_file),
+                "status": "[green]ok[/green]",
+                "pid": 1005,
+                "return_code": 0,
+                "started_at": "2026-04-18T13:00:00Z",
+                "completed_at": "2026-04-18T13:00:01Z",
+                "duration_seconds": 1.0,
+                "error": None,
+            },
+        )
+
+        result = invoke_envmgr("history", envmgr_home=envmgr_home)
+        if result.exit_code != 0:
+            raise AssertionError(
+                "expected history text output with markup-like values to succeed"
+                f"\noutput:\n{result.output}"
+            )
+
+        output = result.output
+        if "[[GREEN]OK[/GREEN]]" not in output:
+            raise AssertionError(
+                "expected history status output to preserve markup-like text literally"
+            )
+        if "echo [red]boom[/red]" not in output:
+            raise AssertionError(
+                "expected history command output to preserve markup-like text literally"
+            )
+
+
 def check_doctor_report_detects_unbootstrapped_runtime() -> None:
     with tempfile.TemporaryDirectory() as temp_dir:
         envmgr_home = Path(temp_dir) / ".envmgr"

@@ -11,11 +11,16 @@ from tests.checks.doctor_history import (
     check_doctor_text_output,
     check_history_json_output,
     check_history_text_output,
+    check_history_text_output_preserves_markup_like_values,
 )
 from tests.support import Check, build_check_suite, build_check_test_case
 
 DOCTOR_HISTORY_TEST_CHECKS: tuple[Check, ...] = (
     ("history renders readable text output", check_history_text_output),
+    (
+        "history preserves markup-like status and command text",
+        check_history_text_output_preserves_markup_like_values,
+    ),
     ("history emits json output", check_history_json_output),
     (
         "doctor detects an unbootstrapped runtime",
