@@ -439,7 +439,15 @@ def resolve_install_playbook(
     """Resolve a playbook for install operations based on explicit input or tag scope."""
     assets = resolve_runtime_assets()
     if explicit_playbook:
-        resolved_playbook = str(assets.resolve_playbook(explicit_playbook))
+        explicit_reference = Path(explicit_playbook).expanduser()
+        if (
+            explicit_reference.is_absolute()
+            or explicit_reference.suffix in (".yml", ".yaml")
+            or len(explicit_reference.parts) > 1
+        ):
+            resolved_playbook = str(assets.resolve_repo_path(explicit_reference))
+        else:
+            resolved_playbook = str(assets.resolve_playbook(explicit_reference))
         if selected_tags and not is_all_tag_selection(selected_tags):
             playbook_tags = load_playbook_tags(resolved_playbook)
             requested_tags = set(selected_tags)

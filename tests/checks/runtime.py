@@ -227,10 +227,20 @@ def check_runtime_assets_resolve_outside_repo_cwd() -> None:
     repo_root = Path(__file__).resolve().parents[2]
     with tempfile.TemporaryDirectory() as temp_dir:
         envmgr_home = Path(temp_dir) / ".envmgr"
+        shadow_playbooks_dir = Path(temp_dir) / "playbooks"
+        shadow_playbooks_dir.mkdir()
+        shadow_workstation_playbook = shadow_playbooks_dir / "workstation.yml"
+        shadow_workstation_playbook.write_text(
+            "- hosts: localhost\n  gather_facts: false\n  tasks: []\n",
+            encoding="utf-8",
+        )
         original_cwd = Path.cwd()
         os.chdir(temp_dir)
         try:
             assets = resolve_runtime_assets(envmgr_home=envmgr_home)
+            resolved_shadow_playbook = assets.resolve_playbook(
+                "playbooks/workstation.yml"
+            )
         finally:
             os.chdir(original_cwd)
 
@@ -243,6 +253,10 @@ def check_runtime_assets_resolve_outside_repo_cwd() -> None:
         ):
             raise AssertionError(
                 "expected logical scenario names to resolve to absolute playbook paths"
+            )
+        if resolved_shadow_playbook != shadow_workstation_playbook.resolve():
+            raise AssertionError(
+                "expected path-like playbook references to resolve from the caller cwd first"
             )
         if assets.resolve_playbook("playbooks/node.yml") != (
             repo_root / "playbooks" / "node.yml"

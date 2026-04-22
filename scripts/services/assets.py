@@ -42,19 +42,11 @@ class RuntimeAssets:
 
     def resolve_playbook(self, reference: str | Path) -> Path:
         raw_reference = Path(reference).expanduser()
-        if raw_reference.is_absolute():
-            return raw_reference.resolve()
-
-        if raw_reference.suffix in _SCENARIO_PLAYBOOK_SUFFIXES:
-            resolved_path = self.resolve_repo_path(raw_reference)
-            if resolved_path.exists():
-                return resolved_path
-            scenario_candidate = (self.playbooks_dir / raw_reference.name).resolve()
-            if scenario_candidate.exists():
-                return scenario_candidate
-            return resolved_path
-
-        if len(raw_reference.parts) > 1:
+        if (
+            raw_reference.is_absolute()
+            or raw_reference.suffix in _SCENARIO_PLAYBOOK_SUFFIXES
+            or len(raw_reference.parts) > 1
+        ):
             return self.resolve_repo_path(raw_reference)
 
         scenario_name = raw_reference.name

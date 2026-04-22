@@ -193,7 +193,7 @@ all:
               ansible_python_interpreter: "{{ ansible_playbook_python }}"
 ```
 
-> **Note:** `envmgr install <tags>` now resolves the scenario playbook from the selected tags. If the tags are valid in more than one scenario, pass `--playbook playbooks/workstation.yml` or `--playbook playbooks/node.yml` explicitly.
+> **Note:** `envmgr install <tags>` now resolves the scenario playbook from the selected tags. If the tags are valid in more than one scenario, pass `--playbook workstation` or `--playbook node` explicitly.
 > `envmgr install all` uses the `playbook` value from `~/.envmgr/config.toml` by default.
 
 **For Remote Hosts:**
@@ -259,16 +259,16 @@ envmgr install ai_tools          # Launch the interactive AI Tools Setup wizard 
 envmgr install ai_tools --codex  # Install default AI tools and explicitly manage Codex CLI
 envmgr install ai_tools --no-rtk # RTK is enabled by default; use this to skip it
 
-# Use an explicit scenario playbook for ambiguous tags or full-scenario runs
-envmgr install --playbook playbooks/workstation.yml zsh node ai_tools
-envmgr install --playbook playbooks/node.yml docker kubeadm
+# Use an explicit scenario token for ambiguous tags or full-scenario runs
+envmgr install --playbook workstation zsh node ai_tools
+envmgr install --playbook node docker kubeadm
 
-# Use a scenario-specific playbook for a common preset
-envmgr install --playbook playbooks/workstation.yml init zsh java node golang ruby dotnet cloud
-envmgr install --playbook playbooks/workstation.yml init docker kubernetes_tools minikube
-envmgr install --playbook playbooks/node.yml docker kubeadm monitoring
+# Use a scenario-specific token for a common preset
+envmgr install --playbook workstation init zsh java node golang ruby dotnet cloud
+envmgr install --playbook workstation init docker kubernetes_tools minikube
+envmgr install --playbook node docker kubeadm monitoring
 
-`playbooks/node.yml` installs shared node prerequisites on every cluster node,
+The `node` scenario installs shared node prerequisites on every cluster node,
 then applies cluster management tools only on the `master` group.
 ```
 
@@ -278,11 +278,11 @@ then applies cluster management tools only on the `master` group.
 # Using SSH key authentication
 envmgr install -i remote zsh
 
-# Use a scenario-specific playbook on remote hosts
-envmgr install -i remote --playbook playbooks/node.yml docker kubeadm
+# Use a scenario-specific token on remote hosts
+envmgr install -i remote --playbook node docker kubeadm
 
 # Using password authentication (with vault)
-envmgr install -i password --playbook playbooks/node.yml --ask-vault-pass docker kubeadm
+envmgr install -i password --playbook node --ask-vault-pass docker kubeadm
 
 # List tags (inventory-independent)
 envmgr install -l
@@ -329,8 +329,8 @@ Role-level tags install complete functional modules:
 - ruby   (default version: 3.0.5)
 - zsh
 
-`playbooks/node.yml` runs `docker` and `kubeadm` on all nodes, while
-`kubernetes_tools` and `monitoring` are master-only.
+The `node` scenario runs `docker` and `kubeadm` on all nodes, while
+`kubernetes_tools` and `monitoring` stay master-only.
 
 ##### Task-level Tags
 

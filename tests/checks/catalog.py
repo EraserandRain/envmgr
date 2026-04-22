@@ -41,9 +41,18 @@ def check_playbook_resolution() -> None:
     try:
         resolve_install_playbook(["init"], explicit_playbook="playbooks/node.yml")
     except CatalogError:
+        pass
+    else:
+        raise AssertionError("expected init to be rejected on node playbook")
+
+    try:
+        resolve_install_playbook(["init"], explicit_playbook="workstation.yml")
+    except CatalogError:
         return
 
-    raise AssertionError("expected init to be rejected on node playbook")
+    raise AssertionError(
+        "expected explicit path-like playbook references to stay path-based without scenario fallback"
+    )
 
 
 def check_catalog_defaults_resolve_outside_repo_cwd() -> None:
