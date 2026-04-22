@@ -51,11 +51,14 @@ using the checkout copy of those same assets. In both cases, the installed
 `envmgr ...` command is the supported runtime surface and works outside the
 repo root.
 
-The project still exposes the other console scripts defined by this package,
-but those remain helper/developer entry points rather than the recommended
-day-to-day runtime workflow. When you are working directly from this checkout
-without installing a tool shim, `uv run envmgr ...` remains the repo-root
-fallback.
+The package may still expose separate helper entry points for contributors, but
+the supported runtime surface is only `envmgr ...`. Contributor-only helpers
+such as `create`, `lint`, `ansible-check`, `typecheck`, `validate`, and
+`smoke-test` are supported only from an envmgr checkout via `uv run ...`.
+Outside a checkout, those helper invocations are unsupported and fail with the
+repo-only/dev-only boundary message. When you are working directly from this
+checkout without installing a tool shim, `uv run envmgr ...` remains the
+repo-root fallback.
 
 To remove the global tool shim entirely, run `uv tool uninstall envmgr`. If
 your shell still reports `envmgr: command not found`, check the uv-managed bin
@@ -80,12 +83,13 @@ envmgr ping
 envmgr install -l
 ```
 
-Run `envmgr setup` before `envmgr install`, `envmgr ping`, `uv run validate`,
-or `uv run smoke-test` on a fresh machine or a fresh `ENVMGR_HOME`. Inside the
-repo root, `uv run envmgr setup` is the fallback form of the same runtime
-command. The bootstrap step is safe to re-run and does not overwrite existing
-runtime config files. `uv run validate` now checks both `scripts/` and
-`tests/`, runs the split
+Run `envmgr setup` before `envmgr install` or `envmgr ping` on a fresh machine
+or a fresh `ENVMGR_HOME`. Contributors should also run it before checkout-local
+helpers such as `uv run validate` and `uv run smoke-test`. Inside the repo
+root, `uv run envmgr setup` is the fallback form of the same runtime command.
+The bootstrap step is safe to re-run and does not overwrite existing runtime
+config files. `uv run validate` now checks both `scripts/` and `tests/`, runs
+the split
 `tests/test_*.py` unit modules automatically while excluding `tests.test_smoke`,
 and `uv run smoke-test` runs only the
 `tests.test_smoke` suite before the playbook `--list-tags` checks.
@@ -140,9 +144,13 @@ The installed `envmgr ...` command is the supported runtime command surface for
 envmgr. Editable installs from a checkout and wheel installs from built
 artifacts both support running `envmgr ...` outside the repo root because the
 runtime assets are resolved from the installed package or the live checkout.
-Development helpers stay separate as dedicated commands like `uv run validate`
-or `uv run lint`, and `uv run envmgr ...` remains the explicit fallback when
-you are already inside the repo root and want to run the checkout directly.
+Development helpers stay separate as checkout-only commands such as
+`uv run create`, `uv run lint`, `uv run ansible-check`, `uv run typecheck`,
+`uv run validate`, and `uv run smoke-test`. Those helpers are contributor-only,
+not part of the installed runtime surface, and unsupported non-repo invocations
+now fail with the repo-only/dev-only boundary message. `uv run envmgr ...`
+remains the explicit fallback when you are already inside the repo root and
+want to run the checkout directly.
 Direct `ansible-playbook` or `ansible-galaxy` usage from the repository is not
 a supported interface.
 Repository-internal Python import paths under `scripts/` are implementation
@@ -154,8 +162,8 @@ runtime summaries, status lines, and interactive prompts where applicable, and
 the dedicated developer helper commands also use Typer-based help. The
 supported command surfaces stay intentionally split: run installed runtime
 commands as `envmgr ...`, use `uv run envmgr ...` only as the repo-root
-fallback for a checkout, and keep developer helpers on their existing
-standalone entrypoints.
+fallback for a checkout, and run contributor-only helpers from a checkout via
+`uv run ...`. Installed helper shims are not a supported runtime interface.
 
 Commands that accept `-i/--inventory` only accept inventory aliases defined in `~/.envmgr/config.toml`. envmgr no longer falls back to repository-local inventory files or `./.ansible` caches.
 Inventory alias targets must stay under `~/.envmgr/inventory/`.
@@ -437,14 +445,17 @@ virtualenv. Run `envmgr setup` before `uv run validate` or `uv run smoke-test`
 on a fresh machine; `uv run envmgr setup` remains the repo-root fallback when
 you are running directly from the checkout. Those commands execute playbook
 checks that rely on the runtime inventory and Galaxy content installed during
-bootstrap.
+bootstrap. The helper commands in this section are contributor-only checkout
+entry points: run them via `uv run ...`, keep `envmgr ...` as the installed
+runtime surface, and expect unsupported non-repo helper invocations to fail
+with the repo-only/dev-only boundary message.
 
 ```bash
 # Install or refresh the local dev environment
 uv sync
 
 # Create a new role
-uv run create [role]
+uv run create <role>
 
 # Generated role scaffold includes:
 # - tasks/main.yml

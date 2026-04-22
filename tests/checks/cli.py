@@ -11,6 +11,7 @@ from unittest.mock import patch
 from click.testing import Result
 from typer.testing import CliRunner
 
+from scripts.commands.dev_shared import DEV_HELPER_BOUNDARY_MESSAGE
 from scripts.main import app
 from scripts.runtime_config import ensure_runtime_layout, mark_runtime_setup_complete
 
@@ -38,21 +39,40 @@ def _collapse_whitespace(text: str) -> str:
     return " ".join(text.split())
 
 
-def _invoke_dev_helper_entrypoint_help(
+def _invoke_dev_helper_entrypoint(
     module_name: str,
+    *args: str,
+    cwd: Path = REPO_ROOT,
+    extra_env: dict[str, str] | None = None,
 ) -> subprocess.CompletedProcess[str]:
+    env = os.environ.copy()
+    if extra_env is not None:
+        env.update(extra_env)
+
     return subprocess.run(
         [
             sys.executable,
             "-c",
-            f"from scripts.commands.{module_name} import main; main()",
-            "--help",
+            (
+                "import sys; "
+                f"sys.path.insert(0, {str(REPO_ROOT)!r}); "
+                f"from scripts.commands.{module_name} import main; "
+                "main()"
+            ),
+            *args,
         ],
-        cwd=REPO_ROOT,
+        cwd=cwd,
+        env=env,
         capture_output=True,
         text=True,
         check=False,
     )
+
+
+def _invoke_dev_helper_entrypoint_help(
+    module_name: str,
+) -> subprocess.CompletedProcess[str]:
+    return _invoke_dev_helper_entrypoint(module_name, "--help")
 
 
 def _bootstrap_runtime(envmgr_home: Path) -> None:
@@ -235,6 +255,48 @@ def check_dev_helper_entrypoints_use_typer_help() -> None:
                 raise AssertionError(
                     f"expected `uv run {command_name} --help` to include "
                     f"{expected_fragment!r}\noutput:\n{output}"
+                )
+
+
+def check_dev_helpers_reject_unsupported_non_repo_cwds() -> None:
+    helper_expectations = (
+        ("validate", "validate"),
+        ("smoke-test", "smoke_test"),
+        ("lint", "lint"),
+    )
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        unsupported_cwd = Path(temp_dir) / "outside-checkout"
+        unsupported_cwd.mkdir()
+        helper_env = {
+            "ENVMGR_HOME": str(Path(temp_dir) / ".envmgr"),
+            "PATH": "",
+        }
+
+        for command_name, module_name in helper_expectations:
+            result = _invoke_dev_helper_entrypoint(
+                module_name,
+                cwd=unsupported_cwd,
+                extra_env=helper_env,
+            )
+            if result.returncode != 1:
+                raise AssertionError(
+                    f"expected `{command_name}` to fail with exit code 1 outside "
+                    "a repo checkout"
+                    f"\nstdout:\n{result.stdout}\nstderr:\n{result.stderr}"
+                )
+
+            output = _collapse_whitespace(
+                _normalize_cli_output(result.stdout, result.stderr)
+            )
+            expected_message = DEV_HELPER_BOUNDARY_MESSAGE.format(
+                command_name=command_name
+            )
+            if expected_message not in output:
+                raise AssertionError(
+                    f"expected `{command_name}` to report the shared repo-only "
+                    "boundary message outside a checkout"
+                    f"\noutput:\n{output}"
                 )
 
 

@@ -6,6 +6,7 @@ import typer
 
 from ..command_text import CLI_ROOT_COMMAND
 from ..scaffold import ScaffoldError, generate_role
+from .dev_shared import require_repo_dev_context
 
 COMMAND_NAME = "create"
 app = typer.Typer(add_completion=False, rich_markup_mode="rich")
@@ -20,6 +21,8 @@ def _create_command(
     ] = None,
 ) -> None:
     """Create a new Ansible role by generating the role directory."""
+    require_repo_dev_context(COMMAND_NAME)
+
     if role is None:
         typer.echo(ctx.get_help())
         raise typer.Exit()

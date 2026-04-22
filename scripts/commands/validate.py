@@ -10,7 +10,7 @@ import typer
 
 from ..command_text import CLI_ROOT_COMMAND
 from ..runtime_config import ensure_runtime_layout
-from .dev_shared import PYTHON_CHECK_PATHS, run_command_step
+from .dev_shared import PYTHON_CHECK_PATHS, require_repo_dev_context, run_command_step
 from .shared import require_setup_completed, resolve_inventory_option
 
 COMMAND_NAME = "validate"
@@ -68,6 +68,7 @@ def run_unit_test_step() -> bool:
 
 def run_validate(*, inventory: str | None, playbooks: list[str] | None) -> None:
     """Run the project validation suite in one command."""
+    require_repo_dev_context(COMMAND_NAME)
     require_setup_completed(COMMAND_NAME)
 
     selected_playbooks = playbooks or [
