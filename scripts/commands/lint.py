@@ -5,7 +5,7 @@ import subprocess
 import typer
 
 from ..command_text import CLI_ROOT_COMMAND
-from .dev_shared import PYTHON_CHECK_PATHS
+from .dev_shared import PYTHON_CHECK_PATHS, require_repo_dev_context
 from .shared import exit_with_error
 
 COMMAND_NAME = "lint"
@@ -14,6 +14,8 @@ app = typer.Typer(add_completion=False, rich_markup_mode="rich")
 
 def run_lint() -> None:
     """Run ruff linting and formatting on Python code."""
+    require_repo_dev_context(COMMAND_NAME)
+
     print("Running Python code linting with ruff...")
     check_command = ["ruff", "check", *PYTHON_CHECK_PATHS]
     print("1. Running ruff check...")

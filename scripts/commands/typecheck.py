@@ -5,7 +5,7 @@ import subprocess
 import typer
 
 from ..command_text import CLI_ROOT_COMMAND
-from .dev_shared import PYTHON_CHECK_PATHS
+from .dev_shared import PYTHON_CHECK_PATHS, require_repo_dev_context
 from .shared import exit_with_error
 
 COMMAND_NAME = "typecheck"
@@ -14,6 +14,8 @@ app = typer.Typer(add_completion=False, rich_markup_mode="rich")
 
 def run_typecheck() -> None:
     """Run mypy type checking on the Python source directories."""
+    require_repo_dev_context(COMMAND_NAME)
+
     command = ["mypy", *PYTHON_CHECK_PATHS]
 
     print("Running type checking with mypy...")

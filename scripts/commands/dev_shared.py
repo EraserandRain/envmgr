@@ -2,13 +2,43 @@ from __future__ import annotations
 
 import subprocess
 from collections.abc import Callable
+from pathlib import Path
 
 from ..catalog import CatalogError
 from ..runtime_config import ConfigError, RuntimePaths
 from ..scaffold import ScaffoldError
 from ..services.runtime import run_runtime_subprocess
+from .shared import exit_with_error
 
 PYTHON_CHECK_PATHS = ["scripts/", "tests/"]
+DEV_CHECKOUT_MARKERS = (
+    "pyproject.toml",
+    "playbooks",
+    "roles",
+    "scripts/commands",
+    "tests",
+)
+DEV_HELPER_BOUNDARY_MESSAGE = (
+    "'{command_name}' is a repo-only development helper. "
+    "Run it from an envmgr checkout (for example: `uv run {command_name}`) "
+    "or use `envmgr ...` for supported runtime commands."
+)
+
+
+def _find_dev_checkout_root(start_dir: Path | None = None) -> Path | None:
+    current_dir = Path.cwd().resolve() if start_dir is None else start_dir.resolve()
+    for candidate in (current_dir, *current_dir.parents):
+        if all((candidate / marker).exists() for marker in DEV_CHECKOUT_MARKERS):
+            return candidate
+    return None
+
+
+def require_repo_dev_context(command_name: str) -> None:
+    """Exit when a dev helper runs outside a supported checkout working tree."""
+    if _find_dev_checkout_root() is not None:
+        return
+
+    exit_with_error(DEV_HELPER_BOUNDARY_MESSAGE.format(command_name=command_name))
 
 
 def run_command_step(

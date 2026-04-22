@@ -4,6 +4,7 @@ import unittest
 
 from tests.checks.cli import (
     check_dev_helper_entrypoints_use_typer_help,
+    check_dev_helpers_reject_unsupported_non_repo_cwds,
     check_dispatcher_rejects_dev_only_subcommands,
     check_dispatcher_routes_install_subcommand,
     check_dispatcher_routes_ping_subcommand,
@@ -24,6 +25,10 @@ CLI_CONTRACT_TEST_CHECKS: tuple[Check, ...] = (
     (
         "dedicated dev-helper entrypoints keep Typer Rich help output",
         check_dev_helper_entrypoints_use_typer_help,
+    ),
+    (
+        "dedicated dev helpers reject unsupported non-repo cwds",
+        check_dev_helpers_reject_unsupported_non_repo_cwds,
     ),
     (
         "public CLI routes setup to the shared Rich runtime summary",

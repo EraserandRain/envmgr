@@ -5,6 +5,7 @@ import subprocess
 import typer
 
 from ..command_text import CLI_ROOT_COMMAND
+from .dev_shared import require_repo_dev_context
 from .shared import exit_with_error
 
 COMMAND_NAME = "ansible-check"
@@ -13,6 +14,8 @@ app = typer.Typer(add_completion=False, rich_markup_mode="rich")
 
 def run_ansible_lint() -> None:
     """Run ansible-lint on the roles directory."""
+    require_repo_dev_context(COMMAND_NAME)
+
     command = ["ansible-lint", "./roles"]
 
     print("Running Ansible linting...")
