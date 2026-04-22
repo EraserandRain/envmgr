@@ -105,7 +105,7 @@ def _install_command(
         str | None,
         typer.Option(
             "--playbook",
-            help="Specify a playbook file explicitly when tags are ambiguous",
+            help="Specify a scenario token or playbook path explicitly when tags are ambiguous",
         ),
     ] = None,
     inventory: Annotated[
