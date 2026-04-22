@@ -3,6 +3,9 @@ from __future__ import annotations
 import unittest
 
 from tests.checks.cli import (
+    check_create_helper_fails_when_role_already_exists,
+    check_create_helper_fails_when_scaffold_is_missing,
+    check_create_helper_succeeds_with_expected_output,
     check_dev_helper_entrypoints_use_typer_help,
     check_dev_helpers_reject_unsupported_non_repo_cwds,
     check_dispatcher_rejects_dev_only_subcommands,
@@ -25,6 +28,18 @@ CLI_CONTRACT_TEST_CHECKS: tuple[Check, ...] = (
     (
         "dedicated dev-helper entrypoints keep Typer Rich help output",
         check_dev_helper_entrypoints_use_typer_help,
+    ),
+    (
+        "create helper fails when the scaffold directory is missing",
+        check_create_helper_fails_when_scaffold_is_missing,
+    ),
+    (
+        "create helper fails when the role already exists",
+        check_create_helper_fails_when_role_already_exists,
+    ),
+    (
+        "create helper keeps the existing success contract",
+        check_create_helper_succeeds_with_expected_output,
     ),
     (
         "dedicated dev helpers reject unsupported non-repo cwds",

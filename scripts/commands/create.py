@@ -7,6 +7,7 @@ import typer
 from ..command_text import CLI_ROOT_COMMAND
 from ..scaffold import ScaffoldError, generate_role
 from .dev_shared import require_repo_dev_context
+from .shared import exit_with_error
 
 COMMAND_NAME = "create"
 app = typer.Typer(add_completion=False, rich_markup_mode="rich")
@@ -34,9 +35,9 @@ def _create_command(
             f"Update roles/{role}/meta/envmgr.yml and add the role to the appropriate playbook."
         )
     except FileExistsError:
-        typer.echo(f"Role '{role}' already exists.")
+        exit_with_error(f"Error: Role '{role}' already exists.")
     except (FileNotFoundError, ScaffoldError) as error:
-        typer.echo(str(error))
+        exit_with_error(f"Error: {error}")
 
 
 def create(

@@ -75,6 +75,21 @@ def _invoke_dev_helper_entrypoint_help(
     return _invoke_dev_helper_entrypoint(module_name, "--help")
 
 
+def _create_checkout_stub(base_dir: Path) -> Path:
+    """Create the minimal checkout markers required by repo-only helpers."""
+    checkout_root = base_dir / "envmgr-checkout"
+    checkout_root.mkdir()
+    (checkout_root / "pyproject.toml").write_text("", encoding="utf-8")
+    for relative_path in (
+        Path("playbooks"),
+        Path("roles"),
+        Path("scripts/commands"),
+        Path("tests"),
+    ):
+        (checkout_root / relative_path).mkdir(parents=True, exist_ok=True)
+    return checkout_root
+
+
 def _bootstrap_runtime(envmgr_home: Path) -> None:
     """Create a minimal bootstrapped runtime for CLI contract checks."""
     runtime_paths = ensure_runtime_layout(envmgr_home)
@@ -256,6 +271,85 @@ def check_dev_helper_entrypoints_use_typer_help() -> None:
                     f"expected `uv run {command_name} --help` to include "
                     f"{expected_fragment!r}\noutput:\n{output}"
                 )
+
+
+def check_create_helper_fails_when_scaffold_is_missing() -> None:
+    with tempfile.TemporaryDirectory() as temp_dir:
+        checkout_root = _create_checkout_stub(Path(temp_dir))
+        result = _invoke_dev_helper_entrypoint("create", "demo-role", cwd=checkout_root)
+
+    if result.returncode == 0:
+        raise AssertionError(
+            "expected `create demo-role` to fail when the scaffold directory is missing"
+            f"\nstdout:\n{result.stdout}\nstderr:\n{result.stderr}"
+        )
+
+    output = _collapse_whitespace(_normalize_cli_output(result.stdout, result.stderr))
+    if "Error: scaffold directory not found: scaffolds/role" not in output:
+        raise AssertionError(
+            "expected `create demo-role` to report the missing scaffold directory"
+            f"\noutput:\n{output}"
+        )
+
+
+def check_create_helper_fails_when_role_already_exists() -> None:
+    with tempfile.TemporaryDirectory() as temp_dir:
+        checkout_root = _create_checkout_stub(Path(temp_dir))
+        (checkout_root / "scaffolds/role").mkdir(parents=True)
+        (checkout_root / "roles/demo-role").mkdir(parents=True)
+
+        result = _invoke_dev_helper_entrypoint("create", "demo-role", cwd=checkout_root)
+
+    if result.returncode == 0:
+        raise AssertionError(
+            "expected `create demo-role` to fail when the role directory already exists"
+            f"\nstdout:\n{result.stdout}\nstderr:\n{result.stderr}"
+        )
+
+    output = _collapse_whitespace(_normalize_cli_output(result.stdout, result.stderr))
+    if "Error: Role 'demo-role' already exists." not in output:
+        raise AssertionError(
+            "expected `create demo-role` to report the existing role directory"
+            f"\noutput:\n{output}"
+        )
+
+
+def check_create_helper_succeeds_with_expected_output() -> None:
+    with tempfile.TemporaryDirectory() as temp_dir:
+        checkout_root = _create_checkout_stub(Path(temp_dir))
+        scaffold_root = checkout_root / "scaffolds/role"
+        scaffold_root.mkdir(parents=True)
+        (scaffold_root / "tasks").mkdir()
+        (scaffold_root / "tasks/main.yml").write_text(
+            "- name: Install {{ role_title }}\n",
+            encoding="utf-8",
+        )
+
+        result = _invoke_dev_helper_entrypoint("create", "demo-role", cwd=checkout_root)
+
+        generated_task = checkout_root / "roles/demo-role/tasks/main.yml"
+        if not generated_task.exists():
+            raise AssertionError("expected `create demo-role` to generate role files")
+        rendered_task = generated_task.read_text(encoding="utf-8")
+
+    if result.returncode != 0:
+        raise AssertionError(
+            "expected `create demo-role` to succeed when the scaffold exists"
+            f"\nstdout:\n{result.stdout}\nstderr:\n{result.stderr}"
+        )
+
+    output = _normalize_cli_output(result.stdout, result.stderr)
+    for expected_fragment in (
+        "Role 'demo-role' generated successfully.",
+        "Update roles/demo-role/meta/envmgr.yml and add the role to the appropriate playbook.",
+    ):
+        if expected_fragment not in output:
+            raise AssertionError(
+                f"expected `create demo-role` to include {expected_fragment!r}"
+                f"\noutput:\n{output}"
+            )
+    if "Install Demo Role" not in rendered_task:
+        raise AssertionError("expected scaffold placeholders to render in role files")
 
 
 def check_dev_helpers_reject_unsupported_non_repo_cwds() -> None:
