@@ -1,0 +1,20 @@
+[project]
+name = "envmgr-dev-helpers"
+version = "0.1.0"
+description = "Repo-local developer helper entry points for envmgr."
+requires-python = ">=3.10"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project.scripts]
+create = "scripts.commands.create:main"
+lint = "scripts.commands.lint:main"
+ansible-check = "scripts.commands.ansible_check:main"
+typecheck = "scripts.commands.typecheck:main"
+validate = "scripts.commands.validate:main"
+smoke-test = "scripts.commands.smoke_test:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["dev_helpers"]

@@ -51,12 +51,10 @@ using the checkout copy of those same assets. In both cases, the installed
 `envmgr ...` command is the supported runtime surface and works outside the
 repo root.
 
-The package may still expose separate helper entry points for contributors, but
-the supported runtime surface is only `envmgr ...`. Contributor-only helpers
-such as `create`, `lint`, `ansible-check`, `typecheck`, `validate`, and
-`smoke-test` are supported only from an envmgr checkout via `uv run ...`.
-Outside a checkout, those helper invocations are unsupported and fail with the
-repo-only/dev-only boundary message. When you are working directly from this
+Installed artifacts expose only the `envmgr ...` runtime command.
+Contributor-only helpers such as `create`, `lint`, `ansible-check`,
+`typecheck`, `validate`, and `smoke-test` are checkout-local workflows run via
+`uv run ...` from this repository. When you are working directly from this
 checkout without installing a tool shim, `uv run envmgr ...` remains the
 repo-root fallback.
 
@@ -146,11 +144,10 @@ artifacts both support running `envmgr ...` outside the repo root because the
 runtime assets are resolved from the installed package or the live checkout.
 Development helpers stay separate as checkout-only commands such as
 `uv run create`, `uv run lint`, `uv run ansible-check`, `uv run typecheck`,
-`uv run validate`, and `uv run smoke-test`. Those helpers are contributor-only,
-not part of the installed runtime surface, and unsupported non-repo invocations
-now fail with the repo-only/dev-only boundary message. `uv run envmgr ...`
-remains the explicit fallback when you are already inside the repo root and
-want to run the checkout directly.
+`uv run validate`, and `uv run smoke-test`. Those helpers are contributor-only
+and not part of the installed runtime surface. `uv run envmgr ...` remains the
+explicit fallback when you are already inside the repo root and want to run the
+checkout directly.
 Direct `ansible-playbook` or `ansible-galaxy` usage from the repository is not
 a supported interface.
 Repository-internal Python import paths under `scripts/` are implementation
@@ -163,7 +160,7 @@ the dedicated developer helper commands also use Typer-based help. The
 supported command surfaces stay intentionally split: run installed runtime
 commands as `envmgr ...`, use `uv run envmgr ...` only as the repo-root
 fallback for a checkout, and run contributor-only helpers from a checkout via
-`uv run ...`. Installed helper shims are not a supported runtime interface.
+`uv run ...`. Installed artifacts expose only `envmgr`.
 
 Commands that accept `-i/--inventory` only accept inventory aliases defined in `~/.envmgr/config.toml`. envmgr no longer falls back to repository-local inventory files or `./.ansible` caches.
 Inventory alias targets must stay under `~/.envmgr/inventory/`.
@@ -446,9 +443,8 @@ on a fresh machine; `uv run envmgr setup` remains the repo-root fallback when
 you are running directly from the checkout. Those commands execute playbook
 checks that rely on the runtime inventory and Galaxy content installed during
 bootstrap. The helper commands in this section are contributor-only checkout
-entry points: run them via `uv run ...`, keep `envmgr ...` as the installed
-runtime surface, and expect unsupported non-repo helper invocations to fail
-with the repo-only/dev-only boundary message.
+entry points: run them via `uv run ...` from this checkout and keep
+`envmgr ...` as the installed runtime surface.
 
 ```bash
 # Install or refresh the local dev environment

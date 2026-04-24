@@ -7,11 +7,11 @@ from tests.checks.cli import (
     check_create_helper_fails_when_scaffold_is_missing,
     check_create_helper_succeeds_with_expected_output,
     check_dev_helper_entrypoints_use_typer_help,
-    check_dev_helpers_reject_unsupported_non_repo_cwds,
     check_dispatcher_rejects_dev_only_subcommands,
     check_dispatcher_routes_install_subcommand,
     check_dispatcher_routes_ping_subcommand,
     check_dispatcher_routes_setup_subcommand,
+    check_plan_a_packaging_keeps_runtime_and_checkout_scripts_split,
     check_runtime_subcommands_use_typer_help,
 )
 from tests.support import Check, build_check_suite, build_check_test_case
@@ -42,8 +42,8 @@ CLI_CONTRACT_TEST_CHECKS: tuple[Check, ...] = (
         check_create_helper_succeeds_with_expected_output,
     ),
     (
-        "dedicated dev helpers reject unsupported non-repo cwds",
-        check_dev_helpers_reject_unsupported_non_repo_cwds,
+        "Plan A packaging keeps runtime and checkout helper scripts split",
+        check_plan_a_packaging_keeps_runtime_and_checkout_scripts_split,
     ),
     (
         "public CLI routes setup to the shared Rich runtime summary",
