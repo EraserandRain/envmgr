@@ -19,11 +19,15 @@ build-backend = "hatchling.build"
 [dependency-groups]
 dev = [
     "ansible-lint>=25.1.2",
+    "envmgr-dev-helpers",
     "mypy>=1.15.0",
     "pre-commit>=4.0.0",
     "types-PyYAML>=6.0.0",
     "ruff>=0.8.0",
 ]
+
+[tool.uv.sources]
+envmgr-dev-helpers = { path = "dev-helpers" }
 
 [tool.hatch.metadata]
 allow-direct-references = true
@@ -50,12 +54,6 @@ packages = ["scripts"]
 
 [project.scripts]
 envmgr = "scripts.main:main"
-create = "scripts.commands.create:main"
-lint = "scripts.commands.lint:main"
-ansible-check = "scripts.commands.ansible_check:main"
-typecheck = "scripts.commands.typecheck:main"
-validate = "scripts.commands.validate:main"
-smoke-test = "scripts.commands.smoke_test:main"
 
 [tool.mypy]
 python_version = "3.10"

@@ -11,9 +11,13 @@ from unittest.mock import patch
 from click.testing import Result
 from typer.testing import CliRunner
 
-from scripts.commands.dev_shared import DEV_HELPER_BOUNDARY_MESSAGE
 from scripts.main import app
 from scripts.runtime_config import ensure_runtime_layout, mark_runtime_setup_complete
+
+try:
+    import tomllib
+except ModuleNotFoundError:  # pragma: no cover - Python 3.10 compatibility
+    import tomli as tomllib
 
 CLI_RUNNER = CliRunner()
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -96,6 +100,10 @@ def _bootstrap_runtime(envmgr_home: Path) -> None:
     (runtime_paths.galaxy_roles_dir / "gantsign.oh-my-zsh").mkdir()
     (runtime_paths.galaxy_collections_dir / "community").mkdir()
     mark_runtime_setup_complete(runtime_paths)
+
+
+def _load_toml_document(path: Path) -> dict[str, object]:
+    return tomllib.loads(path.read_text(encoding="utf-8"))
 
 
 def check_dispatcher_routes_install_subcommand() -> None:
@@ -352,46 +360,48 @@ def check_create_helper_succeeds_with_expected_output() -> None:
         raise AssertionError("expected scaffold placeholders to render in role files")
 
 
-def check_dev_helpers_reject_unsupported_non_repo_cwds() -> None:
-    helper_expectations = (
-        ("validate", "validate"),
-        ("smoke-test", "smoke_test"),
-        ("lint", "lint"),
+def check_plan_a_packaging_keeps_runtime_and_checkout_scripts_split() -> None:
+    root_pyproject = _load_toml_document(REPO_ROOT / "pyproject.toml")
+    project_scripts = root_pyproject.get("project", {}).get("scripts")
+    expected_runtime_scripts = {"envmgr": "scripts.main:main"}
+    if project_scripts != expected_runtime_scripts:
+        raise AssertionError(
+            "expected the root package to install only the `envmgr` runtime script"
+        )
+
+    dev_dependencies = root_pyproject.get("dependency-groups", {}).get("dev")
+    if dev_dependencies is None or "envmgr-dev-helpers" not in dev_dependencies:
+        raise AssertionError(
+            "expected checkout dev dependencies to include `envmgr-dev-helpers`"
+        )
+
+    helper_source = (
+        root_pyproject.get("tool", {})
+        .get("uv", {})
+        .get("sources", {})
+        .get("envmgr-dev-helpers")
     )
+    if helper_source != {"path": "dev-helpers"}:
+        raise AssertionError(
+            "expected checkout helper scripts to come from the repo-local "
+            "`dev-helpers` package"
+        )
 
-    with tempfile.TemporaryDirectory() as temp_dir:
-        unsupported_cwd = Path(temp_dir) / "outside-checkout"
-        unsupported_cwd.mkdir()
-        helper_env = {
-            "ENVMGR_HOME": str(Path(temp_dir) / ".envmgr"),
-            "PATH": "",
-        }
-
-        for command_name, module_name in helper_expectations:
-            result = _invoke_dev_helper_entrypoint(
-                module_name,
-                cwd=unsupported_cwd,
-                extra_env=helper_env,
-            )
-            if result.returncode != 1:
-                raise AssertionError(
-                    f"expected `{command_name}` to fail with exit code 1 outside "
-                    "a repo checkout"
-                    f"\nstdout:\n{result.stdout}\nstderr:\n{result.stderr}"
-                )
-
-            output = _collapse_whitespace(
-                _normalize_cli_output(result.stdout, result.stderr)
-            )
-            expected_message = DEV_HELPER_BOUNDARY_MESSAGE.format(
-                command_name=command_name
-            )
-            if expected_message not in output:
-                raise AssertionError(
-                    f"expected `{command_name}` to report the shared repo-only "
-                    "boundary message outside a checkout"
-                    f"\noutput:\n{output}"
-                )
+    dev_helper_pyproject = _load_toml_document(REPO_ROOT / "dev-helpers/pyproject.toml")
+    helper_scripts = dev_helper_pyproject.get("project", {}).get("scripts")
+    expected_helper_scripts = {
+        "create": "scripts.commands.create:main",
+        "lint": "scripts.commands.lint:main",
+        "ansible-check": "scripts.commands.ansible_check:main",
+        "typecheck": "scripts.commands.typecheck:main",
+        "validate": "scripts.commands.validate:main",
+        "smoke-test": "scripts.commands.smoke_test:main",
+    }
+    if helper_scripts != expected_helper_scripts:
+        raise AssertionError(
+            "expected checkout-only helper entry points to stay in "
+            "`dev-helpers/pyproject.toml`"
+        )
 
 
 def check_dispatcher_routes_setup_subcommand() -> None:
