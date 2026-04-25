@@ -30,6 +30,24 @@ installer-managed state under `~/.envmgr/install.toml`, and does not edit shell
 profiles or hidden PATH files. Use `--version VERSION` for a pinned release or
 `--dry-run` to inspect the planned wheel URL and command before installing.
 
+To inspect and verify a release before running the installer, download the
+release assets, verify the published SHA256 checksums, then read `install.sh`:
+
+```bash
+release=v0.1.0
+version="${release#v}"
+base="https://github.com/EraserandRain/envmgr/releases/download/${release}"
+
+curl -fsSLO "${base}/envmgr-${version}-py3-none-any.whl"
+curl -fsSLO "${base}/envmgr-${version}.tar.gz"
+curl -fsSLO "${base}/install.sh"
+curl -fsSLO "${base}/SHA256SUMS"
+
+sha256sum -c SHA256SUMS
+less install.sh
+bash install.sh --dry-run --version "${version}"
+```
+
 Installer-managed GitHub Release installs can update or remove themselves:
 
 ```bash
@@ -70,7 +88,7 @@ To refresh the editable tool after pulling changes in this checkout, run
 
 ```bash
 # Build wheel + sdist artifacts
-uv build
+uv build --no-sources
 
 # Install the built wheel as a global tool
 uv tool install dist/envmgr-*.whl
@@ -123,7 +141,7 @@ or a fresh `ENVMGR_HOME`. Contributors should also run it before checkout-local
 helpers such as `uv run validate` and `uv run smoke-test`. Inside the repo
 root, `uv run envmgr setup` is the fallback form of the same runtime command.
 The bootstrap step is safe to re-run and does not overwrite existing runtime
-config files. `uv run validate` now checks both `scripts/` and `tests/`, runs
+config files. `uv run validate` now checks both `src/envmgr/` and `tests/`, runs
 the split
 `tests/test_*.py` unit modules automatically while excluding `tests.test_smoke`,
 and `uv run smoke-test` runs only the
@@ -175,12 +193,12 @@ Repository-local files still keep their original purpose:
 
 - `roles/` stays the source of first-party envmgr roles in this repo
 - `playbooks/` stays the source of scenario playbooks in this repo
-- `scripts/main.py` defines the Typer-based public `envmgr` CLI used by the
+- `src/envmgr/main.py` defines the Typer-based public `envmgr` CLI used by the
   installed `envmgr ...` command plus the checkout-local fallback
   `uv run envmgr ...`, with Rich help plus shared Rich runtime summaries/prompts
-- `scripts/commands/` holds command runners plus the dedicated helper entrypoints and CLI glue shared by the public CLI and helper commands
-- `scripts/services/` holds reusable runtime, install-planning, and doctor logic
-- `scripts/smoke_checks/` stays reserved for smoke-test-only checks
+- `src/envmgr/commands/` holds command runners plus the dedicated helper entrypoints and CLI glue shared by the public CLI and helper commands
+- `src/envmgr/services/` holds reusable runtime, install-planning, and doctor logic
+- `src/envmgr/smoke_checks/` stays reserved for smoke-test-only checks
 - `tests/checks/` holds the finer-grained unit-check implementations used by `validate`
 - `ansible.cfg` remains repository metadata used by envmgr internals and project checks
 
@@ -196,7 +214,7 @@ explicit fallback when you are already inside the repo root and want to run the
 checkout directly.
 Direct `ansible-playbook` or `ansible-galaxy` usage from the repository is not
 a supported interface.
-Repository-internal Python import paths under `scripts/` are implementation
+Repository-internal Python import paths under `src/envmgr/` are implementation
 details; any conservative compatibility re-exports or root-command shims are
 not a supported public API.
 
@@ -556,6 +574,30 @@ the manual stage exposes `validate` and `smoke-test` through the same
 `pre-commit` interface. Treat the direct `uv run lint`, `uv run typecheck`,
 and `uv run ansible-check` commands as debugging fallbacks for cases where you
 want to rerun one tool by itself or reproduce a CI failure more directly.
+
+### Release Maintenance
+
+GitHub Release publishing is tag-driven. Push immutable version tags such as
+`v0.2.0` only after the versioned commit is ready. The release workflow runs
+`uv sync --locked`, `uv run validate`, `uv run smoke-test`,
+`uv build --no-sources`, package-surface inspection, SHA256 checksum generation,
+and an isolated `uv tool install` smoke test from the generated wheel. The
+artifact checks reject `envmgr-dev-helpers` release artifacts and reject
+checkout-only helper shims such as `create`, `lint`, `ansible-check`,
+`typecheck`, `validate`, and `smoke-test` from installed wheels.
+
+Release notes should include:
+
+- Install guidance that links to `install.sh` and reminds users to inspect it
+  and verify `SHA256SUMS`.
+- Upgrade guidance with `envmgr self update --version <version>` for
+  installer-managed installs.
+- Uninstall guidance with `envmgr self uninstall [--yes]`, including that
+  runtime data under `~/.envmgr/` is preserved by default.
+- Clean-reinstall guidance for stale shims, usually `uv tool uninstall envmgr`,
+  rerun the GitHub Release installer, then `hash -r` in existing shells.
+- Release-specific highlights, breaking changes, migration notes, and any
+  manual follow-up needed for install, upgrade, or uninstall paths.
 
 ## Reference
 

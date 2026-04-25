@@ -17,7 +17,7 @@ repos:
         name: ruff check --fix
         entry: uv run ruff check --fix
         language: system
-        files: ^(scripts/|tests/)
+        files: ^(src/envmgr/|tests/)
         types_or:
           - python
           - pyi
@@ -26,7 +26,7 @@ repos:
         name: ruff format
         entry: uv run ruff format
         language: system
-        files: ^(scripts/|tests/)
+        files: ^(src/envmgr/|tests/)
         types_or:
           - python
           - pyi
@@ -36,7 +36,7 @@ repos:
         entry: uv run typecheck
         language: system
         pass_filenames: false
-        files: ^(scripts/|tests/|pyproject\.toml)$
+        files: ^(src/envmgr/|tests/|pyproject\.toml|dev-helpers/pyproject\.toml)$
         stages:
           - pre-push
 

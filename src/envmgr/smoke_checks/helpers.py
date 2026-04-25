@@ -11,7 +11,7 @@ from ..runtime_config import (
     mark_runtime_setup_complete,
 )
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
+REPO_ROOT = Path(__file__).resolve().parents[3]
 
 
 def run_envmgr_cli(
@@ -23,7 +23,7 @@ def run_envmgr_cli(
         env.update(env_overrides)
 
     return subprocess.run(
-        [sys.executable, "-c", "from scripts.main import main; main()", *args],
+        [sys.executable, "-c", "from envmgr.main import main; main()", *args],
         cwd=REPO_ROOT,
         capture_output=True,
         text=True,

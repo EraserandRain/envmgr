@@ -12,10 +12,10 @@ from unittest.mock import Mock, patch
 import typer
 from rich.console import Console
 
-from scripts.command_text import SETUP_COMMAND
-from scripts.commands.setup import run_setup
-from scripts.main import require_setup_completed
-from scripts.runtime_config import (
+from envmgr.command_text import SETUP_COMMAND
+from envmgr.commands.setup import run_setup
+from envmgr.main import require_setup_completed
+from envmgr.runtime_config import (
     SETUP_SCHEMA_VERSION,
     ConfigError,
     ensure_runtime_layout,
@@ -24,8 +24,8 @@ from scripts.runtime_config import (
     mark_runtime_setup_complete,
     resolve_inventory_reference,
 )
-from scripts.services.assets import resolve_runtime_assets
-from scripts.services.runtime import (
+from envmgr.services.assets import resolve_runtime_assets
+from envmgr.services.runtime import (
     build_ansible_runtime_env,
     popen_runtime_subprocess,
     run_runtime_subprocess,
@@ -88,7 +88,7 @@ def check_setup_uses_shared_runtime_output() -> None:
             patch("sys.stdout", new=captured_output),
             patch.dict(os.environ, {"ENVMGR_HOME": str(envmgr_home)}, clear=False),
             patch(
-                "scripts.commands.setup.run_runtime_subprocess",
+                "envmgr.commands.setup.run_runtime_subprocess",
                 return_value=subprocess.CompletedProcess(
                     ["ansible-galaxy", "--version"],
                     0,
@@ -129,7 +129,7 @@ def check_setup_uses_resolved_runtime_assets() -> None:
             with (
                 patch.dict(os.environ, {"ENVMGR_HOME": str(envmgr_home)}, clear=False),
                 patch(
-                    "scripts.commands.setup.run_runtime_subprocess",
+                    "envmgr.commands.setup.run_runtime_subprocess",
                     return_value=subprocess.CompletedProcess(
                         ["ansible-galaxy", "--version"],
                         0,
@@ -176,7 +176,7 @@ def check_unbootstrapped_runtime_surfaces_setup_guidance() -> None:
             stderr=True,
         )
 
-        with patch("scripts.commands.shared.error_console", capturing_console):
+        with patch("envmgr.commands.shared.error_console", capturing_console):
             try:
                 require_setup_completed("ping", envmgr_home=envmgr_home)
             except typer.Exit as error:
@@ -300,7 +300,7 @@ def check_runtime_assets_resolve_from_packaged_assets_outside_repo_cwd() -> None
     with tempfile.TemporaryDirectory() as temp_dir:
         workspace = Path(temp_dir)
         envmgr_home = workspace / ".envmgr"
-        package_dir = workspace / "site-packages" / "scripts"
+        package_dir = workspace / "site-packages" / "envmgr"
         packaged_assets_root = package_dir / "_assets"
         packaged_playbooks_dir = packaged_assets_root / "playbooks"
         packaged_roles_dir = packaged_assets_root / "roles"
@@ -406,10 +406,10 @@ def check_runtime_env_uses_runtime_paths_only() -> None:
                 clear=False,
             ),
             patch(
-                "scripts.services.runtime.sysconfig.get_path",
+                "envmgr.services.runtime.sysconfig.get_path",
                 return_value=str(tool_bin),
             ),
-            patch("scripts.services.runtime.sys.executable", str(tool_bin / "python3")),
+            patch("envmgr.services.runtime.sys.executable", str(tool_bin / "python3")),
         ):
             env = build_ansible_runtime_env(runtime_paths)
 
@@ -452,10 +452,10 @@ def check_runtime_subprocess_helpers_use_runtime_paths() -> None:
                 clear=False,
             ),
             patch(
-                "scripts.services.runtime.sysconfig.get_path",
+                "envmgr.services.runtime.sysconfig.get_path",
                 return_value=str(tool_bin),
             ),
-            patch("scripts.services.runtime.sys.executable", str(tool_bin / "python3")),
+            patch("envmgr.services.runtime.sys.executable", str(tool_bin / "python3")),
             patch(
                 "subprocess.run",
                 return_value=subprocess.CompletedProcess(
@@ -516,10 +516,10 @@ def check_runtime_subprocess_helpers_use_runtime_paths() -> None:
                 clear=False,
             ),
             patch(
-                "scripts.services.runtime.sysconfig.get_path",
+                "envmgr.services.runtime.sysconfig.get_path",
                 return_value=str(tool_bin),
             ),
-            patch("scripts.services.runtime.sys.executable", str(tool_bin / "python3")),
+            patch("envmgr.services.runtime.sys.executable", str(tool_bin / "python3")),
             patch("subprocess.Popen", return_value=mock_process) as mock_popen,
         ):
             process = popen_runtime_subprocess(
@@ -572,33 +572,32 @@ def check_runtime_subprocess_helpers_use_runtime_paths() -> None:
 
 def check_package_root_helper_exports_resolve_to_command_modules() -> None:
     expected_exports = {
-        "create": ("scripts.commands.create", "create"),
-        "lint": ("scripts.commands.lint", "lint"),
-        "ansible_lint": ("scripts.commands.ansible_check", "ansible_lint"),
-        "typecheck": ("scripts.commands.typecheck", "typecheck"),
-        "validate": ("scripts.commands.validate", "validate"),
-        "smoke_test": ("scripts.commands.smoke_test", "smoke_test"),
+        "create": ("envmgr.commands.create", "create"),
+        "lint": ("envmgr.commands.lint", "lint"),
+        "ansible_lint": ("envmgr.commands.ansible_check", "ansible_lint"),
+        "typecheck": ("envmgr.commands.typecheck", "typecheck"),
+        "validate": ("envmgr.commands.validate", "validate"),
+        "smoke_test": ("envmgr.commands.smoke_test", "smoke_test"),
     }
-    package = __import__("scripts", fromlist=list(expected_exports))
+    package = __import__("envmgr", fromlist=list(expected_exports))
     package_all = getattr(package, "__all__", None)
     if not isinstance(package_all, list):
-        raise AssertionError("expected scripts.__all__ to remain a list of exports")
+        raise AssertionError("expected envmgr.__all__ to remain a list of exports")
 
     for export_name, (module_name, attr_name) in expected_exports.items():
         exported = getattr(package, export_name, None)
         target = getattr(importlib.import_module(module_name), attr_name)
         if exported is not target:
             raise AssertionError(
-                f"expected scripts.{export_name} to resolve to "
-                f"{module_name}.{attr_name}"
+                f"expected envmgr.{export_name} to resolve to {module_name}.{attr_name}"
             )
         if export_name not in package_all:
             raise AssertionError(
-                f"expected scripts.__all__ to keep {export_name!r} available"
+                f"expected envmgr.__all__ to keep {export_name!r} available"
             )
 
 
-def check_scripts_main_keeps_only_root_command_exports() -> None:
+def check_envmgr_main_keeps_only_root_command_exports() -> None:
     expected_exports = [
         "app",
         "doctor",
@@ -617,23 +616,23 @@ def check_scripts_main_keeps_only_root_command_exports() -> None:
         "validate",
         "smoke_test",
     )
-    main_module = importlib.import_module("scripts.main")
+    main_module = importlib.import_module("envmgr.main")
     if getattr(main_module, "__all__", None) != expected_exports:
         raise AssertionError(
-            "expected scripts.main.__all__ to describe only the retained "
+            "expected envmgr.main.__all__ to describe only the retained "
             "root-command surface"
         )
 
     for export_name in expected_exports:
         if not hasattr(main_module, export_name):
             raise AssertionError(
-                f"expected scripts.main to keep {export_name!r} available"
+                f"expected envmgr.main to keep {export_name!r} available"
             )
 
     for export_name in removed_helper_exports:
         if hasattr(main_module, export_name):
             raise AssertionError(
-                f"expected scripts.main to stop exposing {export_name!r}"
+                f"expected envmgr.main to stop exposing {export_name!r}"
             )
 
 

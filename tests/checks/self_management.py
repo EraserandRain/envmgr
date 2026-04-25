@@ -10,7 +10,7 @@ from unittest.mock import patch
 from click.testing import Result
 from typer.testing import CliRunner
 
-from scripts.main import app
+from envmgr.main import app
 
 CLI_RUNNER = CliRunner()
 HELPER_SHIMS = (
@@ -381,7 +381,7 @@ def check_self_uninstall_prompts_without_yes_and_can_cancel() -> None:
             uv_tool_bin_dir=tool_bin_dir,
         )
 
-        with patch("scripts.commands.shared.confirm_backend", return_value=False):
+        with patch("envmgr.commands.shared.confirm_backend", return_value=False):
             result = _invoke_envmgr_with_home(envmgr_home, "self", "uninstall")
 
         if result.exit_code != 1:

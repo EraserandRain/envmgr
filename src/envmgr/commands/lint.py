@@ -38,7 +38,7 @@ def run_lint() -> None:
         print("✓ Ruff format check passed")
     except subprocess.CalledProcessError:
         exit_with_error(
-            "✗ Code formatting issues found. Run 'ruff format scripts/ tests/' to fix."
+            "✗ Code formatting issues found. Run 'ruff format src/envmgr/ tests/' to fix."
         )
     except FileNotFoundError:
         exit_with_error(

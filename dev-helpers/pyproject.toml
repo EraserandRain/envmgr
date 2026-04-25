@@ -9,12 +9,12 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project.scripts]
-create = "scripts.commands.create:main"
-lint = "scripts.commands.lint:main"
-ansible-check = "scripts.commands.ansible_check:main"
-typecheck = "scripts.commands.typecheck:main"
-validate = "scripts.commands.validate:main"
-smoke-test = "scripts.commands.smoke_test:main"
+create = "envmgr.commands.create:main"
+lint = "envmgr.commands.lint:main"
+ansible-check = "envmgr.commands.ansible_check:main"
+typecheck = "envmgr.commands.typecheck:main"
+validate = "envmgr.commands.validate:main"
+smoke-test = "envmgr.commands.smoke_test:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["dev_helpers"]

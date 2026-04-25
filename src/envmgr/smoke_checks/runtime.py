@@ -63,7 +63,7 @@ def check_setup_logs_ansible_galaxy_runs() -> None:
 
 
 def check_setup_succeeds_outside_repo_cwd() -> None:
-    repo_root = Path(__file__).resolve().parents[2]
+    repo_root = Path(__file__).resolve().parents[3]
     with tempfile.TemporaryDirectory() as temp_dir:
         workspace = Path(temp_dir)
         envmgr_home = workspace / ".envmgr"
@@ -73,7 +73,7 @@ def check_setup_succeeds_outside_repo_cwd() -> None:
             with (
                 patch.dict(os.environ, {"ENVMGR_HOME": str(envmgr_home)}, clear=False),
                 patch(
-                    "scripts.commands.setup.run_runtime_subprocess",
+                    "envmgr.commands.setup.run_runtime_subprocess",
                     return_value=subprocess.CompletedProcess(
                         ["ansible-galaxy", "--version"],
                         0,

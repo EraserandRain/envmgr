@@ -11,17 +11,17 @@ import yaml
 from rich.console import Console
 from typer.testing import CliRunner
 
-from scripts.commands import shared as shared_commands
-from scripts.commands.install import (
+from envmgr.commands import shared as shared_commands
+from envmgr.commands.install import (
     WizardCancelled,
     resolve_ai_tools_install_options,
     run_install,
 )
-from scripts.commands.shared import exit_with_error
-from scripts.main import app
-from scripts.runtime_config import ensure_runtime_layout
-from scripts.services.assets import resolve_runtime_assets
-from scripts.services.install import (
+from envmgr.commands.shared import exit_with_error
+from envmgr.main import app
+from envmgr.runtime_config import ensure_runtime_layout
+from envmgr.services.assets import resolve_runtime_assets
+from envmgr.services.install import (
     AiToolsInstallDefaults,
     InstallPlan,
     build_install_plan,
@@ -108,16 +108,14 @@ def check_ai_tools_install_option_resolution() -> None:
 
 def check_shared_prompt_helpers_use_rich_defaults_and_patchable_backends() -> None:
     with patch(
-        "scripts.commands.shared.Prompt.ask", return_value="custom"
+        "envmgr.commands.shared.Prompt.ask", return_value="custom"
     ) as mock_prompt:
         if shared_commands.prompt_text("Name", default="default") != "custom":
             raise AssertionError("expected prompt_text to use the Rich Prompt backend")
     if mock_prompt.call_count != 1:
         raise AssertionError("expected prompt_text to call the default Rich prompt")
 
-    with patch(
-        "scripts.commands.shared.Confirm.ask", return_value=True
-    ) as mock_confirm:
+    with patch("envmgr.commands.shared.Confirm.ask", return_value=True) as mock_confirm:
         if not shared_commands.confirm_choice("Continue?", default=False):
             raise AssertionError(
                 "expected confirm_choice to use the Rich Confirm backend"
@@ -127,10 +125,10 @@ def check_shared_prompt_helpers_use_rich_defaults_and_patchable_backends() -> No
 
     with (
         patch(
-            "scripts.commands.shared.prompt_backend", return_value="patched"
+            "envmgr.commands.shared.prompt_backend", return_value="patched"
         ) as mock_prompt_backend,
         patch(
-            "scripts.commands.shared.confirm_backend", return_value=True
+            "envmgr.commands.shared.confirm_backend", return_value=True
         ) as mock_confirm_backend,
     ):
         if shared_commands.prompt_text("Name", default="default") != "patched":
@@ -144,13 +142,13 @@ def check_shared_prompt_helpers_use_rich_defaults_and_patchable_backends() -> No
 
 def check_ai_tools_setup_wizard_uses_shared_prompt_path() -> None:
     with (
-        patch("scripts.commands.install.console.print"),
+        patch("envmgr.commands.install.console.print"),
         patch(
-            "scripts.commands.shared.confirm_backend",
+            "envmgr.commands.shared.confirm_backend",
             side_effect=[True, True, True, True, True],
         ) as mock_confirm,
         patch(
-            "scripts.commands.shared.prompt_backend",
+            "envmgr.commands.shared.prompt_backend",
             side_effect=["1", "1"],
         ) as mock_prompt,
         patch(
@@ -190,9 +188,9 @@ def check_ai_tools_setup_wizard_uses_shared_prompt_path() -> None:
 
 def check_ai_tools_setup_wizard_prompt_interrupt_exits_130() -> None:
     with (
-        patch("scripts.commands.install.console.print"),
+        patch("envmgr.commands.install.console.print"),
         patch(
-            "scripts.commands.shared.confirm_backend",
+            "envmgr.commands.shared.confirm_backend",
             side_effect=KeyboardInterrupt,
         ),
     ):
@@ -361,10 +359,10 @@ def check_install_scoped_runs_rewrite_vars_files_to_absolute_paths() -> None:
 def check_install_list_tags_uses_rich_console() -> None:
     with (
         patch(
-            "scripts.commands.install.load_available_tags",
+            "envmgr.commands.install.load_available_tags",
             return_value=(["init"], ["codex", "rtk"]),
         ),
-        patch("scripts.commands.install.console.print") as mock_console_print,
+        patch("envmgr.commands.install.console.print") as mock_console_print,
         patch("builtins.print") as mock_print,
     ):
         run_install(
@@ -404,9 +402,9 @@ def check_install_list_tags_uses_rich_console() -> None:
 
 def check_install_rejects_unknown_tags_with_exit_code() -> None:
     with (
-        patch("scripts.commands.shared.error_console.print") as mock_error_print,
+        patch("envmgr.commands.shared.error_console.print") as mock_error_print,
         patch(
-            "scripts.commands.install.load_available_tags",
+            "envmgr.commands.install.load_available_tags",
             return_value=(["zsh"], ["codex"]),
         ),
     ):
@@ -447,7 +445,7 @@ def check_install_error_output_preserves_markup_like_text() -> None:
         color_system=None,
     )
 
-    with patch("scripts.commands.shared.error_console", capturing_console):
+    with patch("envmgr.commands.shared.error_console", capturing_console):
         try:
             exit_with_error("Error: unknown tags: [red]boom[/red]")
         except typer.Exit as error:
@@ -491,27 +489,27 @@ def check_install_summary_uses_rich_console_and_keeps_raw_subprocess_output() ->
 
         with (
             patch(
-                "scripts.commands.install.load_available_tags",
+                "envmgr.commands.install.load_available_tags",
                 return_value=(["zsh"], []),
             ),
-            patch("scripts.commands.install.require_setup_completed"),
+            patch("envmgr.commands.install.require_setup_completed"),
             patch(
-                "scripts.commands.install.build_install_plan",
+                "envmgr.commands.install.build_install_plan",
                 return_value=install_plan,
             ),
             patch(
-                "scripts.commands.install.resolve_ai_tools_install_options",
+                "envmgr.commands.install.resolve_ai_tools_install_options",
                 return_value=None,
             ),
             patch(
-                "scripts.commands.install.build_install_command",
+                "envmgr.commands.install.build_install_command",
                 return_value=["ansible-playbook", "playbooks/workstation.yml"],
             ),
             patch(
-                "scripts.commands.install.popen_runtime_subprocess",
+                "envmgr.commands.install.popen_runtime_subprocess",
                 return_value=process,
             ),
-            patch("scripts.commands.install.console.print") as mock_console_print,
+            patch("envmgr.commands.install.console.print") as mock_console_print,
             patch("builtins.print") as mock_print,
         ):
             run_install(
@@ -586,22 +584,22 @@ def check_install_wizard_cancellation_reports_via_rich_console() -> None:
 
         with (
             patch(
-                "scripts.commands.install.load_available_tags",
+                "envmgr.commands.install.load_available_tags",
                 return_value=(["ai_tools"], []),
             ),
-            patch("scripts.commands.install.require_setup_completed"),
+            patch("envmgr.commands.install.require_setup_completed"),
             patch(
-                "scripts.commands.install.build_install_plan",
+                "envmgr.commands.install.build_install_plan",
                 return_value=install_plan,
             ),
             patch(
-                "scripts.commands.install.resolve_ai_tools_install_options",
+                "envmgr.commands.install.resolve_ai_tools_install_options",
                 side_effect=WizardCancelled(
                     "AI Tools Setup cancelled before installation."
                 ),
             ),
-            patch("scripts.commands.install.cleanup_install_plan") as mock_cleanup,
-            patch("scripts.commands.install.console.print") as mock_console_print,
+            patch("envmgr.commands.install.cleanup_install_plan") as mock_cleanup,
+            patch("envmgr.commands.install.console.print") as mock_console_print,
             patch("builtins.print") as mock_print,
         ):
             try:
@@ -639,7 +637,7 @@ def check_install_wizard_cancellation_reports_via_rich_console() -> None:
 
 
 def check_install_rejects_all_plus_other_tags() -> None:
-    with patch("scripts.commands.shared.error_console.print") as mock_error_print:
+    with patch("envmgr.commands.shared.error_console.print") as mock_error_print:
         try:
             run_install(
                 tags=["all", "zsh"],
@@ -694,16 +692,16 @@ def check_install_interrupt_exits_cleanly() -> None:
         )
 
         with (
-            patch("scripts.commands.install.require_setup_completed"),
+            patch("envmgr.commands.install.require_setup_completed"),
             patch(
-                "scripts.commands.install.build_install_plan", return_value=install_plan
+                "envmgr.commands.install.build_install_plan", return_value=install_plan
             ),
             patch(
-                "scripts.commands.install.resolve_ai_tools_install_options",
+                "envmgr.commands.install.resolve_ai_tools_install_options",
                 return_value=None,
             ),
             patch(
-                "scripts.commands.install.popen_runtime_subprocess",
+                "envmgr.commands.install.popen_runtime_subprocess",
                 side_effect=KeyboardInterrupt,
             ),
         ):
@@ -741,7 +739,7 @@ def check_install_typer_flags_preserve_tri_state_bools() -> None:
     def _capture_run_install(**kwargs: object) -> None:
         captured_calls.append(kwargs)
 
-    with patch("scripts.main.run_install", side_effect=_capture_run_install):
+    with patch("envmgr.main.run_install", side_effect=_capture_run_install):
         default_result = CLI_RUNNER.invoke(
             app,
             ["install", "ai_tools"],
