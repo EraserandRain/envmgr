@@ -9,6 +9,9 @@ import tempfile
 from pathlib import Path
 from unittest.mock import Mock, patch
 
+import typer
+from rich.console import Console
+
 from scripts.command_text import SETUP_COMMAND
 from scripts.commands.setup import run_setup
 from scripts.main import require_setup_completed
@@ -165,13 +168,19 @@ def check_unbootstrapped_runtime_surfaces_setup_guidance() -> None:
     with tempfile.TemporaryDirectory() as temp_dir:
         envmgr_home = Path(temp_dir) / ".envmgr"
         ensure_runtime_layout(envmgr_home)
-        captured_output = io.StringIO()
+        captured_stderr = io.StringIO()
+        capturing_console = Console(
+            file=captured_stderr,
+            force_terminal=False,
+            color_system=None,
+            stderr=True,
+        )
 
-        with patch("sys.stdout", new=captured_output):
+        with patch("scripts.commands.shared.error_console", capturing_console):
             try:
                 require_setup_completed("ping", envmgr_home=envmgr_home)
-            except SystemExit as error:
-                if error.code != 1:
+            except typer.Exit as error:
+                if error.exit_code != 1:
                     raise AssertionError(
                         "expected unbootstrapped runtime to exit with code 1"
                     ) from error
@@ -180,9 +189,9 @@ def check_unbootstrapped_runtime_surfaces_setup_guidance() -> None:
                     "expected unbootstrapped runtime to require setup guidance"
                 )
 
-        if f"`{SETUP_COMMAND}`" not in captured_output.getvalue():
+        if f"`{SETUP_COMMAND}`" not in captured_stderr.getvalue():
             raise AssertionError(
-                f"expected setup guidance to mention `{SETUP_COMMAND}`"
+                f"expected stderr setup guidance to mention `{SETUP_COMMAND}`"
             )
 
 

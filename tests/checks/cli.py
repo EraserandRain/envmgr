@@ -6,6 +6,7 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
+from typing import cast
 from unittest.mock import patch
 
 from click.testing import Result
@@ -14,9 +15,9 @@ from typer.testing import CliRunner
 from scripts.main import app
 from scripts.runtime_config import ensure_runtime_layout, mark_runtime_setup_complete
 
-try:
+if sys.version_info >= (3, 11):
     import tomllib
-except ModuleNotFoundError:  # pragma: no cover - Python 3.10 compatibility
+else:  # pragma: no cover - Python 3.10 compatibility
     import tomli as tomllib
 
 CLI_RUNNER = CliRunner()
@@ -103,7 +104,7 @@ def _bootstrap_runtime(envmgr_home: Path) -> None:
 
 
 def _load_toml_document(path: Path) -> dict[str, object]:
-    return tomllib.loads(path.read_text(encoding="utf-8"))
+    return cast(dict[str, object], tomllib.loads(path.read_text(encoding="utf-8")))
 
 
 def check_dispatcher_routes_install_subcommand() -> None:
@@ -156,6 +157,61 @@ def check_dispatcher_routes_install_subcommand() -> None:
         raise AssertionError("expected dispatcher to print install task tags")
 
 
+def check_public_cli_help_aliases_version_and_completion() -> None:
+    for args in (("--help",), ("-h",)):
+        result = invoke_envmgr(*args)
+        if result.exit_code != 0:
+            raise AssertionError(
+                f"expected `envmgr {' '.join(args)}` to exit successfully"
+                f"\noutput:\n{result.output}"
+            )
+
+        output = _collapse_whitespace(
+            _normalize_cli_output(result.stdout, result.stderr)
+        )
+        for expected_fragment in (
+            "Usage: envmgr",
+            "--version",
+            "--help",
+            "-h",
+        ):
+            if expected_fragment not in output:
+                raise AssertionError(
+                    f"expected `envmgr {' '.join(args)}` to include "
+                    f"{expected_fragment!r}"
+                )
+        for completion_fragment in ("--install-completion", "--show-completion"):
+            if completion_fragment in output:
+                raise AssertionError(
+                    f"expected public help to omit {completion_fragment!r}"
+                )
+
+    version_result = invoke_envmgr("--version")
+    if version_result.exit_code != 0:
+        raise AssertionError(
+            "expected `envmgr --version` to exit successfully"
+            f"\noutput:\n{version_result.output}"
+        )
+
+    version_output = _normalize_cli_output(
+        version_result.stdout,
+        version_result.stderr,
+    ).strip()
+    if re.fullmatch(r"envmgr \S+", version_output) is None:
+        raise AssertionError(
+            "expected `envmgr --version` to print a version string"
+            f"\noutput:\n{version_output}"
+        )
+
+    for args in (("--install-completion",), ("--show-completion",)):
+        result = invoke_envmgr(*args)
+        if result.exit_code != 2:
+            raise AssertionError(
+                f"expected `envmgr {' '.join(args)}` to be rejected"
+                f"\noutput:\n{result.output}"
+            )
+
+
 def check_runtime_subcommands_use_typer_help() -> None:
     help_expectations = (
         (
@@ -163,8 +219,41 @@ def check_runtime_subcommands_use_typer_help() -> None:
             (
                 "Usage: envmgr install",
                 "Run Ansible roles and task tags.",
+                "--help",
+                "-h",
                 "--list-tags",
                 "--inventory",
+                "Output",
+                "Runtime options",
+                "AI tools",
+            ),
+        ),
+        (
+            ("install", "-h"),
+            (
+                "Usage: envmgr install",
+                "Run Ansible roles and task tags.",
+                "--help",
+                "-h",
+                "--list-tags",
+                "--inventory",
+                "Output",
+                "Runtime options",
+                "AI tools",
+            ),
+        ),
+        (
+            ("install",),
+            (
+                "Usage: envmgr install",
+                "Run Ansible roles and task tags.",
+                "--help",
+                "-h",
+                "--list-tags",
+                "--inventory",
+                "Output",
+                "Runtime options",
+                "AI tools",
             ),
         ),
         (
@@ -362,25 +451,28 @@ def check_create_helper_succeeds_with_expected_output() -> None:
 
 def check_plan_a_packaging_keeps_runtime_and_checkout_scripts_split() -> None:
     root_pyproject = _load_toml_document(REPO_ROOT / "pyproject.toml")
-    project_scripts = root_pyproject.get("project", {}).get("scripts")
+    project = cast(dict[str, object], root_pyproject.get("project", {}))
+    project_scripts = project.get("scripts")
     expected_runtime_scripts = {"envmgr": "scripts.main:main"}
     if project_scripts != expected_runtime_scripts:
         raise AssertionError(
             "expected the root package to install only the `envmgr` runtime script"
         )
 
-    dev_dependencies = root_pyproject.get("dependency-groups", {}).get("dev")
+    dependency_groups = cast(
+        dict[str, object],
+        root_pyproject.get("dependency-groups", {}),
+    )
+    dev_dependencies = cast(list[str] | None, dependency_groups.get("dev"))
     if dev_dependencies is None or "envmgr-dev-helpers" not in dev_dependencies:
         raise AssertionError(
             "expected checkout dev dependencies to include `envmgr-dev-helpers`"
         )
 
-    helper_source = (
-        root_pyproject.get("tool", {})
-        .get("uv", {})
-        .get("sources", {})
-        .get("envmgr-dev-helpers")
-    )
+    tool = cast(dict[str, object], root_pyproject.get("tool", {}))
+    uv = cast(dict[str, object], tool.get("uv", {}))
+    sources = cast(dict[str, object], uv.get("sources", {}))
+    helper_source = sources.get("envmgr-dev-helpers")
     if helper_source != {"path": "dev-helpers"}:
         raise AssertionError(
             "expected checkout helper scripts to come from the repo-local "
@@ -388,7 +480,8 @@ def check_plan_a_packaging_keeps_runtime_and_checkout_scripts_split() -> None:
         )
 
     dev_helper_pyproject = _load_toml_document(REPO_ROOT / "dev-helpers/pyproject.toml")
-    helper_scripts = dev_helper_pyproject.get("project", {}).get("scripts")
+    helper_project = cast(dict[str, object], dev_helper_pyproject.get("project", {}))
+    helper_scripts = helper_project.get("scripts")
     expected_helper_scripts = {
         "create": "scripts.commands.create:main",
         "lint": "scripts.commands.lint:main",

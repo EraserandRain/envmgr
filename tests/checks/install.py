@@ -11,6 +11,7 @@ import yaml
 from rich.console import Console
 from typer.testing import CliRunner
 
+from scripts.commands import shared as shared_commands
 from scripts.commands.install import (
     WizardCancelled,
     resolve_ai_tools_install_options,
@@ -105,15 +106,51 @@ def check_ai_tools_install_option_resolution() -> None:
         raise AssertionError("expected node playbook to skip AI tools resolution")
 
 
-def check_ai_tools_setup_wizard_uses_rich_prompt_path() -> None:
+def check_shared_prompt_helpers_use_rich_defaults_and_patchable_backends() -> None:
+    with patch(
+        "scripts.commands.shared.Prompt.ask", return_value="custom"
+    ) as mock_prompt:
+        if shared_commands.prompt_text("Name", default="default") != "custom":
+            raise AssertionError("expected prompt_text to use the Rich Prompt backend")
+    if mock_prompt.call_count != 1:
+        raise AssertionError("expected prompt_text to call the default Rich prompt")
+
+    with patch(
+        "scripts.commands.shared.Confirm.ask", return_value=True
+    ) as mock_confirm:
+        if not shared_commands.confirm_choice("Continue?", default=False):
+            raise AssertionError(
+                "expected confirm_choice to use the Rich Confirm backend"
+            )
+    if mock_confirm.call_count != 1:
+        raise AssertionError("expected confirm_choice to call the default Rich confirm")
+
+    with (
+        patch(
+            "scripts.commands.shared.prompt_backend", return_value="patched"
+        ) as mock_prompt_backend,
+        patch(
+            "scripts.commands.shared.confirm_backend", return_value=True
+        ) as mock_confirm_backend,
+    ):
+        if shared_commands.prompt_text("Name", default="default") != "patched":
+            raise AssertionError("expected prompt_text to honor a patched backend")
+        if not shared_commands.confirm_choice("Continue?", default=False):
+            raise AssertionError("expected confirm_choice to honor a patched backend")
+
+    mock_prompt_backend.assert_called_once_with("Name", "default")
+    mock_confirm_backend.assert_called_once_with("Continue?", False)
+
+
+def check_ai_tools_setup_wizard_uses_shared_prompt_path() -> None:
     with (
         patch("scripts.commands.install.console.print"),
         patch(
-            "scripts.commands.install.Confirm.ask",
+            "scripts.commands.shared.confirm_backend",
             side_effect=[True, True, True, True, True],
         ) as mock_confirm,
         patch(
-            "scripts.commands.install.Prompt.ask",
+            "scripts.commands.shared.prompt_backend",
             side_effect=["1", "1"],
         ) as mock_prompt,
         patch(
@@ -138,10 +175,10 @@ def check_ai_tools_setup_wizard_uses_rich_prompt_path() -> None:
     if options is None:
         raise AssertionError("expected AI tools wizard to return install options")
     if mock_confirm.call_count != 5:
-        raise AssertionError("expected Rich Confirm prompts for each yes/no question")
+        raise AssertionError("expected shared confirm prompts for each yes/no question")
     if mock_prompt.call_count != 2:
         raise AssertionError(
-            "expected Rich Prompt prompts for each Context7 transport choice"
+            "expected shared text prompts for each Context7 transport choice"
         )
     if not options.manage_codex:
         raise AssertionError("expected wizard to allow enabling Codex CLI")
@@ -149,6 +186,35 @@ def check_ai_tools_setup_wizard_uses_rich_prompt_path() -> None:
         raise AssertionError("expected wizard to accept remote transport selections")
     if options.codex_context7_method != "remote":
         raise AssertionError("expected wizard to accept remote transport selections")
+
+
+def check_ai_tools_setup_wizard_prompt_interrupt_exits_130() -> None:
+    with (
+        patch("scripts.commands.install.console.print"),
+        patch(
+            "scripts.commands.shared.confirm_backend",
+            side_effect=KeyboardInterrupt,
+        ),
+    ):
+        try:
+            resolve_ai_tools_install_options(
+                ["ai_tools"],
+                execution_playbook_path="playbooks/workstation.yml",
+                manage_claude_code=None,
+                manage_codex=None,
+                manage_rtk=None,
+                enable_context7=None,
+                claude_context7_method=None,
+                codex_context7_method=None,
+                interactive=True,
+            )
+        except typer.Exit as error:
+            if error.exit_code != 130:
+                raise AssertionError(
+                    "expected interrupted prompts to exit with code 130"
+                ) from error
+        else:
+            raise AssertionError("expected interrupted prompts to exit")
 
 
 def check_install_all_uses_runtime_default_playbook() -> None:
@@ -655,8 +721,8 @@ def check_install_interrupt_exits_cleanly() -> None:
                     claude_context7_method=None,
                     codex_context7_method=None,
                 )
-            except SystemExit as error:
-                if error.code != 130:
+            except typer.Exit as error:
+                if error.exit_code != 130:
                     raise AssertionError(
                         "expected install to exit with code 130 on Ctrl+C"
                     ) from error

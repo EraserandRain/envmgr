@@ -137,6 +137,11 @@ def check_history_text_output() -> None:
             raise AssertionError("expected history text output to include a title")
         if "Showing 2 of 3 recorded runtime commands" not in output:
             raise AssertionError("expected history text output to honor the limit")
+        for expected_header in ("STARTED", "STATUS", "DETAILS", "COMMAND"):
+            if expected_header not in output:
+                raise AssertionError(
+                    f"expected history text output table to include {expected_header!r}"
+                )
         if (
             "2026-04-18T12:00:00Z" not in output
             or "ansible-galaxy role install" not in output
@@ -233,7 +238,7 @@ def check_history_text_output_preserves_markup_like_values() -> None:
             )
 
         output = result.output
-        if "[[GREEN]OK[/GREEN]]" not in output:
+        if "[GREEN]OK[/GREEN]" not in output:
             raise AssertionError(
                 "expected history status output to preserve markup-like text literally"
             )

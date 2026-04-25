@@ -17,7 +17,12 @@ from ..services.doctor import (
     get_doctor_overall_status,
     summarize_doctor_report,
 )
-from .shared import console
+from .shared import (
+    console,
+    exit_with_error,
+    print_command_heading,
+    print_summary_line,
+)
 
 
 def render_doctor_status_text(status: str) -> Text:
@@ -69,8 +74,8 @@ def build_doctor_checks_table(checks: list[DoctorCheck]) -> Table:
     for check in checks:
         table.add_row(
             render_doctor_status_text(check.status),
-            get_doctor_check_label(check.name),
-            get_doctor_check_detail(check),
+            Text(get_doctor_check_label(check.name)),
+            Text(get_doctor_check_detail(check)),
         )
 
     return table
@@ -93,9 +98,8 @@ def print_doctor_overview(report: DoctorReport, configured_home: str | None) -> 
     if default_parts:
         context_rows.append(("Defaults", " ".join(default_parts)))
 
-    label_width = max(len(label) for label, _value in context_rows)
     for label, value in context_rows:
-        print(f"{label:<{label_width}}  {value}")
+        print_summary_line(label, value)
 
 
 def run_doctor(*, json_output: bool) -> None:
@@ -119,16 +123,19 @@ def run_doctor(*, json_output: bool) -> None:
         return
 
     overall_status = get_doctor_overall_status(report)
-    summary = f"Summary: {ok_count} ok, {warn_count} warn, {fail_count} fail"
-    heading = Text("Envmgr Doctor [")
-    heading.append(render_doctor_status_text(overall_status))
-    heading.append("]")
-    console.print(heading)
-    console.print(summary)
+    print_command_heading("Envmgr Doctor")
+    print_summary_line("Status", render_doctor_status_text(overall_status))
+    print_summary_line(
+        "Summary", f"{ok_count} ok, {warn_count} warn, {fail_count} fail"
+    )
     console.print()
     print_doctor_overview(report, configured_home)
     console.print()
     console.print(build_doctor_checks_table(report.checks))
 
     if fail_count:
-        raise typer.Exit(code=1)
+        exit_with_error(
+            "Doctor found "
+            f"{fail_count} failing check(s). Next: run `envmgr setup` if setup is incomplete, "
+            "then rerun `envmgr doctor`."
+        )

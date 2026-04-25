@@ -12,6 +12,7 @@ from tests.checks.cli import (
     check_dispatcher_routes_ping_subcommand,
     check_dispatcher_routes_setup_subcommand,
     check_plan_a_packaging_keeps_runtime_and_checkout_scripts_split,
+    check_public_cli_help_aliases_version_and_completion,
     check_runtime_subcommands_use_typer_help,
 )
 from tests.support import Check, build_check_suite, build_check_test_case
@@ -20,6 +21,10 @@ CLI_CONTRACT_TEST_CHECKS: tuple[Check, ...] = (
     (
         "public CLI exposes help and install subcommands",
         check_dispatcher_routes_install_subcommand,
+    ),
+    (
+        "public CLI supports help aliases, version, and disables completion",
+        check_public_cli_help_aliases_version_and_completion,
     ),
     (
         "public runtime subcommands keep Typer Rich help output",

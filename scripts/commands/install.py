@@ -3,9 +3,8 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
-from typing import NoReturn
 
-from rich.prompt import Confirm, Prompt
+import typer
 from rich.text import Text
 
 from ..catalog import CatalogError
@@ -24,10 +23,15 @@ from ..services.install import (
 )
 from ..services.runtime import RuntimePopenProcess, popen_runtime_subprocess
 from .shared import (
+    confirm_choice,
     console,
     exit_with_error,
     load_available_tags,
+    print_bullet_list,
+    print_labeled_value,
+    print_section_title,
     print_warning,
+    prompt_text,
     require_setup_completed,
 )
 
@@ -36,54 +40,14 @@ class WizardCancelled(RuntimeError):
     """Raised when the interactive setup wizard is cancelled by the user."""
 
 
-def _abort_prompt(error: KeyboardInterrupt) -> NoReturn:
-    """Exit like the shared prompt helpers when an interactive prompt is interrupted."""
-    console.print()
-    raise SystemExit(130) from error
-
-
-def _print_section_title(title: str, *, style: str = "bold cyan") -> None:
-    """Render a simple, consistently styled install section heading."""
-    console.print(Text(title, style=style))
-
-
-def _print_bullet_list(title: str, values: list[str]) -> None:
-    """Render a titled bullet list without changing the public text content."""
-    console.print()
-    console.print(Text(title, style="bold"))
-    for value in values:
-        console.print(Text(f"  - {value}"))
-
-
 def _format_enabled_status(enabled: bool) -> Text:
     """Return a styled enabled/disabled label for setup summaries."""
     return Text("enabled", style="green") if enabled else Text("disabled", style="dim")
 
 
-def _print_labeled_value(
-    label: str,
-    value: str | Text,
-    *,
-    prefix: str = "  ",
-) -> None:
-    """Render a label/value line while preserving the historical wording."""
-    line = Text()
-    line.append(f"{prefix}{label}: ", style="bold")
-    if isinstance(value, Text):
-        line.append_text(value)
-    else:
-        line.append(value)
-    console.print(line)
-
-
 def prompt_bool(message: str, *, default: bool) -> bool:
     """Prompt for a yes/no decision and return the selected value."""
-    try:
-        return bool(Confirm.ask(message, console=console, default=default))
-    except EOFError:
-        return default
-    except KeyboardInterrupt as error:
-        _abort_prompt(error)
+    return confirm_choice(message, default=default)
 
 
 def render_context7_method_label(method: str) -> str:
@@ -128,21 +92,12 @@ def prompt_context7_method(tool_name: str, *, default: str) -> str:
         console.print(option_line)
         console.print(Text(f"     {description}", style="dim"))
 
-    try:
-        response = Prompt.ask(
-            "Choose 1 or 2",
-            console=console,
-            choices=list(option_by_token),
-            case_sensitive=False,
-            show_choices=False,
-            default=default_token,
-        )
-    except EOFError:
-        return default
-    except KeyboardInterrupt as error:
-        _abort_prompt(error)
-
-    return option_by_token[response.lower()]
+    while True:
+        response = prompt_text("Choose 1 or 2", default=default_token).strip().lower()
+        selected_method = option_by_token.get(response)
+        if selected_method is not None:
+            return selected_method
+        print_warning("Choose 1 or 2 to continue.")
 
 
 def build_ai_tools_setup_summary(
@@ -194,7 +149,7 @@ def run_ai_tools_setup_wizard(
 ) -> AiToolsInstallOptions:
     """Run the interactive AI tools setup wizard and return the selected options."""
     console.print()
-    _print_section_title("AI Tools Setup")
+    print_section_title("AI Tools Setup")
     console.print("We'll help you choose which AI tools to install on this machine.")
     console.print(Text("Press Ctrl+C at any time to cancel.", style="dim"))
 
@@ -278,12 +233,12 @@ def run_ai_tools_setup_wizard(
     )
 
     console.print()
-    _print_section_title("AI Tools Setup Summary")
+    print_section_title("AI Tools Setup Summary")
     for label, value in build_ai_tools_setup_summary(
         options,
         context7_api_key_present=context7_api_key_present,
     ):
-        _print_labeled_value(label, value, prefix="- ")
+        print_labeled_value(label, value, prefix="- ")
 
     if not prompt_bool("Install with these settings?", default=True):
         raise WizardCancelled("AI Tools Setup cancelled before installation.")
@@ -351,9 +306,9 @@ def run_install(
     """Install and configure envmgr using explicit option values."""
     if list_tags:
         role_tags, task_tags = load_available_tags()
-        _print_section_title("Envmgr available tags:")
-        _print_bullet_list("Role level tags:", role_tags)
-        _print_bullet_list("Task level tags:", task_tags)
+        print_section_title("Envmgr available tags:")
+        print_bullet_list("Role level tags:", role_tags)
+        print_bullet_list("Task level tags:", task_tags)
         return
 
     try:
@@ -421,6 +376,9 @@ def run_install(
     except CatalogError as error:
         cleanup_install_plan(install_plan)
         exit_with_error(f"Error: {error}")
+    except typer.Exit:
+        cleanup_install_plan(install_plan)
+        raise
 
     try:
         if not install_plan.ai_tools_defaults.applicable and ai_tools_flags_provided:
@@ -429,19 +387,19 @@ def run_install(
             )
 
         console.print()
-        _print_section_title("Running Ansible playbook with:")
-        _print_labeled_value("Playbook", install_plan.source_playbook_path)
+        print_section_title("Running Ansible playbook with:")
+        print_labeled_value("Playbook", install_plan.source_playbook_path)
         if install_plan.execution_playbook_path != install_plan.source_playbook_path:
-            _print_labeled_value(
+            print_labeled_value(
                 "Execution playbook",
                 install_plan.execution_playbook_path,
             )
-        _print_labeled_value(
+        print_labeled_value(
             "Inventory",
             f"{install_plan.inventory_label} -> {install_plan.inventory_path}",
         )
         if is_all_tag_selection(install_plan.selected_tags):
-            _print_labeled_value(
+            print_labeled_value(
                 "Tags",
                 Text("All tags will be executed", style="green"),
             )
@@ -453,9 +411,9 @@ def run_install(
                 label = "Role" if tag in install_plan.role_tags else "Task"
                 style = "green" if label == "Role" else "cyan"
                 rendered_tags.append(f"[{label}: {tag}]", style=style)
-            _print_labeled_value("Tags", rendered_tags)
+            print_labeled_value("Tags", rendered_tags)
         if ai_tools_options is not None:
-            _print_labeled_value(
+            print_labeled_value(
                 "AI tools",
                 (
                     "Claude Code="
@@ -469,20 +427,20 @@ def run_install(
                 context7_status = (
                     "enabled" if ai_tools_options.enable_context7 else "disabled"
                 )
-                _print_labeled_value("Context7", context7_status)
+                print_labeled_value("Context7", context7_status)
             if ai_tools_options.enable_context7:
                 if ai_tools_options.manage_claude_code:
-                    _print_labeled_value(
+                    print_labeled_value(
                         "Claude Code Context7 method",
                         ai_tools_options.claude_context7_method,
                     )
                 if ai_tools_options.manage_codex:
-                    _print_labeled_value(
+                    print_labeled_value(
                         "Codex Context7 method",
                         ai_tools_options.codex_context7_method,
                     )
                 if not os.environ.get("CONTEXT7_API_KEY"):
-                    _print_labeled_value(
+                    print_labeled_value(
                         "Context7 API key",
                         "not set (continuing without it)",
                     )
@@ -508,7 +466,11 @@ def run_install(
             process.stdout.close()
         return_code = process.wait()
         if return_code != 0:
-            raise SystemExit(return_code)
+            exit_with_error(
+                "Install failed with exit code "
+                f"{return_code}. Next: review the Ansible output above or "
+                f"{install_plan.runtime_paths.ansible_log_file}."
+            )
     except KeyboardInterrupt as error:
         if process is not None:
             try:
@@ -517,6 +479,6 @@ def run_install(
                 process.wait()
             except OSError:
                 pass
-        raise SystemExit(130) from error
+        raise typer.Exit(code=130) from error
     finally:
         cleanup_install_plan(install_plan)

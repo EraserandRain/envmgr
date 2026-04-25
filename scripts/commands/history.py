@@ -5,12 +5,19 @@ import os
 from pathlib import Path
 from typing import Any
 
+from rich.table import Table
 from rich.text import Text
 
 from ..runtime_config import get_runtime_paths
 from ..services.runtime import load_runtime_run_history
 from .doctor import abbreviate_home_in_text
-from .shared import console, exit_with_error
+from .shared import (
+    console,
+    exit_with_error,
+    print_command_heading,
+    print_status,
+    print_summary_line,
+)
 
 
 def get_runtime_history_status_text(status: str) -> str:
@@ -32,10 +39,44 @@ def stringify_runtime_history_command(value: Any) -> str:
     return "<unknown command>"
 
 
+def build_runtime_history_table(records: list[dict[str, Any]]) -> Table:
+    """Build a human-readable table for runtime subprocess history."""
+    table = Table(show_header=True)
+    table.add_column("RECORD", no_wrap=True)
+    table.add_column("FIELD", no_wrap=True)
+    table.add_column("VALUE", overflow="fold")
+
+    for index, record in enumerate(records, start=1):
+        return_code = record.get("return_code")
+        details = (
+            f"rc={'-' if return_code is None else return_code} "
+            f"dur={get_runtime_history_duration_text(record.get('duration_seconds'))} "
+            f"mode={record.get('mode', '-')}"
+        )
+        table.add_row(
+            str(index), "STARTED", Text(str(record.get("started_at", "<unknown time>")))
+        )
+        table.add_row(
+            "",
+            "STATUS",
+            Text(get_runtime_history_status_text(str(record.get("status", "unknown")))),
+        )
+        table.add_row("", "DETAILS", Text(details))
+        table.add_row(
+            "",
+            "COMMAND",
+            Text(stringify_runtime_history_command(record.get("command"))),
+        )
+
+    return table
+
+
 def run_history(*, limit: int, json_output: bool) -> None:
     """Show recent runtime subprocess records from ~/.envmgr/log/runs."""
     if limit <= 0:
-        exit_with_error("History limit must be greater than zero.")
+        exit_with_error(
+            "History limit must be greater than zero. Next: pass --limit with a positive integer."
+        )
 
     paths = get_runtime_paths()
     configured_home = os.environ.get("ENVMGR_HOME")
@@ -63,44 +104,17 @@ def run_history(*, limit: int, json_output: bool) -> None:
     runtime_home_value = abbreviate_home_in_text(str(paths.home))
     runtime_home_suffix = " (from ENVMGR_HOME)" if configured_home else " (default)"
 
-    console.print("Envmgr History")
-
-    runtime_home_line = Text("Runtime home  ")
-    runtime_home_line.append(runtime_home_value)
-    runtime_home_line.append(runtime_home_suffix)
-    console.print(runtime_home_line)
-
-    runs_dir_line = Text("Runs dir      ")
-    runs_dir_line.append(abbreviate_home_in_text(str(paths.runs_log_dir)))
-    console.print(runs_dir_line)
+    print_command_heading("Envmgr History")
+    print_summary_line("Runtime home", runtime_home_value + runtime_home_suffix)
+    print_summary_line("Runs dir", abbreviate_home_in_text(str(paths.runs_log_dir)))
 
     if not records:
         console.print()
-        console.print("No runtime subprocess history has been recorded yet.")
+        print_status("No runtime subprocess history has been recorded yet.")
         return
 
-    console.print(
+    print_status(
         f"Showing {len(selected_records)} of {len(records)} recorded runtime commands"
     )
     console.print()
-
-    for record in selected_records:
-        status = str(record.get("status", "unknown"))
-        return_code = record.get("return_code")
-        return_code_text = "-" if return_code is None else str(return_code)
-
-        summary_line = Text("- ")
-        summary_line.append(str(record.get("started_at", "<unknown time>")))
-        summary_line.append(" [")
-        summary_line.append(get_runtime_history_status_text(status))
-        summary_line.append("] ")
-        summary_line.append(f"rc={return_code_text} ")
-        summary_line.append(
-            f"dur={get_runtime_history_duration_text(record.get('duration_seconds'))} "
-        )
-        summary_line.append(f"mode={record.get('mode', '-')}")
-        console.print(summary_line)
-
-        command_line = Text("  ")
-        command_line.append(stringify_runtime_history_command(record.get("command")))
-        console.print(command_line)
+    console.print(build_runtime_history_table(selected_records))

@@ -6,6 +6,7 @@ from typing import Literal, NoReturn
 
 import typer
 from rich.console import Console
+from rich.prompt import Confirm, Prompt
 from rich.rule import Rule
 from rich.text import Text
 
@@ -45,45 +46,24 @@ def _abort_from_interrupt(error: KeyboardInterrupt) -> NoReturn:
 
 
 def _default_prompt_backend(message: str, default: str | None) -> str:
-    """Read a single text response using the current stdin/stdout streams."""
-    prompt = message if default is None else f"{message} [{default}]"
+    """Read a single text response using Rich's prompt renderer."""
     try:
-        response = input(f"{prompt}: ")
+        if default is None:
+            return str(Prompt.ask(message, console=console))
+        return str(Prompt.ask(message, console=console, default=default))
     except EOFError:
         return "" if default is None else default
-    except KeyboardInterrupt as error:
-        _abort_from_interrupt(error)
-
-    stripped = response.strip()
-    if not stripped and default is not None:
-        return default
-    return stripped
 
 
 def _default_confirm_backend(message: str, default: bool) -> bool:
-    """Read a yes/no answer using the shared text prompt behavior."""
-    hint = "Y/n" if default else "y/N"
-    while True:
-        prompt = f"{message} [{hint}]"
-        try:
-            response = input(f"{prompt}: ").strip().lower()
-        except EOFError:
-            return default
-        except KeyboardInterrupt as error:
-            _abort_from_interrupt(error)
-
-        if not response:
-            return default
-        if response in {"y", "yes"}:
-            return True
-        if response in {"n", "no"}:
-            return False
-
-        print("Please answer 'y' or 'n'.")
+    """Read a yes/no answer using Rich's confirm renderer."""
+    try:
+        return bool(Confirm.ask(message, console=console, default=default))
+    except EOFError:
+        return default
 
 
-# Later workers can patch these callables to adopt Rich Prompt/Confirm without
-# changing command call sites.
+# Tests can patch these callables without changing command prompt call sites.
 prompt_backend: PromptBackend = _default_prompt_backend
 confirm_backend: ConfirmBackend = _default_confirm_backend
 
@@ -120,14 +100,14 @@ def require_setup_completed(
     if is_runtime_setup_complete(runtime_paths):
         return
 
-    console.print(
+    error_console.print(
         Text.assemble(
             ("Setup required: ", "bold yellow"),
             f"'{command_name}' needs a bootstrapped envmgr runtime at "
             f"{runtime_paths.home}. Please {SETUP_HINT}.",
         )
     )
-    raise SystemExit(1)
+    raise typer.Exit(code=1)
 
 
 def print_command_heading(title: str, *, subtitle: str | None = None) -> None:
@@ -141,7 +121,10 @@ def print_summary_line(label: str, value: object) -> None:
     """Render a labeled summary line for command plans and runtime details."""
     line = Text()
     line.append(f"{label}: ", style="bold")
-    line.append(str(value))
+    if isinstance(value, Text):
+        line.append_text(value)
+    else:
+        line.append(str(value))
     console.print(line)
 
 
@@ -160,11 +143,46 @@ def print_warning(message: str) -> None:
     print_status(message, tone="warning")
 
 
+def print_section_title(title: str, *, style: str = "bold cyan") -> None:
+    """Render a compact section title for runtime command output."""
+    console.print(Text(title, style=style))
+
+
+def print_bullet_list(title: str, values: list[str]) -> None:
+    """Render a titled bullet list through the shared runtime console."""
+    console.print()
+    console.print(Text(title, style="bold"))
+    for value in values:
+        console.print(Text(f"  - {value}"))
+
+
+def print_labeled_value(
+    label: str,
+    value: str | Text,
+    *,
+    prefix: str = "  ",
+) -> None:
+    """Render a prefixed label/value line while preserving literal text values."""
+    line = Text()
+    line.append(f"{prefix}{label}: ", style="bold")
+    if isinstance(value, Text):
+        line.append_text(value)
+    else:
+        line.append(value)
+    console.print(line)
+
+
 def prompt_text(message: str, *, default: str | None = None) -> str:
     """Ask for free-form input through the shared, patchable prompt backend."""
-    return prompt_backend(message, default)
+    try:
+        return prompt_backend(message, default)
+    except KeyboardInterrupt as error:
+        _abort_from_interrupt(error)
 
 
 def confirm_choice(message: str, *, default: bool = False) -> bool:
     """Ask for a yes/no decision through the shared, patchable confirm backend."""
-    return confirm_backend(message, default)
+    try:
+        return confirm_backend(message, default)
+    except KeyboardInterrupt as error:
+        _abort_from_interrupt(error)
