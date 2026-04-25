@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from importlib import metadata
 from pathlib import Path
 from typing import Annotated, Literal
 
@@ -15,12 +16,19 @@ from .commands.shared import (
     require_setup_completed as shared_require_setup_completed,
 )
 
+HELP_CONTEXT_SETTINGS = {"help_option_names": ["--help", "-h"]}
+RUNTIME_OPTIONS_HELP_PANEL = "Runtime options"
+AI_TOOLS_HELP_PANEL = "AI tools"
+OUTPUT_HELP_PANEL = "Output"
+VERSION_FALLBACK = "0+unknown"
+
 app = typer.Typer(
     help=CLI_APP_HELP,
     no_args_is_help=True,
     add_completion=False,
     suggest_commands=True,
     rich_markup_mode="rich",
+    context_settings=HELP_CONTEXT_SETTINGS,
 )
 
 Context7Method = Literal["remote", "local"]
@@ -48,7 +56,36 @@ def require_setup_completed(
     shared_require_setup_completed(command_name, envmgr_home=envmgr_home)
 
 
-@app.command("doctor")
+def _envmgr_version() -> str:
+    try:
+        return metadata.version("envmgr")
+    except metadata.PackageNotFoundError:
+        return VERSION_FALLBACK
+
+
+def _version_callback(value: bool) -> bool:
+    if value:
+        typer.echo(f"{CLI_ROOT_COMMAND} {_envmgr_version()}")
+        raise typer.Exit()
+    return value
+
+
+@app.callback()
+def _root_callback(
+    version: Annotated[
+        bool,
+        typer.Option(
+            "--version",
+            callback=_version_callback,
+            is_eager=True,
+            help="Show the envmgr version and exit.",
+        ),
+    ] = False,
+) -> None:
+    """Run envmgr commands."""
+
+
+@app.command("doctor", context_settings=HELP_CONTEXT_SETTINGS)
 def _doctor_command(
     json_output: Annotated[
         bool,
@@ -62,7 +99,7 @@ def _doctor_command(
     run_doctor(json_output=json_output)
 
 
-@app.command("history")
+@app.command("history", context_settings=HELP_CONTEXT_SETTINGS)
 def _history_command(
     limit: Annotated[
         int,
@@ -84,7 +121,10 @@ def _history_command(
     run_history(limit=limit, json_output=json_output)
 
 
-@app.command("install")
+@app.command(
+    "install",
+    context_settings=HELP_CONTEXT_SETTINGS,
+)
 def _install_command(
     ctx: typer.Context,
     tags: Annotated[
@@ -99,6 +139,7 @@ def _install_command(
             "--list-tags",
             "-l",
             help="List all available tags",
+            rich_help_panel=OUTPUT_HELP_PANEL,
         ),
     ] = False,
     playbook: Annotated[
@@ -106,6 +147,7 @@ def _install_command(
         typer.Option(
             "--playbook",
             help="Specify a scenario token or playbook path explicitly when tags are ambiguous",
+            rich_help_panel=RUNTIME_OPTIONS_HELP_PANEL,
         ),
     ] = None,
     inventory: Annotated[
@@ -114,6 +156,7 @@ def _install_command(
             "--inventory",
             "-i",
             help="Specify an inventory alias from ~/.envmgr/config.toml",
+            rich_help_panel=RUNTIME_OPTIONS_HELP_PANEL,
         ),
     ] = None,
     ask_vault_pass: Annotated[
@@ -121,6 +164,7 @@ def _install_command(
         typer.Option(
             "--ask-vault-pass",
             help="Ask for vault password",
+            rich_help_panel=RUNTIME_OPTIONS_HELP_PANEL,
         ),
     ] = False,
     manage_claude_code: Annotated[
@@ -129,6 +173,7 @@ def _install_command(
             "--claude-code/--no-claude-code",
             help="When AI tools are selected, explicitly install Claude Code",
             show_default=False,
+            rich_help_panel=AI_TOOLS_HELP_PANEL,
         ),
     ] = None,
     manage_codex: Annotated[
@@ -137,6 +182,7 @@ def _install_command(
             "--codex/--no-codex",
             help="When AI tools are selected, explicitly install Codex CLI",
             show_default=False,
+            rich_help_panel=AI_TOOLS_HELP_PANEL,
         ),
     ] = None,
     manage_rtk: Annotated[
@@ -145,6 +191,7 @@ def _install_command(
             "--rtk/--no-rtk",
             help="When AI tools are selected, explicitly install RTK",
             show_default=False,
+            rich_help_panel=AI_TOOLS_HELP_PANEL,
         ),
     ] = None,
     enable_context7: Annotated[
@@ -153,6 +200,7 @@ def _install_command(
             "--context7/--no-context7",
             help="When AI tools are selected, enable Context7 integration",
             show_default=False,
+            rich_help_panel=AI_TOOLS_HELP_PANEL,
         ),
     ] = None,
     claude_context7_method: Annotated[
@@ -161,6 +209,7 @@ def _install_command(
             "--claude-context7-method",
             help="Choose the Context7 transport for Claude Code",
             show_default=False,
+            rich_help_panel=AI_TOOLS_HELP_PANEL,
         ),
     ] = None,
     codex_context7_method: Annotated[
@@ -169,6 +218,7 @@ def _install_command(
             "--codex-context7-method",
             help="Choose the Context7 transport for Codex CLI",
             show_default=False,
+            rich_help_panel=AI_TOOLS_HELP_PANEL,
         ),
     ] = None,
 ) -> None:
@@ -192,7 +242,7 @@ def _install_command(
     )
 
 
-@app.command("ping")
+@app.command("ping", context_settings=HELP_CONTEXT_SETTINGS)
 def _ping_command(
     inventory: Annotated[
         str | None,
@@ -207,7 +257,7 @@ def _ping_command(
     run_ping(inventory=inventory)
 
 
-@app.command("setup")
+@app.command("setup", context_settings=HELP_CONTEXT_SETTINGS)
 def _setup_command() -> None:
     """Bootstrap the envmgr runtime under ~/.envmgr."""
     run_setup()

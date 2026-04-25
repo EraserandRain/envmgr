@@ -4,7 +4,8 @@ import unittest
 
 from tests.checks.install import (
     check_ai_tools_install_option_resolution,
-    check_ai_tools_setup_wizard_uses_rich_prompt_path,
+    check_ai_tools_setup_wizard_prompt_interrupt_exits_130,
+    check_ai_tools_setup_wizard_uses_shared_prompt_path,
     check_install_all_uses_runtime_default_playbook,
     check_install_error_output_preserves_markup_like_text,
     check_install_interrupt_exits_cleanly,
@@ -16,6 +17,7 @@ from tests.checks.install import (
     check_install_summary_uses_rich_console_and_keeps_raw_subprocess_output,
     check_install_typer_flags_preserve_tri_state_bools,
     check_install_wizard_cancellation_reports_via_rich_console,
+    check_shared_prompt_helpers_use_rich_defaults_and_patchable_backends,
 )
 from tests.support import Check, build_check_suite, build_check_test_case
 
@@ -25,8 +27,16 @@ INSTALL_TEST_CHECKS: tuple[Check, ...] = (
         check_ai_tools_install_option_resolution,
     ),
     (
-        "AI tools wizard uses Rich prompt helpers",
-        check_ai_tools_setup_wizard_uses_rich_prompt_path,
+        "shared prompt helpers use Rich defaults and patchable backends",
+        check_shared_prompt_helpers_use_rich_defaults_and_patchable_backends,
+    ),
+    (
+        "AI tools wizard uses shared prompt helpers",
+        check_ai_tools_setup_wizard_uses_shared_prompt_path,
+    ),
+    (
+        "AI tools wizard prompt interrupts exit 130",
+        check_ai_tools_setup_wizard_prompt_interrupt_exits_130,
     ),
     (
         "install all uses the runtime default playbook",

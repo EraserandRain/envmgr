@@ -74,9 +74,14 @@ want to install or refresh the local Python environment and dev tools.
 # Bootstrap envmgr on this machine
 envmgr setup
 
-# Verify the bootstrap completed successfully
+# Inspect CLI metadata/help and verify the bootstrap completed successfully
+envmgr --version
+envmgr -h
+envmgr install -h
 envmgr doctor
 envmgr doctor --json
+envmgr history
+envmgr history --json
 envmgr ping
 envmgr install -l
 ```
@@ -96,14 +101,23 @@ and `uv run smoke-test` runs only the
 safe to run before or after setup when you want to inspect what is missing
 under `~/.envmgr/`.
 Use `envmgr doctor --json` when you want a machine-readable report for scripts
-or CI.
+or CI. JSON modes, including `envmgr history --json`, print plain JSON without
+Rich formatting.
 Use `envmgr history` to inspect the most recent runtime subprocess records, or
-`envmgr history -n 5` to focus on the latest few commands.
+`envmgr history -n 5` to focus on the latest few commands. Human history output
+uses a Rich table while preserving stored command values literally.
+The public runtime CLI supports `-h` and `--help` at the root and subcommand
+levels, and `envmgr --version` prints `envmgr <version>`. Shell completion is
+intentionally disabled for now, so generated completion install options are
+rejected instead of documented as supported.
 The public runtime CLI uses Typer with Rich help plus shared Rich headings,
-summary lines, and prompts for `setup`, `install`, and `ping`. Development
-helpers such as `uv run validate` and `uv run smoke-test` also use dedicated
-Typer-based help, but they remain separate entrypoints rather than runtime
-subcommands.
+status lines, warnings, summaries, and prompts for runtime commands such as
+`setup`, `install`, and `ping`. Expected user-facing failures print actionable
+guidance to stderr with shell-friendly exit codes. Live external subprocess
+stdout/stderr stays raw so Ansible and other tools keep their native output.
+Development helpers such as `uv run validate` and `uv run smoke-test` also use
+dedicated Typer-based help, but they remain separate entrypoints rather than
+runtime subcommands.
 
 ### Host Settings
 
@@ -154,13 +168,15 @@ Repository-internal Python import paths under `scripts/` are implementation
 details; any conservative compatibility re-exports or root-command shims are
 not a supported public API.
 
-The public runtime CLI now uses Typer with Rich-enhanced help plus shared Rich
-runtime summaries, status lines, and interactive prompts where applicable, and
-the dedicated developer helper commands also use Typer-based help. The
-supported command surfaces stay intentionally split: run installed runtime
-commands as `envmgr ...`, use `uv run envmgr ...` only as the repo-root
-fallback for a checkout, and run contributor-only helpers from a checkout via
-`uv run ...`. Installed artifacts expose only `envmgr`.
+The public runtime CLI now uses Typer with Rich-enhanced `-h`/`--help`, a
+public `envmgr --version`, shared Rich runtime summaries/status/prompts, and a
+Rich human table for `envmgr history`. JSON output and live external subprocess
+stdout/stderr remain plain. Shell completion stays disabled intentionally. The
+dedicated developer helper commands also use Typer-based help but keep plain
+tool-style logs. The supported command surfaces stay intentionally split: run
+installed runtime commands as `envmgr ...`, use `uv run envmgr ...` only as the
+repo-root fallback for a checkout, and run contributor-only helpers from a
+checkout via `uv run ...`. Installed artifacts expose only `envmgr`.
 
 Commands that accept `-i/--inventory` only accept inventory aliases defined in `~/.envmgr/config.toml`. envmgr no longer falls back to repository-local inventory files or `./.ansible` caches.
 Inventory alias targets must stay under `~/.envmgr/inventory/`.

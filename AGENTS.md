@@ -26,6 +26,14 @@ This guide helps contributors work effectively on envmgr (Ansible-driven environ
 - `uv run lint`, `uv run ansible-check`, and `uv run typecheck` are checkout-only contributor helpers for debugging one tool in isolation.
 - `uv run validate` and `uv run smoke-test` remain checkout-only contributor helpers for CI or more targeted troubleshooting; `validate` discovers the split unit modules automatically while `smoke-test` runs the smoke suite.
 
+## Runtime CLI UX Contracts
+
+- Public `envmgr` supports `-h`/`--help` at the root and subcommand levels, and `envmgr --version` prints `envmgr <version>`.
+- Public shell completion stays disabled intentionally with `add_completion=False`; keep generated completion options rejected unless the decision, docs, and tests change together.
+- Use Rich for runtime human help/status/warnings/summaries/prompts and the human `envmgr history` table. Keep JSON output and live external subprocess stdout/stderr plain.
+- Checkout-only developer helpers keep plain tool-style logs even though their entrypoints use Typer-based help.
+- Expected runtime exits should use `typer.Exit` inside command paths, send actionable user guidance to stderr, and preserve shell-friendly exit codes (`0`, `1`, `2`, `130`).
+
 ## Coding Style & Naming Conventions
 
 - Python: 4‑space indent, line length 88, double quotes (Ruff); add type hints (mypy strict settings; no untyped defs).
@@ -45,6 +53,7 @@ This guide helps contributors work effectively on envmgr (Ansible-driven environ
 - Treat documentation updates as part of the code change, not as follow-up cleanup.
 - When behavior, commands, flags, defaults, test layout, project structure, or developer workflow changes, update the relevant docs in the same patch.
 - Always review `AGENTS.md`, `README.md`, and any user-facing command examples affected by the change; stale examples or outdated command descriptions should be fixed before finishing.
+- For CLI UX changes, update `docs/typer-rich-checklist.md` alongside README/AGENTS so the Typer/Rich contract stays current.
 - Use `AGENTS.md` as the repository instruction source of truth and keep `CLAUDE.md` as a thin pointer to `AGENTS.md` rather than maintaining duplicated guidance.
 - During reviews or automated maintenance passes, explicitly check whether the code diff should trigger doc updates and make them proactively.
 
