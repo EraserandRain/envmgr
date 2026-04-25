@@ -4,9 +4,9 @@ import os
 import tempfile
 from pathlib import Path
 
-from scripts.catalog import CatalogError, get_available_tags, load_playbook_tags
-from scripts.services.assets import resolve_runtime_assets
-from scripts.services.install import resolve_install_playbook
+from envmgr.catalog import CatalogError, get_available_tags, load_playbook_tags
+from envmgr.services.assets import resolve_runtime_assets
+from envmgr.services.install import resolve_install_playbook
 
 
 def check_playbook_resolution() -> None:

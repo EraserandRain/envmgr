@@ -9,15 +9,15 @@ from unittest.mock import patch
 from click.testing import Result
 from typer.testing import CliRunner
 
-from scripts.main import app
-from scripts.runtime_config import ensure_runtime_layout, mark_runtime_setup_complete
-from scripts.services.doctor import (
+from envmgr.main import app
+from envmgr.runtime_config import ensure_runtime_layout, mark_runtime_setup_complete
+from envmgr.services.doctor import (
     DOCTOR_COMMANDS,
     DOCTOR_FAIL,
     DOCTOR_OK,
     build_doctor_report,
 )
-from scripts.services.runtime import (
+from envmgr.services.runtime import (
     RUNTIME_RUN_RECORD_SCHEMA_VERSION,
     write_runtime_run_record,
 )
@@ -276,10 +276,10 @@ def check_doctor_report_passes_bootstrapped_runtime() -> None:
         with (
             patch.dict(os.environ, {"PATH": ""}, clear=False),
             patch(
-                "scripts.services.runtime.sysconfig.get_path",
+                "envmgr.services.runtime.sysconfig.get_path",
                 return_value=str(tool_bin),
             ),
-            patch("scripts.services.runtime.sys.executable", str(tool_bin / "python3")),
+            patch("envmgr.services.runtime.sys.executable", str(tool_bin / "python3")),
         ):
             report = build_doctor_report(envmgr_home)
         failures = [
@@ -352,11 +352,11 @@ def check_doctor_resolves_default_playbook_outside_repo_cwd() -> None:
             with (
                 patch.dict(os.environ, {"PATH": ""}, clear=False),
                 patch(
-                    "scripts.services.runtime.sysconfig.get_path",
+                    "envmgr.services.runtime.sysconfig.get_path",
                     return_value=str(tool_bin),
                 ),
                 patch(
-                    "scripts.services.runtime.sys.executable",
+                    "envmgr.services.runtime.sys.executable",
                     str(tool_bin / "python3"),
                 ),
             ):
@@ -440,10 +440,10 @@ def check_doctor_json_output() -> None:
         with (
             patch.dict(os.environ, {"PATH": ""}, clear=False),
             patch(
-                "scripts.services.runtime.sysconfig.get_path",
+                "envmgr.services.runtime.sysconfig.get_path",
                 return_value=str(tool_bin),
             ),
-            patch("scripts.services.runtime.sys.executable", str(tool_bin / "python3")),
+            patch("envmgr.services.runtime.sys.executable", str(tool_bin / "python3")),
         ):
             result = invoke_envmgr(
                 "doctor",

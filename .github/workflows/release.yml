@@ -1,21 +1,33 @@
-name: CI
+name: Release
 
 on:
   push:
-  pull_request:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
-  validate:
-    name: Validate
+  github_release:
+    name: GitHub Release
     runs-on: ubuntu-latest
     env:
       ENVMGR_HOME: /tmp/.envmgr
+      UV_NO_PROGRESS: "1"
 
     steps:
+      - name: Validate immutable version tag
+        run: |
+          if [[ ! "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Release tags must look like v0.2.0: $GITHUB_REF_NAME" >&2
+            exit 1
+          fi
+
       - name: Check out repository
         uses: actions/checkout@v5
 
@@ -34,66 +46,12 @@ jobs:
 
       - name: Bootstrap envmgr runtime
         run: uv run envmgr setup
-
-      - name: Verify first-run command surface
-        run: |
-          uv run envmgr ping
-          uv run envmgr install -l
 
       - name: Run validation suite
         run: uv run validate
 
-  smoke:
-    name: Smoke Tests
-    runs-on: ubuntu-latest
-    env:
-      ENVMGR_HOME: /tmp/.envmgr
-
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v5
-
-      - name: Set up Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: "3.12"
-
-      - name: Install uv
-        run: |
-          curl -LsSf https://astral.sh/uv/install.sh | sh
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-
-      - name: Sync locked dependencies
-        run: uv sync --locked
-
-      - name: Bootstrap envmgr runtime
-        run: uv run envmgr setup
-
-      - name: Run smoke tests with multi-node topology checks
+      - name: Run smoke tests
         run: uv run smoke-test
-
-  package_surface:
-    name: Package Surface
-    runs-on: ubuntu-latest
-    env:
-      UV_NO_PROGRESS: "1"
-
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v5
-
-      - name: Set up Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: "3.12"
-
-      - name: Install uv
-        run: |
-          curl -LsSf https://astral.sh/uv/install.sh | sh
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-
-      - name: Sync locked dependencies
-        run: uv sync --locked
 
       - name: Build no-sources release artifacts
         run: uv build --no-sources --out-dir dist
@@ -149,17 +107,43 @@ jobs:
                       raise SystemExit(f"missing bundled runtime asset: {asset}")
           PY
 
+      - name: Prepare installer asset
+        run: |
+          package_version="${GITHUB_REF_NAME#v}"
+          test -f "dist/envmgr-${package_version}-py3-none-any.whl"
+          test -f "dist/envmgr-${package_version}.tar.gz"
+
+          python - "$package_version" <<'PY'
+          from pathlib import Path
+          import re
+          import sys
+
+          version = sys.argv[1]
+          source = Path("install.sh").read_text()
+          installer, replacements = re.subn(
+              r'^DEFAULT_VERSION="[^"]+"$',
+              f'DEFAULT_VERSION="{version}"',
+              source,
+              count=1,
+              flags=re.MULTILINE,
+          )
+          if replacements != 1:
+              raise SystemExit("expected DEFAULT_VERSION in install.sh")
+          Path("dist/install.sh").write_text(installer)
+          PY
+          chmod +x dist/install.sh
+          bash dist/install.sh --help
+
+      - name: Generate SHA256 checksums
+        run: |
+          cd dist
+          sha256sum envmgr-*.whl envmgr-*.tar.gz install.sh > SHA256SUMS
+          cat SHA256SUMS
+
       - name: Smoke-test isolated wheel install
         run: |
-          wheel="$(python - <<'PY'
-          from pathlib import Path
-
-          wheels = sorted(Path("dist").glob("envmgr-*.whl"))
-          if len(wheels) != 1:
-              raise SystemExit(f"expected one envmgr wheel, found: {wheels}")
-          print(wheels[0])
-          PY
-          )"
+          package_version="${GITHUB_REF_NAME#v}"
+          wheel="dist/envmgr-${package_version}-py3-none-any.whl"
           python_path="$(python -c 'import sys; print(sys.executable)')"
           tmpdir="$(mktemp -d)"
           export UV_TOOL_DIR="$tmpdir/tools"
@@ -174,52 +158,50 @@ jobs:
             fi
           done
 
-  init_install:
-    name: Init Install (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os:
-          - ubuntu-22.04
-          - ubuntu-24.04
-    env:
-      ENVMGR_HOME: /tmp/.envmgr
-
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v5
-
-      - name: Set up Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: "3.12"
-
-      - name: Install uv
+      - name: Write release notes
         run: |
-          curl -LsSf https://astral.sh/uv/install.sh | sh
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          package_version="${GITHUB_REF_NAME#v}"
+          cat > release-notes.md <<EOF
+          ## Install
 
-      - name: Sync locked dependencies
-        run: uv sync --locked
+          Inspect \`install.sh\`, verify \`SHA256SUMS\`, then install with:
 
-      - name: Bootstrap envmgr runtime
-        run: uv run envmgr setup
+          \`\`\`bash
+          curl -fsSL https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/install.sh | bash
+          \`\`\`
 
-      - name: Run init install on localhost
-        run: uv run envmgr install init --playbook playbooks/workstation.yml
+          ## Upgrade
 
-  master_worker_e2e:
-    name: Master/Worker E2E
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
+          \`\`\`bash
+          envmgr self update --version ${package_version}
+          \`\`\`
 
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v5
+          ## Uninstall
 
-      - name: Sanity-check E2E Docker Compose
-        run: bash .github/scripts/check-e2e-compose.sh
+          \`\`\`bash
+          envmgr self uninstall --yes
+          \`\`\`
 
-      - name: Run master-to-workers multi-node e2e
-        run: .github/scripts/run-master-worker-e2e.sh
+          ## Clean Reinstall
+
+          \`\`\`bash
+          uv tool uninstall envmgr || true
+          curl -fsSL https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/install.sh | bash
+          hash -r
+          \`\`\`
+
+          Add release-specific highlights, breaking changes, and migration notes before announcing this release.
+          EOF
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            dist/envmgr-*.whl \
+            dist/envmgr-*.tar.gz \
+            dist/install.sh \
+            dist/SHA256SUMS \
+            --verify-tag \
+            --title "$GITHUB_REF_NAME" \
+            --notes-file release-notes.md

@@ -14,10 +14,10 @@ from .dev_shared import PYTHON_CHECK_PATHS, require_repo_dev_context, run_comman
 from .shared import require_setup_completed, resolve_inventory_option
 
 COMMAND_NAME = "validate"
-REPO_ROOT = Path(__file__).resolve().parents[2]
+REPO_ROOT = Path(__file__).resolve().parents[3]
 TESTS_DIR = REPO_ROOT / "tests"
 UNIT_TEST_PATTERN = "test_*.py"
-SMOKE_TEST_CLASS_MODULE_PREFIX = "scripts.smoke_checks."
+SMOKE_TEST_CLASS_MODULE_PREFIX = "envmgr.smoke_checks."
 app = typer.Typer(add_completion=False, rich_markup_mode="rich")
 
 

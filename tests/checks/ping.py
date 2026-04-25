@@ -9,8 +9,8 @@ from unittest.mock import patch
 
 import typer
 
-from scripts.commands.ping import run_ping
-from scripts.runtime_config import (
+from envmgr.commands.ping import run_ping
+from envmgr.runtime_config import (
     RuntimePaths,
     ensure_runtime_layout,
     mark_runtime_setup_complete,
@@ -35,7 +35,7 @@ def check_ping_uses_selected_inventory_alias() -> None:
             patch("sys.stdout", new=captured_output),
             patch.dict(os.environ, {"ENVMGR_HOME": str(envmgr_home)}, clear=False),
             patch(
-                "scripts.commands.ping.run_runtime_subprocess",
+                "envmgr.commands.ping.run_runtime_subprocess",
                 return_value=subprocess.CompletedProcess(
                     ["ansible", "-m", "ping", "all"],
                     0,
@@ -83,13 +83,13 @@ def check_ping_surfaces_subprocess_failures() -> None:
             patch("sys.stdout", new=captured_output),
             patch.dict(os.environ, {"ENVMGR_HOME": str(envmgr_home)}, clear=False),
             patch(
-                "scripts.commands.ping.run_runtime_subprocess",
+                "envmgr.commands.ping.run_runtime_subprocess",
                 side_effect=subprocess.CalledProcessError(
                     7,
                     ["ansible", "-m", "ping", "all"],
                 ),
             ),
-            patch("scripts.commands.shared.error_console.print") as mock_error_print,
+            patch("envmgr.commands.shared.error_console.print") as mock_error_print,
         ):
             try:
                 run_ping(inventory=None)

@@ -14,8 +14,8 @@ from unittest.mock import patch
 from click.testing import Result
 from typer.testing import CliRunner
 
-from scripts.main import app
-from scripts.runtime_config import ensure_runtime_layout, mark_runtime_setup_complete
+from envmgr.main import app
+from envmgr.runtime_config import ensure_runtime_layout, mark_runtime_setup_complete
 
 if sys.version_info >= (3, 11):
     import tomllib
@@ -62,8 +62,8 @@ def _invoke_dev_helper_entrypoint(
             "-c",
             (
                 "import sys; "
-                f"sys.path.insert(0, {str(REPO_ROOT)!r}); "
-                f"from scripts.commands.{module_name} import main; "
+                f"sys.path.insert(0, {str(REPO_ROOT / 'src')!r}); "
+                f"from envmgr.commands.{module_name} import main; "
                 "main()"
             ),
             *args,
@@ -90,7 +90,7 @@ def _create_checkout_stub(base_dir: Path) -> Path:
     for relative_path in (
         Path("playbooks"),
         Path("roles"),
-        Path("scripts/commands"),
+        Path("src/envmgr/commands"),
         Path("tests"),
     ):
         (checkout_root / relative_path).mkdir(parents=True, exist_ok=True)
@@ -140,7 +140,7 @@ def check_dispatcher_routes_install_subcommand() -> None:
         )
 
     with patch(
-        "scripts.commands.install.load_available_tags",
+        "envmgr.commands.install.load_available_tags",
         return_value=(["zsh"], ["codex"]),
     ):
         result = invoke_envmgr("install", "-l")
@@ -484,7 +484,7 @@ def check_plan_a_packaging_keeps_runtime_and_checkout_scripts_split() -> None:
     root_pyproject = _load_toml_document(REPO_ROOT / "pyproject.toml")
     project = cast(dict[str, object], root_pyproject.get("project", {}))
     project_scripts = project.get("scripts")
-    expected_runtime_scripts = {"envmgr": "scripts.main:main"}
+    expected_runtime_scripts = {"envmgr": "envmgr.main:main"}
     if project_scripts != expected_runtime_scripts:
         raise AssertionError(
             "expected the root package to install only the `envmgr` runtime script"
@@ -514,12 +514,12 @@ def check_plan_a_packaging_keeps_runtime_and_checkout_scripts_split() -> None:
     helper_project = cast(dict[str, object], dev_helper_pyproject.get("project", {}))
     helper_scripts = helper_project.get("scripts")
     expected_helper_scripts = {
-        "create": "scripts.commands.create:main",
-        "lint": "scripts.commands.lint:main",
-        "ansible-check": "scripts.commands.ansible_check:main",
-        "typecheck": "scripts.commands.typecheck:main",
-        "validate": "scripts.commands.validate:main",
-        "smoke-test": "scripts.commands.smoke_test:main",
+        "create": "envmgr.commands.create:main",
+        "lint": "envmgr.commands.lint:main",
+        "ansible-check": "envmgr.commands.ansible_check:main",
+        "typecheck": "envmgr.commands.typecheck:main",
+        "validate": "envmgr.commands.validate:main",
+        "smoke-test": "envmgr.commands.smoke_test:main",
     }
     if helper_scripts != expected_helper_scripts:
         raise AssertionError(
@@ -554,9 +554,10 @@ def check_built_wheel_exposes_only_runtime_console_script() -> None:
             )
 
         with zipfile.ZipFile(wheel_paths[0]) as wheel:
+            wheel_names = set(wheel.namelist())
             entry_point_paths = [
                 name
-                for name in wheel.namelist()
+                for name in wheel_names
                 if name.endswith(".dist-info/entry_points.txt")
             ]
             if len(entry_point_paths) != 1:
@@ -567,6 +568,24 @@ def check_built_wheel_exposes_only_runtime_console_script() -> None:
                 )
             entry_points_text = wheel.read(entry_point_paths[0]).decode("utf-8")
 
+    required_asset_entries = {
+        "envmgr/_assets/ansible.cfg",
+        "envmgr/_assets/requirements.yaml",
+        "envmgr/_assets/playbooks/workstation.yml",
+        "envmgr/_assets/roles/zsh/tasks/main.yml",
+        "envmgr/_assets/vars/global.yml",
+    }
+    missing_asset_entries = sorted(required_asset_entries - wheel_names)
+    if missing_asset_entries:
+        raise AssertionError(
+            "expected the built wheel to bundle runtime assets under envmgr/_assets"
+            f"\nmissing: {missing_asset_entries}"
+        )
+    if any(name.startswith("scripts/") for name in wheel_names):
+        raise AssertionError(
+            "expected the built wheel to avoid the old scripts package"
+        )
+
     parser = configparser.ConfigParser()
     parser.read_string(entry_points_text)
     console_scripts = (
@@ -574,7 +593,7 @@ def check_built_wheel_exposes_only_runtime_console_script() -> None:
         if parser.has_section("console_scripts")
         else {}
     )
-    expected_console_scripts = {"envmgr": "scripts.main:main"}
+    expected_console_scripts = {"envmgr": "envmgr.main:main"}
     if console_scripts != expected_console_scripts:
         raise AssertionError(
             "expected the built wheel to expose only the `envmgr` runtime "
@@ -590,7 +609,7 @@ def check_dispatcher_routes_setup_subcommand() -> None:
         with (
             patch.dict(os.environ, {"ENVMGR_HOME": str(envmgr_home)}, clear=False),
             patch(
-                "scripts.commands.setup.run_runtime_subprocess",
+                "envmgr.commands.setup.run_runtime_subprocess",
                 return_value=subprocess.CompletedProcess(
                     ["ansible-galaxy", "--version"],
                     0,
@@ -657,7 +676,7 @@ def check_dispatcher_routes_ping_subcommand() -> None:
         with (
             patch.dict(os.environ, {"ENVMGR_HOME": str(envmgr_home)}, clear=False),
             patch(
-                "scripts.commands.ping.run_runtime_subprocess",
+                "envmgr.commands.ping.run_runtime_subprocess",
                 return_value=subprocess.CompletedProcess(
                     ["ansible", "-m", "ping", "all"],
                     0,

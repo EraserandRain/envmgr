@@ -7,13 +7,13 @@ from ..commands.install import resolve_ai_tools_install_options
 
 def check_ai_tools_setup_wizard_flow() -> None:
     with (
-        patch("scripts.commands.install.console.print"),
+        patch("envmgr.commands.install.console.print"),
         patch(
-            "scripts.commands.shared.confirm_backend",
+            "envmgr.commands.shared.confirm_backend",
             side_effect=[True, True, True, True, True],
         ),
         patch(
-            "scripts.commands.shared.prompt_backend",
+            "envmgr.commands.shared.prompt_backend",
             side_effect=["1", "1"],
         ),
         patch(

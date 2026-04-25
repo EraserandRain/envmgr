@@ -10,12 +10,12 @@ from ..scaffold import ScaffoldError
 from ..services.runtime import run_runtime_subprocess
 from .shared import exit_with_error
 
-PYTHON_CHECK_PATHS = ["scripts/", "tests/"]
+PYTHON_CHECK_PATHS = ["src/envmgr/", "tests/"]
 DEV_CHECKOUT_MARKERS = (
     "pyproject.toml",
     "playbooks",
     "roles",
-    "scripts/commands",
+    "src/envmgr/commands",
     "tests",
 )
 DEV_HELPER_BOUNDARY_MESSAGE = (

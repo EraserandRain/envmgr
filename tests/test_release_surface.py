@@ -9,7 +9,7 @@ from tests.support import Check, build_check_suite, build_check_test_case
 
 RELEASE_SURFACE_TEST_CHECKS: tuple[Check, ...] = (
     (
-        "isolated uv tool install exposes envmgr and omits create",
+        "isolated uv tool install exposes envmgr and omits checkout-only helper shims",
         check_isolated_uv_tool_install_exposes_envmgr_only,
     ),
 )

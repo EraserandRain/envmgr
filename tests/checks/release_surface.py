@@ -135,9 +135,19 @@ def check_isolated_uv_tool_install_exposes_envmgr_only() -> None:
                 f"\nstderr:\n{version_result.stderr}"
             )
 
-        create_command = _find_command(bin_dir, "create")
-        if create_command is not None:
-            raise AssertionError(
-                "expected isolated uv tool install to omit checkout-only `create` shim"
-                f"\nfound: {create_command}"
-            )
+        checkout_only_helper_shims = (
+            "create",
+            "lint",
+            "ansible-check",
+            "typecheck",
+            "validate",
+            "smoke-test",
+        )
+        for helper_shim in checkout_only_helper_shims:
+            helper_command = _find_command(bin_dir, helper_shim)
+            if helper_command is not None:
+                raise AssertionError(
+                    "expected isolated uv tool install to omit checkout-only "
+                    f"`{helper_shim}` shim"
+                    f"\nfound: {helper_command}"
+                )

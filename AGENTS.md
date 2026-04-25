@@ -6,11 +6,11 @@ This guide helps contributors work effectively on envmgr (Ansible-driven environ
 
 - `playbooks/` — scenario playbooks (`workstation.yml`, `node.yml`).
 - `roles/` — one folder per tool (`tasks/main.yml`, `vars/`, etc.).
-- `scripts/` — Python CLI entrypoints plus shared `commands/` and `services/` modules used by `uv`; `scripts/main.py` defines the Typer-based public `envmgr` CLI with Rich-enhanced help plus shared Rich runtime summaries/prompts, while development helpers remain separate Typer-based entrypoints.
-- `scripts/commands/` — command runners plus the dedicated helper entrypoints and CLI glue shared by the public CLI and helper commands.
+- `src/envmgr/` — Python runtime package plus shared `commands/` and `services/` modules used by `uv`; `src/envmgr/main.py` defines the Typer-based public `envmgr` CLI with Rich-enhanced help plus shared Rich runtime summaries/prompts, while development helpers remain separate Typer-based entrypoints.
+- `src/envmgr/commands/` — command runners plus the dedicated helper entrypoints and CLI glue shared by the public CLI and helper commands.
 - `tests/` — Python `unittest` modules split by domain; `tests/checks/` holds unit-check implementations and `tests/test_smoke.py` remains the dedicated smoke suite exercised by `uv run smoke-test`.
 - `vars/` — shared variables; `ansible.cfg` — repository Ansible defaults; runtime state lives under `~/.envmgr/`.
-- Treat the CLI entrypoints as an intentionally split support matrix: use the installed `envmgr ...` command for supported runtime work from any cwd, whether the tool was installed editably from a checkout or from a built wheel. Installed artifacts expose only `envmgr`. Use `uv run envmgr ...` only as the repo-root fallback when working directly from a checkout. Contributor-only helpers (`create`, `lint`, `ansible-check`, `typecheck`, `validate`, `smoke-test`) are checkout-only workflows run via `uv run ...` from an envmgr checkout. Python import paths under `scripts/` remain implementation details.
+- Treat the CLI entrypoints as an intentionally split support matrix: use the installed `envmgr ...` command for supported runtime work from any cwd, whether the tool was installed editably from a checkout or from a built wheel. Installed artifacts expose only `envmgr`. Use `uv run envmgr ...` only as the repo-root fallback when working directly from a checkout. Contributor-only helpers (`create`, `lint`, `ansible-check`, `typecheck`, `validate`, `smoke-test`) are checkout-only workflows run via `uv run ...` from an envmgr checkout. Python import paths under `src/envmgr/` remain implementation details.
 
 ## Build, Test, and Development Commands
 
@@ -27,6 +27,7 @@ This guide helps contributors work effectively on envmgr (Ansible-driven environ
 - `uv run pre-commit run --hook-stage manual smoke-test --all-files` — run the smoke suite through `pre-commit`.
 - `uv run lint`, `uv run ansible-check`, and `uv run typecheck` are checkout-only contributor helpers for debugging one tool in isolation.
 - `uv run validate` and `uv run smoke-test` remain checkout-only contributor helpers for CI or more targeted troubleshooting; `validate` discovers the split unit modules automatically while `smoke-test` runs the smoke suite.
+- `uv build --no-sources` — build the release-style wheel and sdist from the locked package layout without local source overrides.
 
 ## Runtime CLI UX Contracts
 
@@ -50,6 +51,14 @@ This guide helps contributors work effectively on envmgr (Ansible-driven environ
 - Use `uv run validate --playbook <path>` and `uv run smoke-test --playbook <path>` from an envmgr checkout for scenario-level checks against the runtime inventory managed under `~/.envmgr/`.
 - Run `uv run python -m unittest discover tests -p 'test_*.py'` when you want the full Python test matrix, or `uv run python -m unittest tests.test_smoke` when you want just the Python smoke suite without the CLI wrapper.
 - Ensure tasks are idempotent (second run reports no changes) and scoping via tags works as expected.
+
+## Release Automation & Distribution
+
+- PR/main CI must keep explicit `uv sync --locked`, validation, smoke, `uv build --no-sources`, artifact inspection, and package-surface checks for the GitHub Release distribution path.
+- `.github/workflows/release.yml` publishes immutable version tags matching `vX.Y.Z` (for example `v0.2.0`) to GitHub Releases after `uv sync --locked`, `uv run validate`, `uv run smoke-test`, `uv build --no-sources`, artifact inspection, checksum generation, and isolated wheel-install smoke testing.
+- Release artifacts should include only the envmgr wheel, sdist, generated `install.sh`, and `SHA256SUMS`; never publish an `envmgr-dev-helpers` artifact, and ensure installed wheels expose only the `envmgr` runtime command rather than checkout-only helper shims.
+- User-facing release docs should tell users how to inspect `install.sh`, verify SHA256 checksums, install, upgrade with `envmgr self update --version <version>`, uninstall with `envmgr self uninstall [--yes]`, and clean-reinstall stale shims with `uv tool uninstall envmgr`, the GitHub Release installer, and `hash -r`.
+- Release notes should also call out release-specific highlights, breaking changes, migration steps, and any manual follow-up affecting install, upgrade, uninstall, or clean-reinstall paths.
 
 ## Documentation Sync
 

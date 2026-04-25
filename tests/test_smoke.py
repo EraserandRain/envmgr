@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 
-from scripts.smoke_checks import (
+from envmgr.smoke_checks import (
     SMOKE_TEST_CHECKS,
     SmokeCheck,
     build_smoke_test_suite,

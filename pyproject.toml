@@ -34,7 +34,7 @@ allow-direct-references = true
 
 [tool.hatch.build.targets.sdist]
 include = [
-    "/scripts",
+    "/src/envmgr",
     "/playbooks",
     "/roles",
     "/vars",
@@ -43,17 +43,17 @@ include = [
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["scripts"]
+packages = ["src/envmgr"]
 
 [tool.hatch.build.targets.wheel.force-include]
-"ansible.cfg" = "scripts/_assets/ansible.cfg"
-"requirements.yaml" = "scripts/_assets/requirements.yaml"
-"playbooks" = "scripts/_assets/playbooks"
-"roles" = "scripts/_assets/roles"
-"vars" = "scripts/_assets/vars"
+"ansible.cfg" = "envmgr/_assets/ansible.cfg"
+"requirements.yaml" = "envmgr/_assets/requirements.yaml"
+"playbooks" = "envmgr/_assets/playbooks"
+"roles" = "envmgr/_assets/roles"
+"vars" = "envmgr/_assets/vars"
 
 [project.scripts]
-envmgr = "scripts.main:main"
+envmgr = "envmgr.main:main"
 
 [tool.mypy]
 python_version = "3.10"
