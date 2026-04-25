@@ -11,6 +11,7 @@ from .commands.doctor import run_doctor
 from .commands.history import run_history
 from .commands.install import run_install
 from .commands.ping import run_ping
+from .commands.self_management import self_app
 from .commands.setup import run_setup
 from .commands.shared import (
     require_setup_completed as shared_require_setup_completed,
@@ -29,6 +30,11 @@ app = typer.Typer(
     suggest_commands=True,
     rich_markup_mode="rich",
     context_settings=HELP_CONTEXT_SETTINGS,
+)
+app.add_typer(
+    self_app,
+    name="self",
+    help="Manage installer-managed envmgr releases.",
 )
 
 Context7Method = Literal["remote", "local"]
