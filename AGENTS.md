@@ -18,6 +18,8 @@ This guide helps contributors work effectively on envmgr (Ansible-driven environ
 - `envmgr setup` — initialize `~/.envmgr/` and install Galaxy roles/collections for runtime use; installed runtime commands work outside the repo, while `uv run envmgr setup` remains the repo-root fallback for a live checkout.
 - `envmgr install -l` — list tags; `envmgr install <tag ...>` — apply tags; add `--playbook <path>` when tags are ambiguous, plus `-i <alias>` or `--ask-vault-pass` as needed. Use `uv run envmgr ...` only as the repo-root fallback when running from the checkout.
 - `envmgr ping [-i remote]` — connectivity check; `uv run envmgr ping ...` is the matching fallback.
+- `envmgr self update --version <version>` — update an `install.sh`-managed GitHub Release install from its recorded `~/.envmgr/install.toml`; automatic latest-resolution is intentionally not implemented yet.
+- `envmgr self uninstall [--yes]` — uninstall an `install.sh`-managed GitHub Release tool while keeping the rest of `~/.envmgr/` runtime data by default.
 - `uv run pre-commit install` — install `pre-commit` and `pre-push` Git hooks.
 - `uv run pre-commit run --all-files` — run the standard commit-time checks (YAML hygiene + Ruff).
 - `uv run pre-commit run --hook-stage pre-push --all-files` — run the push-time checks (`typecheck` + `ansible-check`).
@@ -29,6 +31,7 @@ This guide helps contributors work effectively on envmgr (Ansible-driven environ
 ## Runtime CLI UX Contracts
 
 - Public `envmgr` supports `-h`/`--help` at the root and subcommand levels, and `envmgr --version` prints `envmgr <version>`.
+- Public `envmgr self update` and `envmgr self uninstall` are limited to installer-managed GitHub Release installs with `~/.envmgr/install.toml`; unsupported install methods must fail with actionable guidance instead of mutating the user's tool environment.
 - Public shell completion stays disabled intentionally with `add_completion=False`; keep generated completion options rejected unless the decision, docs, and tests change together.
 - Use Rich for runtime human help/status/warnings/summaries/prompts and the human `envmgr history` table. Keep JSON output and live external subprocess stdout/stderr plain.
 - Checkout-only developer helpers keep plain tool-style logs even though their entrypoints use Typer-based help.

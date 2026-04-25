@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import configparser
 import os
 import re
 import subprocess
 import sys
 import tempfile
+import zipfile
 from pathlib import Path
 from typing import cast
 from unittest.mock import patch
@@ -125,6 +127,7 @@ def check_dispatcher_routes_install_subcommand() -> None:
         "history",
         "install",
         "ping",
+        "self",
         "setup",
     ):
         if expected_fragment not in help_output:
@@ -270,6 +273,34 @@ def check_runtime_subcommands_use_typer_help() -> None:
                 "Usage: envmgr ping",
                 "Test inventory connectivity with ansible ping.",
                 "--inventory",
+            ),
+        ),
+        (
+            ("self", "--help"),
+            (
+                "Usage: envmgr self",
+                "Manage installer-managed envmgr releases.",
+                "update",
+                "uninstall",
+                "--help",
+            ),
+        ),
+        (
+            ("self", "update", "--help"),
+            (
+                "Usage: envmgr self update",
+                "Update an install.sh-managed GitHub Release install.",
+                "--version",
+                "Self-management options",
+            ),
+        ),
+        (
+            ("self", "uninstall", "--help"),
+            (
+                "Usage: envmgr self uninstall",
+                "Uninstall envmgr while keeping runtime data under ~/.envmgr.",
+                "--yes",
+                "Self-management options",
             ),
         ),
     )
@@ -494,6 +525,62 @@ def check_plan_a_packaging_keeps_runtime_and_checkout_scripts_split() -> None:
         raise AssertionError(
             "expected checkout-only helper entry points to stay in "
             "`dev-helpers/pyproject.toml`"
+        )
+
+
+def check_built_wheel_exposes_only_runtime_console_script() -> None:
+    with tempfile.TemporaryDirectory() as temp_dir:
+        wheel_dir = Path(temp_dir) / "wheelhouse"
+        wheel_dir.mkdir()
+        result = subprocess.run(
+            ["uv", "build", "--wheel", "--out-dir", str(wheel_dir)],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if result.returncode != 0:
+            raise AssertionError(
+                "expected `uv build --wheel` to build the release wheel"
+                f"\nstdout:\n{result.stdout}\nstderr:\n{result.stderr}"
+            )
+
+        wheel_paths = sorted(wheel_dir.glob("envmgr-*.whl"))
+        if len(wheel_paths) != 1:
+            raise AssertionError(
+                "expected exactly one envmgr wheel to be built"
+                f"\nwheels: {[path.name for path in wheel_paths]}"
+                f"\nstdout:\n{result.stdout}\nstderr:\n{result.stderr}"
+            )
+
+        with zipfile.ZipFile(wheel_paths[0]) as wheel:
+            entry_point_paths = [
+                name
+                for name in wheel.namelist()
+                if name.endswith(".dist-info/entry_points.txt")
+            ]
+            if len(entry_point_paths) != 1:
+                raise AssertionError(
+                    "expected the built wheel to contain exactly one "
+                    "entry_points.txt file"
+                    f"\nentry_points files: {entry_point_paths}"
+                )
+            entry_points_text = wheel.read(entry_point_paths[0]).decode("utf-8")
+
+    parser = configparser.ConfigParser()
+    parser.read_string(entry_points_text)
+    console_scripts = (
+        dict(parser.items("console_scripts"))
+        if parser.has_section("console_scripts")
+        else {}
+    )
+    expected_console_scripts = {"envmgr": "scripts.main:main"}
+    if console_scripts != expected_console_scripts:
+        raise AssertionError(
+            "expected the built wheel to expose only the `envmgr` runtime "
+            "console script"
+            f"\nconsole_scripts: {console_scripts}"
+            f"\nentry_points.txt:\n{entry_points_text}"
         )
 
 

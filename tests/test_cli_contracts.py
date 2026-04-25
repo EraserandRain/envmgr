@@ -3,6 +3,7 @@ from __future__ import annotations
 import unittest
 
 from tests.checks.cli import (
+    check_built_wheel_exposes_only_runtime_console_script,
     check_create_helper_fails_when_role_already_exists,
     check_create_helper_fails_when_scaffold_is_missing,
     check_create_helper_succeeds_with_expected_output,
@@ -49,6 +50,10 @@ CLI_CONTRACT_TEST_CHECKS: tuple[Check, ...] = (
     (
         "Plan A packaging keeps runtime and checkout helper scripts split",
         check_plan_a_packaging_keeps_runtime_and_checkout_scripts_split,
+    ),
+    (
+        "built release wheel exposes only the envmgr console script",
+        check_built_wheel_exposes_only_runtime_console_script,
     ),
     (
         "public CLI routes setup to the shared Rich runtime summary",

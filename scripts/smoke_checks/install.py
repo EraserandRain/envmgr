@@ -9,11 +9,11 @@ def check_ai_tools_setup_wizard_flow() -> None:
     with (
         patch("scripts.commands.install.console.print"),
         patch(
-            "scripts.commands.install.Confirm.ask",
+            "scripts.commands.shared.confirm_backend",
             side_effect=[True, True, True, True, True],
         ),
         patch(
-            "scripts.commands.install.Prompt.ask",
+            "scripts.commands.shared.prompt_backend",
             side_effect=["1", "1"],
         ),
         patch(

@@ -15,6 +15,38 @@ Please install `uv` first 【[uv installation](https://docs.astral.sh/uv/getting
 After installing `uv`, choose one runtime install mode so `envmgr ...` is
 available directly in your shell from any working directory.
 
+**GitHub Release installer:**
+
+```bash
+# Install the latest GitHub Release wheel with uv tool install
+curl -fsSL https://github.com/EraserandRain/envmgr/releases/latest/download/install.sh | bash
+
+# Inspect options, including --version and --dry-run
+curl -fsSL https://github.com/EraserandRain/envmgr/releases/latest/download/install.sh | bash -s -- --help
+```
+
+The installer uses `uv tool install --force` against the release wheel, records
+installer-managed state under `~/.envmgr/install.toml`, and does not edit shell
+profiles or hidden PATH files. Use `--version VERSION` for a pinned release or
+`--dry-run` to inspect the planned wheel URL and command before installing.
+
+Installer-managed GitHub Release installs can update or remove themselves:
+
+```bash
+# Update to a specific release wheel recorded through the installer state
+envmgr self update --version 0.1.0
+
+# Remove the uv tool install, but keep ~/.envmgr/ runtime data
+envmgr self uninstall --yes
+```
+
+Omit `--yes` to confirm through the interactive Rich prompt. Self-management
+commands are intentionally limited to installs with
+`~/.envmgr/install.toml` written by `install.sh`; editable installs, local wheel
+installs, and package-manager installs should be updated or removed with the
+same tool that created them. Automatic "latest release" resolution is not
+implemented yet, so pass `--version VERSION` when using `envmgr self update`.
+
 **Editable install from a checkout:**
 
 ```bash
@@ -58,10 +90,10 @@ Contributor-only helpers such as `create`, `lint`, `ansible-check`,
 checkout without installing a tool shim, `uv run envmgr ...` remains the
 repo-root fallback.
 
-To remove the global tool shim entirely, run `uv tool uninstall envmgr`. If
-your shell still reports `envmgr: command not found`, check the uv-managed bin
-directory with `uv tool dir --bin`, then run `uv tool update-shell` and start a
-new shell session so that directory is added to your `PATH`.
+To remove a non-installer global tool shim entirely, run
+`uv tool uninstall envmgr`. If stale envmgr helper shims remain from an older
+install, run `uv tool uninstall envmgr`, rerun the GitHub Release installer,
+then run `hash -r` in existing shells so command lookup forgets old paths.
 
 ### First-Time Setup
 
