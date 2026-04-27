@@ -6,7 +6,8 @@
 
 ### Dependencies
 
-Envmgr requires Python 3.10 or later and the uv package.
+Envmgr requires Python 3.10 or later. The install and self-management commands
+below use the uv package to manage the `envmgr` tool.
 
 Please install `uv` first 【[uv installation](https://docs.astral.sh/uv/getting-started/installation/)】.
 
@@ -149,7 +150,11 @@ and `uv run smoke-test` runs only the
 
 `envmgr doctor` performs a read-only health check for the current runtime. It is
 safe to run before or after setup when you want to inspect what is missing
-under `~/.envmgr/`.
+under `~/.envmgr/`. Its hard command check covers the Ansible runtime commands
+`ansible`, `ansible-playbook`, and `ansible-galaxy`; `uv` is checked only for
+installer-managed self-management. If `~/.envmgr/install.toml` records a missing
+or non-executable `uv`, doctor reports a self-management warning and still exits
+0 unless another check fails.
 Use `envmgr doctor --json` when you want a machine-readable report for scripts
 or CI. JSON modes, including `envmgr history --json`, print plain JSON without
 Rich formatting.
@@ -264,8 +269,37 @@ all:
               ansible_python_interpreter: "{{ ansible_playbook_python }}"
 ```
 
-> **Note:** `envmgr install <tags>` now resolves the scenario playbook from the selected tags. If the tags are valid in more than one scenario, pass `--playbook workstation` or `--playbook node` explicitly.
-> `envmgr install all` uses the `playbook` value from `~/.envmgr/config.toml` by default.
+> **Note:** `envmgr install <tags>` now resolves the scenario playbook from the
+> selected tags. If the tags are valid in more than one scenario, pass
+> `--playbook workstation` or `--playbook node` explicitly. Use scenario names
+> such as `workstation` and `node` for built-in runtime playbooks. Path-like
+> values, including `playbooks/workstation.yml`, absolute paths, and
+> `.yml`/`.yaml` references, are caller filesystem paths and do not fall back to
+> packaged playbooks. `envmgr install all` uses the `playbook` value from
+> `~/.envmgr/config.toml` by default.
+
+#### Built-in Scenarios
+
+Use `--playbook` when a tag is available in more than one built-in scenario or
+when you want to run every role in a specific scenario. The scenario chooses the
+Ansible playbook topology: target inventory groups, play order, role order, and
+scenario-level vars files. Tags then select features inside that scenario.
+
+| Scenario | Purpose |
+| --- | --- |
+| `workstation` | Local workstation setup targeting the `workstation` inventory group. It covers baseline bootstrap, shell setup, language runtimes, Docker/minikube, Kubernetes tools, cloud tools, and AI tools. |
+| `node` | Kubernetes node setup targeting the `node` group for shared prerequisites and the `master` group for master-only Kubernetes tooling and monitoring. |
+
+Examples:
+
+```bash
+# Built-in scenarios
+envmgr install --playbook workstation zsh node ai_tools
+envmgr install --playbook node docker kubeadm monitoring
+
+# Custom playbook path from the current working directory
+envmgr install --playbook ./custom-playbook.yml zsh
+```
 
 **For Remote Hosts:**
 
@@ -338,10 +372,10 @@ envmgr install --playbook node docker kubeadm
 envmgr install --playbook workstation init zsh java node golang ruby dotnet cloud
 envmgr install --playbook workstation init docker kubernetes_tools minikube
 envmgr install --playbook node docker kubeadm monitoring
+```
 
 The `node` scenario installs shared node prerequisites on every cluster node,
 then applies cluster management tools only on the `master` group.
-```
 
 **Remote execution:**
 

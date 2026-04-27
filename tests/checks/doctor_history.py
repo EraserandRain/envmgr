@@ -15,6 +15,7 @@ from envmgr.services.doctor import (
     DOCTOR_COMMANDS,
     DOCTOR_FAIL,
     DOCTOR_OK,
+    DOCTOR_WARN,
     build_doctor_report,
 )
 from envmgr.services.runtime import (
@@ -51,6 +52,31 @@ def _create_fake_tool_bin(root: Path) -> Path:
     for command_name in DOCTOR_COMMANDS:
         _write_fake_command(tool_bin / command_name)
     return tool_bin.resolve()
+
+
+def _toml_quote(value: Path | str) -> str:
+    return str(value).replace("\\", "\\\\").replace('"', '\\"')
+
+
+def _write_installer_state(envmgr_home: Path, uv_path: Path) -> None:
+    (envmgr_home / "install.toml").write_text(
+        "\n".join(
+            [
+                "[install]",
+                'source = "github-release"',
+                'manager = "install.sh"',
+                'owner = "example"',
+                'repo = "envmgr"',
+                'version = "0.1.0"',
+                'release_tag = "v0.1.0"',
+                'wheel_url = "https://example.invalid/envmgr.whl"',
+                f'uv = "{_toml_quote(uv_path)}"',
+                f'uv_tool_bin_dir = "{_toml_quote(envmgr_home / "uv-bin")}"',
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
 
 
 def check_history_text_output() -> None:
@@ -306,6 +332,45 @@ def check_doctor_report_passes_bootstrapped_runtime() -> None:
             raise AssertionError(
                 "expected doctor to validate the default inventory alias"
             )
+        command_check = next(
+            check for check in report.checks if check.name == "commands"
+        )
+        if "uv" in command_check.detail:
+            raise AssertionError(
+                "expected doctor to avoid hard-checking uv as a runtime command"
+            )
+
+        missing_command_bin = Path(temp_dir) / "missing-command-bin"
+        missing_command_bin.mkdir()
+        for command_name in ("ansible", "ansible-galaxy"):
+            _write_fake_command(missing_command_bin / command_name)
+        with (
+            patch.dict(os.environ, {"PATH": ""}, clear=False),
+            patch(
+                "envmgr.services.runtime.sysconfig.get_path",
+                return_value=str(missing_command_bin),
+            ),
+            patch(
+                "envmgr.services.runtime.sys.executable",
+                str(missing_command_bin / "python3"),
+            ),
+        ):
+            missing_command_report = build_doctor_report(envmgr_home)
+        missing_command_check = next(
+            check for check in missing_command_report.checks if check.name == "commands"
+        )
+        if missing_command_check.status != DOCTOR_FAIL:
+            raise AssertionError(
+                "expected doctor to fail when a required Ansible command is missing"
+            )
+        if "ansible-playbook" not in missing_command_check.detail:
+            raise AssertionError(
+                "expected doctor to identify the missing required Ansible command"
+            )
+        if "uv" in missing_command_check.detail:
+            raise AssertionError(
+                "expected missing uv to stay out of hard command failures"
+            )
 
 
 def check_doctor_ignores_non_default_inventory_aliases() -> None:
@@ -504,4 +569,50 @@ def check_doctor_json_output() -> None:
         if any(check["name"] == "runtime config" for check in payload["checks"]):
             raise AssertionError(
                 "expected doctor --json to omit runtime config when healthy"
+            )
+
+        missing_uv = Path(temp_dir) / "missing-uv"
+        _write_installer_state(envmgr_home, missing_uv)
+        with (
+            patch.dict(os.environ, {"PATH": ""}, clear=False),
+            patch(
+                "envmgr.services.runtime.sysconfig.get_path",
+                return_value=str(tool_bin),
+            ),
+            patch("envmgr.services.runtime.sys.executable", str(tool_bin / "python3")),
+        ):
+            warning_result = invoke_envmgr(
+                "doctor",
+                "--json",
+                envmgr_home=envmgr_home,
+                env_overrides={"PATH": ""},
+            )
+        if warning_result.exit_code != 0:
+            raise AssertionError(
+                "expected doctor --json warnings to keep exit code zero"
+                f"\noutput:\n{warning_result.output}"
+            )
+
+        warning_payload = json.loads(warning_result.output)
+        if warning_payload["status"] != DOCTOR_WARN:
+            raise AssertionError(
+                "expected invalid recorded uv to make doctor --json warn"
+            )
+        if warning_payload["summary"]["warn"] != 1:
+            raise AssertionError("expected invalid recorded uv to count as one warning")
+        if warning_payload["summary"]["fail"] != 0:
+            raise AssertionError(
+                "expected invalid recorded uv to avoid doctor failures"
+            )
+        warnings = [
+            check
+            for check in warning_payload["checks"]
+            if check["status"] == DOCTOR_WARN
+        ]
+        if not any(
+            check["name"] == "self management" and str(missing_uv) in check["detail"]
+            for check in warnings
+        ):
+            raise AssertionError(
+                "expected invalid recorded uv warning to identify the recorded path"
             )

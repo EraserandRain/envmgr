@@ -250,6 +250,9 @@ def check_runtime_assets_resolve_outside_repo_cwd() -> None:
             resolved_shadow_playbook = assets.resolve_playbook(
                 "playbooks/workstation.yml"
             )
+            resolved_missing_node_playbook = assets.resolve_playbook(
+                "playbooks/node.yml"
+            )
         finally:
             os.chdir(original_cwd)
 
@@ -267,11 +270,10 @@ def check_runtime_assets_resolve_outside_repo_cwd() -> None:
             raise AssertionError(
                 "expected path-like playbook references to resolve from the caller cwd first"
             )
-        if assets.resolve_playbook("playbooks/node.yml") != (
-            repo_root / "playbooks" / "node.yml"
-        ):
+        missing_node_playbook = (Path(temp_dir) / "playbooks" / "node.yml").resolve()
+        if resolved_missing_node_playbook != missing_node_playbook:
             raise AssertionError(
-                "expected repo-relative playbook paths to resolve outside the repo cwd"
+                "expected missing path-like playbook references to avoid packaged fallback"
             )
         if assets.roles_dir != (repo_root / "roles"):
             raise AssertionError(
@@ -352,11 +354,12 @@ def check_runtime_assets_resolve_from_packaged_assets_outside_repo_cwd() -> None
             raise AssertionError(
                 "expected scenario playbooks to resolve from packaged assets"
             )
-        if resolved_repo_relative_playbook != (
-            packaged_playbooks_dir / "workstation.yml"
-        ):
+        expected_caller_playbook = (
+            outside_cwd / "playbooks" / "workstation.yml"
+        ).resolve()
+        if resolved_repo_relative_playbook != expected_caller_playbook:
             raise AssertionError(
-                "expected repo-relative playbook paths to resolve from packaged assets"
+                "expected path-like playbook references to avoid packaged fallback"
             )
         if assets.roles_dir != packaged_roles_dir:
             raise AssertionError(

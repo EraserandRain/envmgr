@@ -25,7 +25,7 @@ def check_ai_tools_setup_wizard_flow() -> None:
     ):
         options = resolve_ai_tools_install_options(
             ["ai_tools"],
-            execution_playbook_path="playbooks/workstation.yml",
+            execution_playbook_path="workstation",
             manage_claude_code=None,
             manage_codex=None,
             manage_rtk=None,

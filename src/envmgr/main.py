@@ -152,7 +152,11 @@ def _install_command(
         str | None,
         typer.Option(
             "--playbook",
-            help="Specify a scenario token or playbook path explicitly when tags are ambiguous",
+            help=(
+                "Built-in scenario (`workstation`, `node`) or custom playbook path. "
+                "`workstation` targets the local workstation group; `node` targets "
+                "Kubernetes node/master groups."
+            ),
             rich_help_panel=RUNTIME_OPTIONS_HELP_PANEL,
         ),
     ] = None,

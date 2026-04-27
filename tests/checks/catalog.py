@@ -70,12 +70,30 @@ def check_catalog_defaults_resolve_outside_repo_cwd() -> None:
         os.chdir(temp_dir)
         try:
             role_tags, task_tags = get_available_tags()
-            relative_workstation_tags = load_playbook_tags("playbooks/workstation.yml")
+            try:
+                load_playbook_tags("playbooks/workstation.yml")
+            except CatalogError:
+                relative_workstation_tags_rejected = True
+            else:
+                relative_workstation_tags_rejected = False
             logical_workstation_tags = load_playbook_tags("workstation")
             resolved_workstation_playbook = resolve_install_playbook(
                 ["zsh"],
                 explicit_playbook=None,
             )
+            explicit_workstation_playbook = resolve_install_playbook(
+                ["init"],
+                explicit_playbook="workstation",
+            )
+            try:
+                resolve_install_playbook(
+                    ["init"],
+                    explicit_playbook="playbooks/workstation.yml",
+                )
+            except CatalogError:
+                explicit_relative_playbook_rejected = True
+            else:
+                explicit_relative_playbook_rejected = False
         finally:
             os.chdir(original_cwd)
 
@@ -83,9 +101,9 @@ def check_catalog_defaults_resolve_outside_repo_cwd() -> None:
         raise AssertionError(
             "expected catalog defaults to resolve first-party roles outside the repo cwd"
         )
-    if relative_workstation_tags != expected_workstation_tags:
+    if not relative_workstation_tags_rejected:
         raise AssertionError(
-            "expected repo-relative playbook paths to resolve outside the repo cwd"
+            "expected missing path-like playbook references to avoid packaged fallback"
         )
     if logical_workstation_tags != expected_workstation_tags:
         raise AssertionError(
@@ -94,4 +112,12 @@ def check_catalog_defaults_resolve_outside_repo_cwd() -> None:
     if resolved_workstation_playbook != expected_workstation_playbook:
         raise AssertionError(
             "expected tag-based playbook resolution to keep working outside the repo cwd"
+        )
+    if explicit_workstation_playbook != expected_workstation_playbook:
+        raise AssertionError(
+            "expected explicit scenario playbooks to resolve outside the repo cwd"
+        )
+    if not explicit_relative_playbook_rejected:
+        raise AssertionError(
+            "expected explicit path-like playbooks to avoid packaged fallback"
         )

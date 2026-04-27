@@ -16,7 +16,7 @@ This guide helps contributors work effectively on envmgr (Ansible-driven environ
 
 - `uv sync` — install or refresh the local Python environment for development work.
 - `envmgr setup` — initialize `~/.envmgr/` and install Galaxy roles/collections for runtime use; installed runtime commands work outside the repo, while `uv run envmgr setup` remains the repo-root fallback for a live checkout.
-- `envmgr install -l` — list tags; `envmgr install <tag ...>` — apply tags; add `--playbook <path>` when tags are ambiguous, plus `-i <alias>` or `--ask-vault-pass` as needed. Use `uv run envmgr ...` only as the repo-root fallback when running from the checkout.
+- `envmgr install -l` — list tags and built-in scenarios; `envmgr install <tag ...>` — apply tags; add `--playbook <scenario-or-path>` when tags are ambiguous, plus `-i <alias>` or `--ask-vault-pass` as needed. Prefer built-in scenario names (`workstation` for local workstation setup, `node` for Kubernetes node/master setup) for runtime playbooks; path-like values are caller filesystem paths. Use `uv run envmgr ...` only as the repo-root fallback when running from the checkout.
 - `envmgr ping [-i remote]` — connectivity check; `uv run envmgr ping ...` is the matching fallback.
 - `envmgr self update --version <version>` — update an `install.sh`-managed GitHub Release install from its recorded `~/.envmgr/install.toml`; automatic latest-resolution is intentionally not implemented yet.
 - `envmgr self uninstall [--yes]` — uninstall an `install.sh`-managed GitHub Release tool while keeping the rest of `~/.envmgr/` runtime data by default.
@@ -34,6 +34,7 @@ This guide helps contributors work effectively on envmgr (Ansible-driven environ
 - Public `envmgr` supports `-h`/`--help` at the root and subcommand levels, and `envmgr --version` prints `envmgr <version>`.
 - Public `envmgr self update` and `envmgr self uninstall` are limited to installer-managed GitHub Release installs with `~/.envmgr/install.toml`; unsupported install methods must fail with actionable guidance instead of mutating the user's tool environment.
 - Public shell completion stays disabled intentionally with `add_completion=False`; keep generated completion options rejected unless the decision, docs, and tests change together.
+- Public `envmgr install --playbook` accepts scenario names (`workstation`, `node`) or filesystem paths. Use `workstation` for local workstation setup and `node` for Kubernetes node/master setup. Scenario names select the built-in Ansible playbook topology, while tags select features inside that topology; path-like values (absolute, containing separators, or `.yml`/`.yaml`) resolve from the caller filesystem.
 - Use Rich for runtime human help/status/warnings/summaries/prompts and the human `envmgr history` table. Keep JSON output and live external subprocess stdout/stderr plain.
 - Checkout-only developer helpers keep plain tool-style logs even though their entrypoints use Typer-based help.
 - Expected runtime exits should use `typer.Exit` inside command paths, send actionable user guidance to stderr, and preserve shell-friendly exit codes (`0`, `1`, `2`, `130`).

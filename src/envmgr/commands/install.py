@@ -35,6 +35,17 @@ from .shared import (
     require_setup_completed,
 )
 
+BUILTIN_SCENARIOS = (
+    (
+        "workstation",
+        "Local workstation setup for the workstation inventory group.",
+    ),
+    (
+        "node",
+        "Kubernetes node setup: node prerequisites plus master-only tools.",
+    ),
+)
+
 
 class WizardCancelled(RuntimeError):
     """Raised when the interactive setup wizard is cancelled by the user."""
@@ -289,6 +300,14 @@ def resolve_ai_tools_install_options(
     )
 
 
+def print_builtin_scenarios() -> None:
+    """Render built-in scenario tokens alongside tag discovery output."""
+    console.print()
+    console.print(Text("Built-in scenarios:", style="bold"))
+    for name, description in BUILTIN_SCENARIOS:
+        console.print(Text(f"  - {name}: {description}"))
+
+
 def run_install(
     *,
     tags: list[str],
@@ -307,6 +326,7 @@ def run_install(
     if list_tags:
         role_tags, task_tags = load_available_tags()
         print_section_title("Envmgr available tags:")
+        print_builtin_scenarios()
         print_bullet_list("Role level tags:", role_tags)
         print_bullet_list("Task level tags:", task_tags)
         return
