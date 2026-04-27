@@ -50,7 +50,7 @@ class _FakeRuntimeProcess:
 def check_ai_tools_install_option_resolution() -> None:
     options = resolve_ai_tools_install_options(
         ["ai_tools"],
-        execution_playbook_path="playbooks/workstation.yml",
+        execution_playbook_path="workstation",
         manage_claude_code=None,
         manage_codex=True,
         manage_rtk=None,
@@ -75,7 +75,7 @@ def check_ai_tools_install_option_resolution() -> None:
 
     rtk_only_options = resolve_ai_tools_install_options(
         ["rtk"],
-        execution_playbook_path="playbooks/workstation.yml",
+        execution_playbook_path="workstation",
         manage_claude_code=None,
         manage_codex=None,
         manage_rtk=None,
@@ -93,7 +93,7 @@ def check_ai_tools_install_option_resolution() -> None:
 
     node_options = resolve_ai_tools_install_options(
         ["all"],
-        execution_playbook_path="playbooks/node.yml",
+        execution_playbook_path="node",
         manage_claude_code=None,
         manage_codex=None,
         manage_rtk=None,
@@ -160,7 +160,7 @@ def check_ai_tools_setup_wizard_uses_shared_prompt_path() -> None:
     ):
         options = resolve_ai_tools_install_options(
             ["ai_tools"],
-            execution_playbook_path="playbooks/workstation.yml",
+            execution_playbook_path="workstation",
             manage_claude_code=None,
             manage_codex=None,
             manage_rtk=None,
@@ -197,7 +197,7 @@ def check_ai_tools_setup_wizard_prompt_interrupt_exits_130() -> None:
         try:
             resolve_ai_tools_install_options(
                 ["ai_tools"],
-                execution_playbook_path="playbooks/workstation.yml",
+                execution_playbook_path="workstation",
                 manage_claude_code=None,
                 manage_codex=None,
                 manage_rtk=None,
@@ -325,7 +325,7 @@ def check_install_scoped_runs_rewrite_vars_files_to_absolute_paths() -> None:
             os.chdir(temp_dir)
             install_plan = build_install_plan(
                 ["init"],
-                explicit_playbook="playbooks/workstation.yml",
+                explicit_playbook="workstation",
                 inventory_reference=None,
                 envmgr_home=envmgr_home,
             )
@@ -388,6 +388,9 @@ def check_install_list_tags_uses_rich_console() -> None:
     )
     for expected_fragment in (
         "Envmgr available tags:",
+        "Built-in scenarios:",
+        "  - workstation: Local workstation setup",
+        "  - node: Kubernetes node setup",
         "Role level tags:",
         "Task level tags:",
         "  - init",

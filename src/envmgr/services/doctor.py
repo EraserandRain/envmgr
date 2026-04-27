@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
@@ -15,8 +16,9 @@ from ..runtime_config import (
 )
 from .assets import RuntimeAssetError, RuntimeAssets, resolve_runtime_assets
 from .runtime import build_effective_command_path
+from .self_management import SelfManagementError, load_installer_state
 
-DOCTOR_COMMANDS = ("uv", "ansible", "ansible-playbook", "ansible-galaxy")
+DOCTOR_COMMANDS = ("ansible", "ansible-playbook", "ansible-galaxy")
 DOCTOR_OK = "ok"
 DOCTOR_WARN = "warn"
 DOCTOR_FAIL = "fail"
@@ -81,6 +83,10 @@ def build_doctor_report(envmgr_home: str | Path | None = None) -> DoctorReport:
             DOCTOR_OK,
             ", ".join(DOCTOR_COMMANDS),
         )
+
+    installer_uv_warning = get_installer_uv_warning_detail(paths)
+    if installer_uv_warning is not None:
+        add_check("self management", DOCTOR_WARN, installer_uv_warning)
 
     if not paths.home.exists():
         add_check(
@@ -177,6 +183,30 @@ def build_doctor_report(envmgr_home: str | Path | None = None) -> DoctorReport:
         default_playbook_path=default_playbook_path,
         checks=checks,
     )
+
+
+def get_installer_uv_warning_detail(paths: RuntimePaths) -> str | None:
+    """Return a warning when installer-managed self-management has a bad uv."""
+    state_file = paths.home / "install.toml"
+    if not state_file.exists():
+        return None
+
+    try:
+        state = load_installer_state(paths.home)
+    except SelfManagementError:
+        return None
+
+    if not state.uv.exists():
+        return (
+            f"recorded uv executable not found: {state.uv} "
+            f"(from {state.state_file}); envmgr self update/uninstall may fail"
+        )
+    if not os.access(state.uv, os.X_OK):
+        return (
+            f"recorded uv executable is not executable: {state.uv} "
+            f"(from {state.state_file}); envmgr self update/uninstall may fail"
+        )
+    return None
 
 
 def summarize_doctor_report(report: DoctorReport) -> tuple[int, int, int]:

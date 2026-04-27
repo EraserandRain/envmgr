@@ -47,7 +47,7 @@ class RuntimeAssets:
             or raw_reference.suffix in _SCENARIO_PLAYBOOK_SUFFIXES
             or len(raw_reference.parts) > 1
         ):
-            return self.resolve_repo_path(raw_reference)
+            return raw_reference.resolve()
 
         scenario_name = raw_reference.name
         if scenario_name in self.scenario_playbooks:

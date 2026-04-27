@@ -154,6 +154,12 @@ def check_dispatcher_routes_install_subcommand() -> None:
     output = result.output
     if "Envmgr available tags:" not in output:
         raise AssertionError("expected dispatcher to route to the install subcommand")
+    if "Built-in scenarios:" not in output:
+        raise AssertionError("expected dispatcher to print built-in scenarios")
+    if "  - workstation:" not in output:
+        raise AssertionError("expected dispatcher to print workstation scenario")
+    if "  - node:" not in output:
+        raise AssertionError("expected dispatcher to print node scenario")
     if "  - zsh" not in output:
         raise AssertionError("expected dispatcher to print install role tags")
     if "  - codex" not in output:
@@ -226,6 +232,11 @@ def check_runtime_subcommands_use_typer_help() -> None:
                 "-h",
                 "--list-tags",
                 "--inventory",
+                "--playbook",
+                "Built-in scenario",
+                "workstation",
+                "node",
+                "custom playbook path",
                 "Output",
                 "Runtime options",
                 "AI tools",
@@ -240,6 +251,11 @@ def check_runtime_subcommands_use_typer_help() -> None:
                 "-h",
                 "--list-tags",
                 "--inventory",
+                "--playbook",
+                "Built-in scenario",
+                "workstation",
+                "node",
+                "custom playbook path",
                 "Output",
                 "Runtime options",
                 "AI tools",
@@ -254,6 +270,11 @@ def check_runtime_subcommands_use_typer_help() -> None:
                 "-h",
                 "--list-tags",
                 "--inventory",
+                "--playbook",
+                "Built-in scenario",
+                "workstation",
+                "node",
+                "custom playbook path",
                 "Output",
                 "Runtime options",
                 "AI tools",

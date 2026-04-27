@@ -69,23 +69,23 @@ def check_scaffold_generation() -> None:
 
 def check_execution_playbook_generation() -> None:
     generated_ai_tools_playbook = build_execution_playbook(
-        "playbooks/workstation.yml",
+        "workstation",
         ["ai_tools"],
     )
     generated_codex_playbook = build_execution_playbook(
-        "playbooks/workstation.yml",
+        "workstation",
         ["codex"],
     )
     generated_rtk_playbook = build_execution_playbook(
-        "playbooks/workstation.yml",
+        "workstation",
         ["rtk"],
     )
     generated_init_playbook = build_execution_playbook(
-        "playbooks/workstation.yml",
+        "workstation",
         ["init"],
     )
     generated_monitoring_playbook = build_execution_playbook(
-        "playbooks/node.yml",
+        "node",
         ["monitoring"],
     )
 
