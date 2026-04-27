@@ -32,9 +32,12 @@ This guide helps contributors work effectively on envmgr (Ansible-driven environ
 ## Runtime CLI UX Contracts
 
 - Public `envmgr` supports `-h`/`--help` at the root and subcommand levels, and `envmgr --version` prints `envmgr <version>`.
-- Public `envmgr self update` and `envmgr self uninstall` are limited to installer-managed GitHub Release installs with `~/.envmgr/install.toml`; unsupported install methods must fail with actionable guidance instead of mutating the user's tool environment.
 - Public shell completion stays disabled intentionally with `add_completion=False`; keep generated completion options rejected unless the decision, docs, and tests change together.
 - Public `envmgr install --playbook` accepts scenario names (`workstation`, `node`) or filesystem paths. Use `workstation` for local workstation setup and `node` for Kubernetes node/master setup. Scenario names select the built-in Ansible playbook topology, while tags select features inside that topology; path-like values (absolute, containing separators, or `.yml`/`.yaml`) resolve from the caller filesystem.
+- Public `envmgr install --help` must explain built-in scenarios and custom playbook paths; `envmgr install -l` must show built-in scenario descriptions before role and task tags.
+- Public `envmgr doctor` and `envmgr doctor --json` exit non-zero only for failing checks; warning-only reports still exit `0`. The hard command check covers Ansible runtime commands (`ansible`, `ansible-playbook`, `ansible-galaxy`), while invalid installer-recorded `uv` paths produce a self-management warning instead of a generic runtime command failure.
+- Public `envmgr self update` and `envmgr self uninstall` are limited to installer-managed GitHub Release installs with `~/.envmgr/install.toml`; unsupported install methods must fail with actionable guidance instead of mutating the user's tool environment.
+- Public `envmgr self update --version VERSION` is required because automatic latest-release resolution is not implemented yet. `envmgr self uninstall` prompts through the shared Rich confirm helper unless `--yes` is provided, removes only installer state and the uv tool install, and keeps the rest of `~/.envmgr/` runtime data by default.
 - Use Rich for runtime human help/status/warnings/summaries/prompts and the human `envmgr history` table. Keep JSON output and live external subprocess stdout/stderr plain.
 - Checkout-only developer helpers keep plain tool-style logs even though their entrypoints use Typer-based help.
 - Expected runtime exits should use `typer.Exit` inside command paths, send actionable user guidance to stderr, and preserve shell-friendly exit codes (`0`, `1`, `2`, `130`).
@@ -66,7 +69,10 @@ This guide helps contributors work effectively on envmgr (Ansible-driven environ
 - Treat documentation updates as part of the code change, not as follow-up cleanup.
 - When behavior, commands, flags, defaults, test layout, project structure, or developer workflow changes, update the relevant docs in the same patch.
 - Always review `AGENTS.md`, `README.md`, and any user-facing command examples affected by the change; stale examples or outdated command descriptions should be fixed before finishing.
-- For CLI UX changes, update `docs/typer-rich-checklist.md` alongside README/AGENTS so the Typer/Rich contract stays current.
+- When public `envmgr` commands, options, arguments, defaults, or exit semantics change, update the user-facing docs and the docs contract tests so `tests/test_docs_contracts.py` continues to prove the public CLI surface is documented.
+- For CLI UX changes, update the `Runtime CLI UX Contracts` section alongside README examples so the Typer/Rich contract stays current.
+- When playbook resolution semantics, built-in scenarios, or `--playbook` behavior changes, update `README.md`, `AGENTS.md`, CLI help/list output, and the docs/CLI contract tests in the same patch.
+- When `envmgr doctor` dependency classification, warning behavior, JSON status, or exit semantics change, update `README.md`, `AGENTS.md`, and the docs/CLI contract tests in the same patch.
 - Use `AGENTS.md` as the repository instruction source of truth and keep `CLAUDE.md` as a thin pointer to `AGENTS.md` rather than maintaining duplicated guidance.
 - During reviews or automated maintenance passes, explicitly check whether the code diff should trigger doc updates and make them proactively.
 
