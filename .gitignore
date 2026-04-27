@@ -102,9 +102,8 @@ Pipfile.lock
 poetry.lock
 
 # uv
-#   uv.lock should generally be included in version control for reproducible builds
-#   but can be ignored for libraries
-uv.lock
+#   uv.lock is committed for reproducible CI and release builds because
+#   workflows run `uv sync --locked`.
 
 # pdm
 #   Similar to Pipfile.lock, it is generally recommended to include pdm.lock in version control.
