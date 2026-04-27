@@ -159,8 +159,9 @@ Use `envmgr doctor --json` when you want a machine-readable report for scripts
 or CI. JSON modes, including `envmgr history --json`, print plain JSON without
 Rich formatting.
 Use `envmgr history` to inspect the most recent runtime subprocess records, or
-`envmgr history -n 5` to focus on the latest few commands. Human history output
-uses a Rich table while preserving stored command values literally.
+`envmgr history --limit 5` / `envmgr history -n 5` to focus on the latest few
+commands. Human history output uses a Rich table while preserving stored command
+values literally.
 The public runtime CLI supports `-h` and `--help` at the root and subcommand
 levels, and `envmgr --version` prints `envmgr <version>`. Shell completion is
 intentionally disabled for now, so generated completion install options are
