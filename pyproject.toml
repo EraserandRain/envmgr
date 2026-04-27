@@ -22,6 +22,7 @@ dev = [
     "envmgr-dev-helpers",
     "mypy>=1.15.0",
     "pre-commit>=4.0.0",
+    "tomli>=2.2.1",
     "types-PyYAML>=6.0.0",
     "ruff>=0.8.0",
 ]
