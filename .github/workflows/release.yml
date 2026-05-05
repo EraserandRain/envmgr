@@ -158,16 +158,21 @@ jobs:
             fi
           done
 
-      - name: Write release notes
+      - name: Write fixed release note preface
         run: |
           package_version="${GITHUB_REF_NAME#v}"
           cat > release-notes.md <<EOF
           ## Install
 
-          Inspect \`install.sh\`, verify \`SHA256SUMS\`, then install with:
+          Download the installer and checksum file, inspect the script, verify the
+          installer checksum, then install:
 
           \`\`\`bash
-          curl -fsSL https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/install.sh | bash
+          curl -fsSLO https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/install.sh
+          curl -fsSLO https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/SHA256SUMS
+          grep ' install.sh$' SHA256SUMS | sha256sum -c -
+          less install.sh
+          bash install.sh
           \`\`\`
 
           ## Upgrade
@@ -189,8 +194,6 @@ jobs:
           curl -fsSL https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/install.sh | bash
           hash -r
           \`\`\`
-
-          Add release-specific highlights, breaking changes, and migration notes before announcing this release.
           EOF
 
       - name: Publish GitHub Release
@@ -204,4 +207,5 @@ jobs:
             dist/SHA256SUMS \
             --verify-tag \
             --title "$GITHUB_REF_NAME" \
-            --notes-file release-notes.md
+            --generate-notes \
+            --notes "$(cat release-notes.md)"

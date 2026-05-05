@@ -360,7 +360,7 @@ def check_install_list_tags_uses_rich_console() -> None:
     with (
         patch(
             "envmgr.commands.install.load_available_tags",
-            return_value=(["init"], ["codex", "rtk"]),
+            return_value=(["init"], ["codex", "github_cli", "rtk"]),
         ),
         patch("envmgr.commands.install.console.print") as mock_console_print,
         patch("builtins.print") as mock_print,
@@ -395,6 +395,7 @@ def check_install_list_tags_uses_rich_console() -> None:
         "Task level tags:",
         "  - init",
         "  - codex",
+        "  - github_cli",
         "  - rtk",
     ):
         if expected_fragment not in output:

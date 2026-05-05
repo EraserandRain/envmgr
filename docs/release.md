@@ -26,7 +26,9 @@ GitHub Release publishing is tag-driven. Push version tags matching `vX.Y.Z`
 only after the release commit is ready. The release workflow should run locked
 dependency sync, setup, validation, smoke tests, release-style builds, artifact
 inspection, installer preparation, SHA256 checksum generation, isolated wheel
-install smoke testing, and `gh release create`.
+install smoke testing, and `gh release create` with `--generate-notes`. The
+workflow prepends fixed install, SHA256 verification, upgrade, uninstall, and
+clean-reinstall guidance with `--notes`.
 
 Release artifacts should include only:
 
@@ -85,16 +87,14 @@ shells.
 
 ## Release Notes Checklist
 
-Include:
+GitHub-generated release notes provide the changelog body. The workflow prepends
+fixed guidance that includes:
 
-- Release-specific highlights.
-- Breaking changes and migration steps.
 - Install guidance that links to `install.sh`.
 - SHA256 verification guidance.
 - Upgrade guidance with `envmgr self update --version <version>`.
 - Uninstall guidance with `envmgr self uninstall [--yes]`.
 - Clean-reinstall guidance for stale shims.
-- Manual follow-up needed for install, upgrade, uninstall, or runtime data.
 
 ## CI Alignment
 

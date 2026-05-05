@@ -226,6 +226,7 @@ def check_install_list_tags_cli_contract() -> None:
         "Task level tags:",
         "  - init",
         "  - codex",
+        "  - github_cli",
         "  - rtk",
     ):
         if expected_fragment not in output:
