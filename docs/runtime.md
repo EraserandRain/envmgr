@@ -142,8 +142,8 @@ Role-level tags install complete modules:
 - `ruby` - default Ruby version `3.0.5`.
 - `zsh`
 
-Task-level tags include `claude_code`, `codex`, `rtk`, `hashicorp`,
-`terraform`, and `tf`.
+Task-level tags include `claude_code`, `codex`, `rtk`, `github_cli`,
+`hashicorp`, `terraform`, and `tf`.
 
 Use `envmgr install -l` or `envmgr install --list-tags` for the generated,
 current list of scenarios, role tags, and task tags.

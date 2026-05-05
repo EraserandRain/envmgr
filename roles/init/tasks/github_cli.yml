@@ -1,4 +1,20 @@
 ---
+- name: Resolve GitHub CLI apt architecture
+  set_fact:
+    github_cli_apt_architecture: >-
+      {{ github_cli_apt_architecture_map.get(ansible_architecture, '') }}
+  vars:
+    github_cli_apt_architecture_map:
+      x86_64: amd64
+      aarch64: arm64
+
+- name: Fail if GitHub CLI apt architecture is unsupported
+  fail:
+    msg: >-
+      GitHub CLI apt repository does not support architecture
+      '{{ ansible_architecture }}'. Supported architectures: x86_64, aarch64.
+  when: github_cli_apt_architecture == ""
+
 - name: Check if wget is installed
   command: which wget
   register: wget_check
@@ -29,7 +45,7 @@
 
 - name: Add GitHub CLI repository
   apt_repository:
-    repo: "deb [arch={{ ansible_architecture }} signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main"
+    repo: "deb [arch={{ github_cli_apt_architecture }} signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main"
     state: present
     filename: github-cli
   become: true
@@ -37,6 +53,6 @@
 - name: Install GitHub CLI
   apt:
     name: gh
-    state: present
+    state: latest
     update_cache: true
   become: true

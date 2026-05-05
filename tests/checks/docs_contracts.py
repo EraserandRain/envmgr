@@ -197,3 +197,29 @@ def check_doctor_dependency_docs_contract() -> None:
             "invalid installer-recorded `uv` paths produce a self-management warning",
         ),
     )
+
+
+def check_release_notes_docs_contract() -> None:
+    """Keep release note automation synchronized in release docs."""
+    release_docs = _read_repo_text("docs/release.md")
+    agents = _read_repo_text("AGENTS.md")
+
+    _assert_contains(
+        file_name="docs/release.md",
+        text=release_docs,
+        fragments=(
+            "`gh release create` with `--generate-notes`",
+            "workflow prepends fixed install, SHA256 verification, upgrade,",
+            "clean-reinstall guidance with `--notes`",
+            "GitHub-generated release notes provide the changelog body",
+        ),
+    )
+    _assert_contains(
+        file_name="AGENTS.md",
+        text=agents,
+        fragments=(
+            "`gh release create` with GitHub-generated release notes",
+            "Release notes prepend fixed install, SHA256 verification, upgrade,",
+            "before GitHub-generated notes",
+        ),
+    )

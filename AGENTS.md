@@ -179,7 +179,7 @@ and release contracts.
   `vX.Y.Z` only after locked sync, setup, validation, smoke tests,
   release-style build, artifact inspection, installer preparation, SHA256
   checksum generation, isolated wheel-install smoke testing, and
-  `gh release create`.
+  `gh release create` with GitHub-generated release notes.
 - [ ] Release artifacts include only the envmgr wheel, sdist, generated
   `install.sh`, and `SHA256SUMS`; never publish an `envmgr-dev-helpers`
   artifact.
@@ -188,9 +188,8 @@ and release contracts.
   `envmgr self update --version <version>`, uninstall with
   `envmgr self uninstall [--yes]`, and clean-reinstall stale shims with
   `uv tool uninstall envmgr`, the GitHub Release installer, and `hash -r`.
-- [ ] Release notes call out release-specific highlights, breaking changes,
-  migration steps, and manual follow-up affecting install, upgrade, uninstall,
-  or clean-reinstall paths.
+- [ ] Release notes prepend fixed install, SHA256 verification, upgrade,
+  uninstall, and clean-reinstall guidance before GitHub-generated notes.
 
 ## PR And Security Checklist
 

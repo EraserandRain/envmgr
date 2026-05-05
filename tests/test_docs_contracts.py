@@ -5,6 +5,7 @@ import unittest
 from tests.checks.docs_contracts import (
     check_doctor_dependency_docs_contract,
     check_public_cli_surface_docs_contract,
+    check_release_notes_docs_contract,
     check_runtime_playbook_scenario_docs_contract,
 )
 from tests.support import Check, build_check_suite, build_check_test_case
@@ -21,6 +22,10 @@ DOCS_CONTRACT_TEST_CHECKS: tuple[Check, ...] = (
     (
         "doctor dependency docs stay synchronized",
         check_doctor_dependency_docs_contract,
+    ),
+    (
+        "release notes docs stay synchronized",
+        check_release_notes_docs_contract,
     ),
 )
 

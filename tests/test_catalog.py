@@ -4,6 +4,7 @@ import unittest
 
 from tests.checks.catalog import (
     check_catalog_defaults_resolve_outside_repo_cwd,
+    check_github_cli_task_tag_catalog_and_execution_playbook,
     check_playbook_resolution,
 )
 from tests.support import Check, build_check_suite, build_check_test_case
@@ -13,6 +14,10 @@ CATALOG_TEST_CHECKS: tuple[Check, ...] = (
     (
         "catalog defaults resolve outside the repo cwd",
         check_catalog_defaults_resolve_outside_repo_cwd,
+    ),
+    (
+        "github_cli task tag catalog and execution playbook",
+        check_github_cli_task_tag_catalog_and_execution_playbook,
     ),
 )
 

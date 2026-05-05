@@ -100,7 +100,7 @@ envmgr install --playbook ./custom-playbook.yml zsh
 Role-level tags include `ai_tools`, `cloud`, `docker`, `dotnet`, `golang`,
 `init`, `java`, `kubeadm`, `kubernetes_tools`, `minikube`, `monitoring`, `node`,
 `ruby`, and `zsh`. Task-level tags include `claude_code`, `codex`, `rtk`,
-`hashicorp`, `terraform`, and `tf`.
+`github_cli`, `hashicorp`, `terraform`, and `tf`.
 
 ## AI Tools
 

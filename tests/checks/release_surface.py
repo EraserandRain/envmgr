@@ -8,6 +8,11 @@ import tempfile
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+RELEASE_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "release.yml"
+
+
+def _read_release_workflow() -> str:
+    return RELEASE_WORKFLOW.read_text(encoding="utf-8")
 
 
 def _run_command(
@@ -48,6 +53,44 @@ def _find_command(bin_dir: Path, command_name: str) -> Path | None:
         if candidate.exists():
             return candidate
     return None
+
+
+def _assert_workflow_contains(fragments: tuple[str, ...]) -> None:
+    workflow = _read_release_workflow()
+    missing = [fragment for fragment in fragments if fragment not in workflow]
+    if missing:
+        raise AssertionError(
+            "release workflow is missing required fragments: "
+            + ", ".join(repr(fragment) for fragment in missing)
+        )
+
+
+def check_release_workflow_publishes_generated_notes_with_fixed_guidance() -> None:
+    workflow = _read_release_workflow()
+    placeholder = (
+        "Add release-specific highlights, breaking changes, and migration notes "
+        "before announcing this release."
+    )
+    if placeholder in workflow:
+        raise AssertionError(
+            "release workflow still publishes manual placeholder notes"
+        )
+
+    _assert_workflow_contains(
+        (
+            "## Install",
+            "SHA256SUMS",
+            "grep ' install.sh$' SHA256SUMS | sha256sum -c -",
+            "bash install.sh",
+            "envmgr self update --version ${package_version}",
+            "envmgr self uninstall --yes",
+            "## Clean Reinstall",
+            "uv tool uninstall envmgr || true",
+            "hash -r",
+            "--generate-notes",
+            '--notes "$(cat release-notes.md)"',
+        )
+    )
 
 
 def check_isolated_uv_tool_install_exposes_envmgr_only() -> None:

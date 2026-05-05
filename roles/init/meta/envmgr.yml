@@ -7,7 +7,8 @@ tags:
   - init
 depends_on:
   - init_core
-task_tags: []
+task_tags:
+  - github_cli
 vars_files: []
 playbook_roles:
   - init

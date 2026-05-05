@@ -4,9 +4,16 @@ import os
 import tempfile
 from pathlib import Path
 
+import yaml
+
 from envmgr.catalog import CatalogError, get_available_tags, load_playbook_tags
 from envmgr.services.assets import resolve_runtime_assets
-from envmgr.services.install import resolve_install_playbook
+from envmgr.services.install import (
+    build_execution_playbook,
+    read_playbook_role_name,
+    read_playbook_role_tags,
+    resolve_install_playbook,
+)
 
 
 def check_playbook_resolution() -> None:
@@ -19,6 +26,12 @@ def check_playbook_resolution() -> None:
         != workstation_playbook
     ):
         raise AssertionError("expected zsh to resolve to workstation playbook")
+
+    if (
+        resolve_install_playbook(["github_cli"], explicit_playbook=None)
+        != workstation_playbook
+    ):
+        raise AssertionError("expected github_cli to resolve to workstation playbook")
 
     if resolve_install_playbook(["kubeadm"], explicit_playbook=None) != node_playbook:
         raise AssertionError("expected kubeadm to resolve to node playbook")
@@ -53,6 +66,54 @@ def check_playbook_resolution() -> None:
     raise AssertionError(
         "expected explicit path-like playbook references to stay path-based without scenario fallback"
     )
+
+
+def check_github_cli_task_tag_catalog_and_execution_playbook() -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    _role_tags, task_tags = get_available_tags(repo_root / "roles")
+    if "github_cli" not in task_tags:
+        raise AssertionError("expected github_cli to be exposed as a task tag")
+
+    generated_playbook = build_execution_playbook(
+        "workstation",
+        ["github_cli"],
+        repo_root / "roles",
+    )
+    try:
+        with Path(generated_playbook).open(encoding="utf-8") as file:
+            playbook_data = yaml.safe_load(file)
+
+        if not isinstance(playbook_data, list) or not playbook_data:
+            raise AssertionError(
+                "expected generated github_cli playbook to contain a play"
+            )
+
+        roles = playbook_data[0].get("roles", [])
+        if not isinstance(roles, list):
+            raise AssertionError("expected generated playbook roles to be a list")
+
+        role_names = [
+            read_playbook_role_name(role_entry, Path(generated_playbook))
+            for role_entry in roles
+        ]
+        if role_names != ["init_core", "init"]:
+            raise AssertionError(
+                "expected github_cli execution roles to be "
+                f"['init_core', 'init'], got {role_names}"
+            )
+
+        init_entry = roles[1]
+        if not isinstance(init_entry, dict):
+            raise AssertionError("expected init role entry to include tags")
+        if "github_cli" not in read_playbook_role_tags(
+            init_entry,
+            Path(generated_playbook),
+        ):
+            raise AssertionError(
+                "expected generated init role to preserve the github_cli tag"
+            )
+    finally:
+        Path(generated_playbook).unlink(missing_ok=True)
 
 
 def check_catalog_defaults_resolve_outside_repo_cwd() -> None:

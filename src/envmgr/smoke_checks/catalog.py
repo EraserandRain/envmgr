@@ -27,6 +27,8 @@ def check_metadata_catalog() -> None:
         raise AssertionError("expected task tag 'codex' to be present")
     if "rtk" not in task_tags:
         raise AssertionError("expected task tag 'rtk' to be present")
+    if "github_cli" not in task_tags:
+        raise AssertionError("expected task tag 'github_cli' to be present")
 
 
 def check_scaffold_generation() -> None:
@@ -80,6 +82,10 @@ def check_execution_playbook_generation() -> None:
         "workstation",
         ["rtk"],
     )
+    generated_github_cli_playbook = build_execution_playbook(
+        "workstation",
+        ["github_cli"],
+    )
     generated_init_playbook = build_execution_playbook(
         "workstation",
         ["init"],
@@ -96,6 +102,8 @@ def check_execution_playbook_generation() -> None:
             codex_data = yaml.safe_load(file)
         with Path(generated_rtk_playbook).open(encoding="utf-8") as file:
             rtk_data = yaml.safe_load(file)
+        with Path(generated_github_cli_playbook).open(encoding="utf-8") as file:
+            github_cli_data = yaml.safe_load(file)
         with Path(generated_init_playbook).open(encoding="utf-8") as file:
             init_data = yaml.safe_load(file)
         with Path(generated_monitoring_playbook).open(encoding="utf-8") as file:
@@ -109,6 +117,10 @@ def check_execution_playbook_generation() -> None:
             raise AssertionError("expected generated codex playbook to contain a play")
         if not isinstance(rtk_data, list) or not rtk_data:
             raise AssertionError("expected generated rtk playbook to contain a play")
+        if not isinstance(github_cli_data, list) or not github_cli_data:
+            raise AssertionError(
+                "expected generated github_cli playbook to contain a play"
+            )
         if not isinstance(init_data, list) or not init_data:
             raise AssertionError("expected generated init playbook to contain a play")
         if not isinstance(monitoring_data, list) or len(monitoring_data) != 2:
@@ -119,6 +131,7 @@ def check_execution_playbook_generation() -> None:
         ai_tools_roles = ai_tools_data[0].get("roles", [])
         codex_roles = codex_data[0].get("roles", [])
         rtk_roles = rtk_data[0].get("roles", [])
+        github_cli_roles = github_cli_data[0].get("roles", [])
         init_roles = init_data[0].get("roles", [])
         monitoring_node_roles = monitoring_data[0].get("roles", [])
         monitoring_master_roles = monitoring_data[1].get("roles", [])
@@ -126,6 +139,7 @@ def check_execution_playbook_generation() -> None:
             not isinstance(ai_tools_roles, list)
             or not isinstance(codex_roles, list)
             or not isinstance(rtk_roles, list)
+            or not isinstance(github_cli_roles, list)
             or not isinstance(init_roles, list)
             or not isinstance(monitoring_node_roles, list)
             or not isinstance(monitoring_master_roles, list)
@@ -143,6 +157,10 @@ def check_execution_playbook_generation() -> None:
         rtk_role_names = [
             read_playbook_role_name(role_entry, Path(generated_rtk_playbook))
             for role_entry in rtk_roles
+        ]
+        github_cli_role_names = [
+            read_playbook_role_name(role_entry, Path(generated_github_cli_playbook))
+            for role_entry in github_cli_roles
         ]
         init_role_names = [
             read_playbook_role_name(role_entry, Path(generated_init_playbook))
@@ -172,6 +190,11 @@ def check_execution_playbook_generation() -> None:
             raise AssertionError(
                 "expected rtk execution roles to be "
                 f"['init_core', 'node', 'ai_tools'], got {rtk_role_names}"
+            )
+        if github_cli_role_names != ["init_core", "init"]:
+            raise AssertionError(
+                "expected github_cli execution roles to be "
+                f"['init_core', 'init'], got {github_cli_role_names}"
             )
         if init_role_names != ["init_core", "init"]:
             raise AssertionError(
@@ -233,9 +256,21 @@ def check_execution_playbook_generation() -> None:
             raise AssertionError(
                 "expected ai_tools role to inherit the rtk tag for task-level runs"
             )
+
+        github_cli_init_entry = github_cli_roles[1]
+        if not isinstance(github_cli_init_entry, dict):
+            raise AssertionError("expected github_cli role entry to include tags")
+        if "github_cli" not in read_playbook_role_tags(
+            github_cli_init_entry,
+            Path(generated_github_cli_playbook),
+        ):
+            raise AssertionError(
+                "expected init role to inherit the github_cli tag for task-level runs"
+            )
     finally:
         Path(generated_ai_tools_playbook).unlink(missing_ok=True)
         Path(generated_codex_playbook).unlink(missing_ok=True)
         Path(generated_rtk_playbook).unlink(missing_ok=True)
+        Path(generated_github_cli_playbook).unlink(missing_ok=True)
         Path(generated_init_playbook).unlink(missing_ok=True)
         Path(generated_monitoring_playbook).unlink(missing_ok=True)
