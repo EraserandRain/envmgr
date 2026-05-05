@@ -11,6 +11,9 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 DOCS_CONTRACT_FILES = (
     "README.md",
     "AGENTS.md",
+    "docs/runtime.md",
+    "docs/development.md",
+    "docs/release.md",
 )
 
 
@@ -158,12 +161,12 @@ def check_runtime_playbook_scenario_docs_contract() -> None:
 
 def check_doctor_dependency_docs_contract() -> None:
     """Keep doctor dependency and warning semantics synchronized in docs."""
-    readme = _read_repo_text("README.md")
+    runtime_docs = _read_repo_text("docs/runtime.md")
     agents = _read_repo_text("AGENTS.md")
 
     _assert_contains(
-        file_name="README.md",
-        text=readme,
+        file_name="docs/runtime.md",
+        text=runtime_docs,
         fragments=(
             "hard command check covers the Ansible runtime commands",
             "`ansible`",
