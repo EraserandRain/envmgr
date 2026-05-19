@@ -159,6 +159,44 @@ def check_runtime_playbook_scenario_docs_contract() -> None:
     )
 
 
+def check_install_dry_run_docs_contract() -> None:
+    """Keep install dry-run CLI semantics synchronized in user docs."""
+    readme = _read_repo_text("README.md")
+    runtime_docs = _read_repo_text("docs/runtime.md")
+    agents = _read_repo_text("AGENTS.md")
+
+    _assert_contains(
+        file_name="README.md",
+        text=readme,
+        fragments=(
+            "envmgr install --dry-run [--json] [tag ...]",
+            "envmgr install --dry-run zsh",
+            "envmgr install --dry-run --json zsh",
+        ),
+    )
+    _assert_contains(
+        file_name="docs/runtime.md",
+        text=runtime_docs,
+        fragments=(
+            "Install Dry Run",
+            "without starting Ansible",
+            "effective `--ask-vault-pass`",
+            "AI tools choices",
+            "`command_argv`",
+        ),
+    )
+    _assert_contains(
+        file_name="AGENTS.md",
+        text=agents,
+        fragments=(
+            "envmgr install --dry-run <tag ...>",
+            "does not start Ansible",
+            "envmgr install --dry-run --json",
+            "stable plan keys",
+        ),
+    )
+
+
 def check_doctor_dependency_docs_contract() -> None:
     """Keep doctor dependency and warning semantics synchronized in docs."""
     runtime_docs = _read_repo_text("docs/runtime.md")

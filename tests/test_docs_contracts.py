@@ -4,6 +4,7 @@ import unittest
 
 from tests.checks.docs_contracts import (
     check_doctor_dependency_docs_contract,
+    check_install_dry_run_docs_contract,
     check_public_cli_surface_docs_contract,
     check_release_notes_docs_contract,
     check_runtime_playbook_scenario_docs_contract,
@@ -18,6 +19,10 @@ DOCS_CONTRACT_TEST_CHECKS: tuple[Check, ...] = (
     (
         "runtime playbook scenario docs stay synchronized",
         check_runtime_playbook_scenario_docs_contract,
+    ),
+    (
+        "install dry-run docs stay synchronized",
+        check_install_dry_run_docs_contract,
     ),
     (
         "doctor dependency docs stay synchronized",

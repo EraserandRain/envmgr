@@ -26,6 +26,7 @@ safe to rerun.
 | --- | --- |
 | `envmgr setup` | Initialize runtime files and install Galaxy dependencies. |
 | `envmgr install [tag ...]` | Apply role or task tags through a scenario playbook. |
+| `envmgr install --dry-run [--json] [tag ...]` | Inspect the install plan without running Ansible. |
 | `envmgr install -l` / `envmgr install --list-tags` | List built-in scenarios, role tags, and task tags. |
 | `envmgr ping [-i alias]` | Run Ansible ping against an inventory alias. |
 | `envmgr doctor [--json]` | Check runtime health without changing runtime files. |
@@ -34,8 +35,8 @@ safe to rerun.
 | `envmgr self uninstall [--yes]` | Remove the installer-managed tool and keep runtime data. |
 
 Useful public options include `--playbook`, `--inventory`, `--ask-vault-pass`,
-`--json`, `--limit`, `--version`, and `--yes`. Public help is available with
-`-h` and `--help` at the root and subcommand levels.
+`--dry-run`, `--json`, `--limit`, `--version`, and `--yes`. Public help is
+available with `-h` and `--help` at the root and subcommand levels.
 
 Common examples:
 
@@ -49,6 +50,10 @@ envmgr install docker kubernetes_tools minikube
 envmgr ping --inventory remote
 envmgr install --inventory remote zsh
 envmgr install -i password --ask-vault-pass zsh
+
+# Install planning
+envmgr install --dry-run zsh
+envmgr install --dry-run --json zsh
 
 # Health and history
 envmgr doctor --json

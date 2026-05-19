@@ -92,6 +92,22 @@ caller filesystem paths and do not fall back to packaged playbooks.
 unless `--playbook` is explicit. Specific tags may infer a built-in scenario
 only when they map to exactly one built-in playbook.
 
+## Install Dry Run
+
+Use `envmgr install --dry-run <tag ...>` to inspect the resolved install plan
+without starting Ansible. The dry run still builds the same execution playbook
+plan, including temporary scoped playbooks, then cleans temporary files before
+exiting. Human output uses Rich and shows the source playbook, execution
+playbook when different, inventory alias and path, selected tags or all-tags
+status, effective `--ask-vault-pass`, AI tools choices when applicable, and the
+final `ansible-playbook` command.
+
+Use `envmgr install --dry-run --json <tag ...>` for plain machine-readable JSON.
+The JSON report includes selected tags, source and execution playbook paths,
+whether the execution playbook was temporary, inventory label and path,
+effective `ask_vault_pass`, AI tools options and extra-vars when applicable,
+and `command_argv`.
+
 ## Doctor And History
 
 `envmgr doctor` is read-only. Its hard command check covers the Ansible runtime commands:

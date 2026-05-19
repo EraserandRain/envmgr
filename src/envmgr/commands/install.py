@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import json
 import os
+import shlex
 import subprocess
 import sys
 
@@ -12,6 +14,8 @@ from ..runtime_config import ConfigError
 from ..services.install import (
     AiToolsInstallDefaults,
     AiToolsInstallOptions,
+    InstallPlan,
+    build_ai_tools_extra_vars,
     build_ai_tools_install_defaults,
     build_install_command,
     build_install_plan,
@@ -25,6 +29,7 @@ from ..services.runtime import RuntimePopenProcess, popen_runtime_subprocess
 from .shared import (
     confirm_choice,
     console,
+    error_console,
     exit_with_error,
     load_available_tags,
     print_bullet_list,
@@ -44,6 +49,9 @@ BUILTIN_SCENARIOS = (
         "node",
         "Kubernetes node setup: node prerequisites plus master-only tools.",
     ),
+)
+IGNORED_AI_TOOLS_FLAGS_WARNING = (
+    "AI-tools flags were ignored because this run does not include the ai_tools role"
 )
 
 
@@ -308,10 +316,139 @@ def print_builtin_scenarios() -> None:
         console.print(Text(f"  - {name}: {description}"))
 
 
+def _render_selected_tags(install_plan: InstallPlan) -> str | Text:
+    if is_all_tag_selection(install_plan.selected_tags):
+        return Text("All tags will be executed", style="green")
+
+    rendered_tags = Text()
+    for index, tag in enumerate(install_plan.selected_tags):
+        if index:
+            rendered_tags.append(" ")
+        label = "Role" if tag in install_plan.role_tags else "Task"
+        style = "green" if label == "Role" else "cyan"
+        rendered_tags.append(f"[{label}: {tag}]", style=style)
+    return rendered_tags
+
+
+def _render_ai_tools_summary(ai_tools_options: AiToolsInstallOptions | None) -> None:
+    if ai_tools_options is None:
+        return
+
+    print_labeled_value(
+        "AI tools",
+        (
+            "Claude Code="
+            f"{ai_tools_options.manage_claude_code}, "
+            "Codex CLI="
+            f"{ai_tools_options.manage_codex}, "
+            f"RTK={ai_tools_options.manage_rtk}"
+        ),
+    )
+    if ai_tools_options.manage_claude_code or ai_tools_options.manage_codex:
+        context7_status = "enabled" if ai_tools_options.enable_context7 else "disabled"
+        print_labeled_value("Context7", context7_status)
+    if ai_tools_options.enable_context7:
+        if ai_tools_options.manage_claude_code:
+            print_labeled_value(
+                "Claude Code Context7 method",
+                ai_tools_options.claude_context7_method,
+            )
+        if ai_tools_options.manage_codex:
+            print_labeled_value(
+                "Codex Context7 method",
+                ai_tools_options.codex_context7_method,
+            )
+        if not os.environ.get("CONTEXT7_API_KEY"):
+            print_labeled_value(
+                "Context7 API key",
+                "not set (continuing without it)",
+            )
+
+
+def _print_install_plan_summary(
+    *,
+    title: str,
+    install_plan: InstallPlan,
+    ask_vault_pass: bool,
+    ai_tools_options: AiToolsInstallOptions | None,
+    command: list[str],
+    show_execution_details: bool = False,
+) -> None:
+    console.print()
+    print_section_title(title)
+    print_labeled_value("Playbook", install_plan.source_playbook_path)
+    if install_plan.execution_playbook_path != install_plan.source_playbook_path:
+        print_labeled_value(
+            "Execution playbook",
+            install_plan.execution_playbook_path,
+        )
+    print_labeled_value(
+        "Inventory",
+        f"{install_plan.inventory_label} -> {install_plan.inventory_path}",
+    )
+    print_labeled_value("Tags", _render_selected_tags(install_plan))
+    _render_ai_tools_summary(ai_tools_options)
+    if show_execution_details:
+        print_labeled_value("Ask vault pass", str(ask_vault_pass))
+        print_labeled_value("Command", shlex.join(command))
+    console.print()
+
+
+def _install_plan_json(
+    *,
+    install_plan: InstallPlan,
+    ask_vault_pass: bool,
+    ai_tools_options: AiToolsInstallOptions | None,
+    command: list[str],
+) -> dict[str, object]:
+    ai_tools: dict[str, object] = {"applicable": ai_tools_options is not None}
+    if ai_tools_options is not None:
+        ai_tools.update(
+            {
+                "manage_claude_code": ai_tools_options.manage_claude_code,
+                "manage_codex": ai_tools_options.manage_codex,
+                "manage_rtk": ai_tools_options.manage_rtk,
+                "enable_context7": ai_tools_options.enable_context7,
+                "claude_context7_method": ai_tools_options.claude_context7_method,
+                "codex_context7_method": ai_tools_options.codex_context7_method,
+                "extra_vars": build_ai_tools_extra_vars(ai_tools_options),
+            }
+        )
+
+    return {
+        "selected_tags": list(install_plan.selected_tags),
+        "all_tags": is_all_tag_selection(install_plan.selected_tags),
+        "source_playbook_path": install_plan.source_playbook_path,
+        "execution_playbook_path": install_plan.execution_playbook_path,
+        "uses_temporary_execution_playbook": (
+            install_plan.uses_temporary_execution_playbook
+        ),
+        "inventory": {
+            "label": install_plan.inventory_label,
+            "path": str(install_plan.inventory_path),
+        },
+        "ask_vault_pass": ask_vault_pass,
+        "ai_tools": ai_tools,
+        "command_argv": list(command),
+    }
+
+
+def _print_ignored_ai_tools_flags_warning(*, json_output: bool) -> None:
+    if json_output:
+        error_console.print(
+            Text(f"Warning: {IGNORED_AI_TOOLS_FLAGS_WARNING}", style="yellow")
+        )
+        return
+
+    print_warning(IGNORED_AI_TOOLS_FLAGS_WARNING)
+
+
 def run_install(
     *,
     tags: list[str],
     list_tags: bool,
+    dry_run: bool = False,
+    json_output: bool = False,
     playbook: str | None,
     inventory: str | None,
     ask_vault_pass: bool,
@@ -324,12 +461,18 @@ def run_install(
 ) -> None:
     """Install and configure envmgr using explicit option values."""
     if list_tags:
+        if dry_run or json_output:
+            exit_with_error(
+                "Error: --dry-run and --json cannot be used with --list-tags"
+            )
         role_tags, task_tags = load_available_tags()
         print_section_title("Envmgr available tags:")
         print_builtin_scenarios()
         print_bullet_list("Role level tags:", role_tags)
         print_bullet_list("Task level tags:", task_tags)
         return
+    if json_output and not dry_run:
+        exit_with_error("Error: --json is only supported with install --dry-run")
 
     try:
         selected_tags = normalize_selected_tags(list(tags))
@@ -374,7 +517,9 @@ def run_install(
             codex_context7_method,
         )
     )
-    use_ai_tools_wizard = interactive_ai_tools and not ai_tools_flags_provided
+    use_ai_tools_wizard = (
+        interactive_ai_tools and not ai_tools_flags_provided and not dry_run
+    )
 
     process: RuntimePopenProcess | None = None
     try:
@@ -402,74 +547,45 @@ def run_install(
 
     try:
         if not install_plan.ai_tools_defaults.applicable and ai_tools_flags_provided:
-            print_warning(
-                "AI-tools flags were ignored because this run does not include the ai_tools role"
-            )
+            _print_ignored_ai_tools_flags_warning(json_output=json_output)
 
-        console.print()
-        print_section_title("Running Ansible playbook with:")
-        print_labeled_value("Playbook", install_plan.source_playbook_path)
-        if install_plan.execution_playbook_path != install_plan.source_playbook_path:
-            print_labeled_value(
-                "Execution playbook",
-                install_plan.execution_playbook_path,
-            )
-        print_labeled_value(
-            "Inventory",
-            f"{install_plan.inventory_label} -> {install_plan.inventory_path}",
-        )
-        if is_all_tag_selection(install_plan.selected_tags):
-            print_labeled_value(
-                "Tags",
-                Text("All tags will be executed", style="green"),
-            )
-        else:
-            rendered_tags = Text()
-            for index, tag in enumerate(install_plan.selected_tags):
-                if index:
-                    rendered_tags.append(" ")
-                label = "Role" if tag in install_plan.role_tags else "Task"
-                style = "green" if label == "Role" else "cyan"
-                rendered_tags.append(f"[{label}: {tag}]", style=style)
-            print_labeled_value("Tags", rendered_tags)
-        if ai_tools_options is not None:
-            print_labeled_value(
-                "AI tools",
-                (
-                    "Claude Code="
-                    f"{ai_tools_options.manage_claude_code}, "
-                    "Codex CLI="
-                    f"{ai_tools_options.manage_codex}, "
-                    f"RTK={ai_tools_options.manage_rtk}"
-                ),
-            )
-            if ai_tools_options.manage_claude_code or ai_tools_options.manage_codex:
-                context7_status = (
-                    "enabled" if ai_tools_options.enable_context7 else "disabled"
-                )
-                print_labeled_value("Context7", context7_status)
-            if ai_tools_options.enable_context7:
-                if ai_tools_options.manage_claude_code:
-                    print_labeled_value(
-                        "Claude Code Context7 method",
-                        ai_tools_options.claude_context7_method,
-                    )
-                if ai_tools_options.manage_codex:
-                    print_labeled_value(
-                        "Codex Context7 method",
-                        ai_tools_options.codex_context7_method,
-                    )
-                if not os.environ.get("CONTEXT7_API_KEY"):
-                    print_labeled_value(
-                        "Context7 API key",
-                        "not set (continuing without it)",
-                    )
-        console.print()
-
+        effective_ask_vault_pass = ask_vault_pass or install_plan.default_ask_vault_pass
         command = build_install_command(
             install_plan,
-            ask_vault_pass=ask_vault_pass or install_plan.default_ask_vault_pass,
+            ask_vault_pass=effective_ask_vault_pass,
             ai_tools_options=ai_tools_options,
+        )
+
+        if dry_run:
+            if json_output:
+                typer.echo(
+                    json.dumps(
+                        _install_plan_json(
+                            install_plan=install_plan,
+                            ask_vault_pass=effective_ask_vault_pass,
+                            ai_tools_options=ai_tools_options,
+                            command=command,
+                        ),
+                        sort_keys=True,
+                    )
+                )
+            else:
+                _print_install_plan_summary(
+                    title="Install dry run:",
+                    install_plan=install_plan,
+                    ask_vault_pass=effective_ask_vault_pass,
+                    ai_tools_options=ai_tools_options,
+                    command=command,
+                    show_execution_details=True,
+                )
+            return
+
+        _print_install_plan_summary(
+            title="Running Ansible playbook with:",
+            install_plan=install_plan,
+            ask_vault_pass=effective_ask_vault_pass,
+            ai_tools_options=ai_tools_options,
+            command=command,
         )
 
         process = popen_runtime_subprocess(

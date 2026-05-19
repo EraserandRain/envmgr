@@ -148,6 +148,22 @@ def _install_command(
             rich_help_panel=OUTPUT_HELP_PANEL,
         ),
     ] = False,
+    dry_run: Annotated[
+        bool,
+        typer.Option(
+            "--dry-run",
+            help="Show the install plan without running Ansible",
+            rich_help_panel=OUTPUT_HELP_PANEL,
+        ),
+    ] = False,
+    json_output: Annotated[
+        bool,
+        typer.Option(
+            "--json",
+            help="Print the dry-run install plan as JSON",
+            rich_help_panel=OUTPUT_HELP_PANEL,
+        ),
+    ] = False,
     playbook: Annotated[
         str | None,
         typer.Option(
@@ -240,6 +256,8 @@ def _install_command(
     run_install(
         tags=[] if tags is None else list(tags),
         list_tags=list_tags,
+        dry_run=dry_run,
+        json_output=json_output,
         playbook=playbook,
         inventory=inventory,
         ask_vault_pass=ask_vault_pass,

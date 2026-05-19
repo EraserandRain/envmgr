@@ -55,6 +55,8 @@ and release contracts.
   `--playbook <scenario-or-path>` when tags are ambiguous or when overriding the
   default scenario for `all`, and add `-i <alias>` / `--ask-vault-pass` as
   needed.
+- [ ] `envmgr install --dry-run <tag ...>` shows the resolved install plan
+  without starting Ansible; add `--json` for plain machine-readable plan JSON.
 - [ ] `envmgr ping [-i remote]` checks inventory connectivity with Ansible ping.
 - [ ] `envmgr doctor [--json]` inspects runtime health; `envmgr history
   [--limit N] [--json]` inspects runtime subprocess records.
@@ -93,6 +95,12 @@ and release contracts.
   `~/.envmgr/config.toml` unless `--playbook` is explicit. Specific tag
   selections may infer a scenario only when they map to exactly one built-in
   playbook.
+- [ ] Public `envmgr install --dry-run` builds the normal install plan but
+  does not start Ansible. Human output uses Rich and includes source/execution
+  playbooks, inventory, selected tags, effective ask-vault status, AI tools
+  choices when applicable, and final command argv/readable command.
+  `envmgr install --dry-run --json` emits plain JSON with stable plan keys and
+  no Rich markup.
 - [ ] Public `envmgr doctor` and `envmgr doctor --json` exit non-zero only for failing checks; warning-only reports still exit `0`. The hard command check covers Ansible runtime commands (`ansible`, `ansible-playbook`, `ansible-galaxy`), while invalid installer-recorded `uv` paths produce a self-management warning instead of a generic runtime command failure.
 - [ ] Public `envmgr self update` and `envmgr self uninstall` are limited to
   installer-managed GitHub Release installs with `~/.envmgr/install.toml`;

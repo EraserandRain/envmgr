@@ -17,13 +17,15 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 def run_envmgr_cli(
     *args: str,
     env_overrides: dict[str, str] | None = None,
+    python_executable: Path | None = None,
 ) -> subprocess.CompletedProcess[str]:
     env = os.environ.copy()
     if env_overrides is not None:
         env.update(env_overrides)
+    executable = sys.executable if python_executable is None else str(python_executable)
 
     return subprocess.run(
-        [sys.executable, "-c", "from envmgr.main import main; main()", *args],
+        [executable, "-c", "from envmgr.main import main; main()", *args],
         cwd=REPO_ROOT,
         capture_output=True,
         text=True,
