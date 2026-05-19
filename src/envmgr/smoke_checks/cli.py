@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import sys
 import tempfile
 from pathlib import Path
 
@@ -41,6 +42,16 @@ def _write_fake_command(command_path: Path, body: str) -> None:
     """Create a small executable used to stub ansible binaries in smoke tests."""
     command_path.write_text(body, encoding="utf-8")
     command_path.chmod(0o755)
+
+
+def _link_python_executable(command_path: Path) -> None:
+    """Expose the current Python inside a temporary tool bin directory."""
+    command_path.symlink_to(Path(sys.executable))
+
+
+def _current_pythonpath() -> str:
+    """Let a symlinked Python child import the same checkout dependencies."""
+    return os.pathsep.join(entry for entry in sys.path if entry)
 
 
 def _prepend_path(fake_bin_dir: Path) -> str:
@@ -245,6 +256,8 @@ def check_setup_cli_contract() -> None:
         envmgr_home = temp_root / ".envmgr"
         fake_bin_dir = temp_root / "bin"
         fake_bin_dir.mkdir()
+        fake_python = fake_bin_dir / "python"
+        _link_python_executable(fake_python)
         _write_fake_command(
             fake_bin_dir / "ansible-galaxy",
             "#!/bin/sh\nexit 0\n",
@@ -255,7 +268,9 @@ def check_setup_cli_contract() -> None:
             env_overrides={
                 "ENVMGR_HOME": str(envmgr_home),
                 "PATH": _prepend_path(fake_bin_dir),
+                "PYTHONPATH": _current_pythonpath(),
             },
+            python_executable=fake_python,
         )
 
         if result.returncode != 0:

@@ -3,6 +3,7 @@ from __future__ import annotations
 import unittest
 
 from tests.checks.catalog import (
+    check_builtin_playbooks_match_enabled_role_metadata,
     check_catalog_defaults_resolve_outside_repo_cwd,
     check_github_cli_task_tag_catalog_and_execution_playbook,
     check_playbook_resolution,
@@ -18,6 +19,10 @@ CATALOG_TEST_CHECKS: tuple[Check, ...] = (
     (
         "github_cli task tag catalog and execution playbook",
         check_github_cli_task_tag_catalog_and_execution_playbook,
+    ),
+    (
+        "built-in playbooks match enabled role metadata",
+        check_builtin_playbooks_match_enabled_role_metadata,
     ),
 )
 

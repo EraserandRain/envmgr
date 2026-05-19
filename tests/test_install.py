@@ -3,10 +3,14 @@ from __future__ import annotations
 import unittest
 
 from tests.checks.install import (
+    check_ai_tools_extra_vars_match_role_contract,
     check_ai_tools_install_option_resolution,
     check_ai_tools_setup_wizard_prompt_interrupt_exits_130,
     check_ai_tools_setup_wizard_uses_shared_prompt_path,
     check_install_all_uses_runtime_default_playbook,
+    check_install_dry_run_json_keeps_ignored_ai_tools_warning_off_stdout,
+    check_install_dry_run_json_outputs_machine_readable_plan,
+    check_install_dry_run_reports_plan_without_subprocess_and_cleans_temp,
     check_install_error_output_preserves_markup_like_text,
     check_install_interrupt_exits_cleanly,
     check_install_list_tags_uses_rich_console,
@@ -25,6 +29,10 @@ INSTALL_TEST_CHECKS: tuple[Check, ...] = (
     (
         "AI tools install options resolve correctly",
         check_ai_tools_install_option_resolution,
+    ),
+    (
+        "AI tools extra-vars match the role contract",
+        check_ai_tools_extra_vars_match_role_contract,
     ),
     (
         "shared prompt helpers use Rich defaults and patchable backends",
@@ -65,6 +73,18 @@ INSTALL_TEST_CHECKS: tuple[Check, ...] = (
     (
         "install summary uses Rich output while subprocess passthrough stays raw",
         check_install_summary_uses_rich_console_and_keeps_raw_subprocess_output,
+    ),
+    (
+        "install dry-run reports plan without subprocess and cleans temp",
+        check_install_dry_run_reports_plan_without_subprocess_and_cleans_temp,
+    ),
+    (
+        "install dry-run JSON outputs machine-readable plan",
+        check_install_dry_run_json_outputs_machine_readable_plan,
+    ),
+    (
+        "install dry-run JSON keeps ignored AI-tools warning off stdout",
+        check_install_dry_run_json_keeps_ignored_ai_tools_warning_off_stdout,
     ),
     (
         "install rejects mixed all-tag selections",

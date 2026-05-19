@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import tempfile
 from io import StringIO
@@ -23,7 +24,9 @@ from envmgr.runtime_config import ensure_runtime_layout
 from envmgr.services.assets import resolve_runtime_assets
 from envmgr.services.install import (
     AiToolsInstallDefaults,
+    AiToolsInstallOptions,
     InstallPlan,
+    build_ai_tools_extra_vars,
     build_install_plan,
     cleanup_install_plan,
 )
@@ -104,6 +107,56 @@ def check_ai_tools_install_option_resolution() -> None:
     )
     if node_options is not None:
         raise AssertionError("expected node playbook to skip AI tools resolution")
+
+
+def check_ai_tools_extra_vars_match_role_contract() -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    defaults_path = repo_root / "roles" / "ai_tools" / "defaults" / "main.yml"
+    tasks_path = repo_root / "roles" / "ai_tools" / "tasks" / "main.yml"
+
+    defaults_data = yaml.safe_load(defaults_path.read_text(encoding="utf-8"))
+    if not isinstance(defaults_data, dict):
+        raise AssertionError("expected ai_tools defaults to be a mapping")
+
+    options = AiToolsInstallOptions(
+        manage_claude_code=True,
+        manage_codex=False,
+        manage_rtk=True,
+        enable_context7=False,
+        claude_context7_method="local",
+        codex_context7_method="remote",
+    )
+    extra_vars = build_ai_tools_extra_vars(options)
+    expected_extra_var_keys = {
+        "ai_tools_manage_claude_code_override",
+        "ai_tools_manage_codex_override",
+        "ai_tools_manage_rtk_override",
+        "ai_tools_context7_enabled",
+        "ai_tools_claude_context7_method",
+        "ai_tools_codex_context7_method",
+    }
+
+    if set(extra_vars) != expected_extra_var_keys:
+        raise AssertionError(
+            "expected AI tools extra-vars to match the install-time role contract; "
+            f"got {sorted(extra_vars)}"
+        )
+
+    missing_defaults = sorted(set(extra_vars) - set(defaults_data))
+    if missing_defaults:
+        raise AssertionError(
+            "expected AI tools extra-vars to be declared in role defaults; "
+            f"missing defaults for {missing_defaults}"
+        )
+
+    tasks_text = tasks_path.read_text(encoding="utf-8")
+    override_keys = {key for key in extra_vars if key.endswith("_override")}
+    missing_task_refs = sorted(key for key in override_keys if key not in tasks_text)
+    if missing_task_refs:
+        raise AssertionError(
+            "expected AI tools override extra-vars to be consumed by tasks/main.yml; "
+            f"missing references for {missing_task_refs}"
+        )
 
 
 def check_shared_prompt_helpers_use_rich_defaults_and_patchable_backends() -> None:
@@ -560,6 +613,259 @@ def check_install_summary_uses_rich_console_and_keeps_raw_subprocess_output() ->
                 raise AssertionError(
                     "expected subprocess passthrough to preserve print(..., end='')"
                 )
+
+
+def check_install_dry_run_reports_plan_without_subprocess_and_cleans_temp() -> None:
+    with tempfile.TemporaryDirectory() as temp_dir:
+        runtime_paths = ensure_runtime_layout(Path(temp_dir) / ".envmgr")
+        execution_playbook_path = Path(temp_dir) / "execution.yml"
+        execution_playbook_path.write_text("---\n", encoding="utf-8")
+        install_plan = InstallPlan(
+            selected_tags=["zsh"],
+            role_tags=["zsh"],
+            task_tags=[],
+            source_playbook_path="playbooks/workstation.yml",
+            execution_playbook_path=str(execution_playbook_path),
+            uses_temporary_execution_playbook=True,
+            inventory_path=runtime_paths.default_inventory_file,
+            inventory_label="default",
+            runtime_paths=runtime_paths,
+            default_ask_vault_pass=True,
+            ai_tools_defaults=AiToolsInstallDefaults(
+                applicable=False,
+                manage_claude_code=False,
+                manage_codex=False,
+                manage_rtk=False,
+            ),
+        )
+
+        with (
+            patch(
+                "envmgr.commands.install.load_available_tags",
+                return_value=(["zsh"], []),
+            ),
+            patch("envmgr.commands.install.require_setup_completed"),
+            patch(
+                "envmgr.commands.install.build_install_plan",
+                return_value=install_plan,
+            ),
+            patch(
+                "envmgr.commands.install.resolve_ai_tools_install_options",
+                return_value=None,
+            ),
+            patch(
+                "envmgr.commands.install.popen_runtime_subprocess",
+                side_effect=AssertionError("dry-run must not start Ansible"),
+            ),
+            patch("envmgr.commands.install.console.print") as mock_console_print,
+            patch("builtins.print") as mock_print,
+        ):
+            run_install(
+                tags=["zsh"],
+                list_tags=False,
+                dry_run=True,
+                json_output=False,
+                playbook=None,
+                inventory=None,
+                ask_vault_pass=False,
+                manage_claude_code=None,
+                manage_codex=None,
+                manage_rtk=None,
+                enable_context7=None,
+                claude_context7_method=None,
+                codex_context7_method=None,
+            )
+
+        if mock_print.called:
+            raise AssertionError("expected dry-run to avoid subprocess passthrough")
+        if execution_playbook_path.exists():
+            raise AssertionError("expected dry-run to clean temporary playbooks")
+
+        output = "\n".join(
+            "" if not call.args else str(call.args[0])
+            for call in mock_console_print.call_args_list
+        )
+        for expected_fragment in (
+            "Install dry run:",
+            "  Playbook: playbooks/workstation.yml",
+            "  Execution playbook:",
+            "  Inventory: default ->",
+            "  Tags: [Role: zsh]",
+            "  Ask vault pass: True",
+            "  Command: ansible-playbook",
+            "--ask-vault-pass",
+        ):
+            if expected_fragment not in output:
+                raise AssertionError(
+                    f"expected dry-run output to include {expected_fragment!r}"
+                )
+
+
+def check_install_dry_run_json_outputs_machine_readable_plan() -> None:
+    with tempfile.TemporaryDirectory() as temp_dir:
+        runtime_paths = ensure_runtime_layout(Path(temp_dir) / ".envmgr")
+        execution_playbook_path = Path(temp_dir) / "execution.yml"
+        execution_playbook_path.write_text("---\n", encoding="utf-8")
+        install_plan = InstallPlan(
+            selected_tags=["ai_tools"],
+            role_tags=["ai_tools"],
+            task_tags=[],
+            source_playbook_path="playbooks/workstation.yml",
+            execution_playbook_path=str(execution_playbook_path),
+            uses_temporary_execution_playbook=True,
+            inventory_path=runtime_paths.default_inventory_file,
+            inventory_label="default",
+            runtime_paths=runtime_paths,
+            default_ask_vault_pass=False,
+            ai_tools_defaults=AiToolsInstallDefaults(
+                applicable=True,
+                manage_claude_code=True,
+                manage_codex=False,
+                manage_rtk=True,
+            ),
+        )
+        ai_tools_options = AiToolsInstallOptions(
+            manage_claude_code=True,
+            manage_codex=True,
+            manage_rtk=False,
+            enable_context7=True,
+            claude_context7_method="local",
+            codex_context7_method="remote",
+        )
+
+        with (
+            patch(
+                "envmgr.commands.install.load_available_tags",
+                return_value=(["ai_tools"], []),
+            ),
+            patch("envmgr.commands.install.require_setup_completed"),
+            patch(
+                "envmgr.commands.install.build_install_plan",
+                return_value=install_plan,
+            ),
+            patch(
+                "envmgr.commands.install.resolve_ai_tools_install_options",
+                return_value=ai_tools_options,
+            ),
+            patch(
+                "envmgr.commands.install.popen_runtime_subprocess",
+                side_effect=AssertionError("dry-run must not start Ansible"),
+            ),
+            patch("envmgr.commands.install.console.print") as mock_console_print,
+        ):
+            result = CLI_RUNNER.invoke(
+                app,
+                ["install", "ai_tools", "--dry-run", "--json"],
+                prog_name="envmgr",
+            )
+
+        if result.exit_code != 0:
+            raise AssertionError(
+                f"expected JSON dry-run to exit successfully\noutput:\n{result.output}"
+            )
+        if mock_console_print.called:
+            raise AssertionError("expected JSON dry-run to avoid Rich output")
+        if execution_playbook_path.exists():
+            raise AssertionError("expected JSON dry-run to clean temporary playbooks")
+
+        plan = json.loads(result.output)
+        expected_command_prefix = [
+            "ansible-playbook",
+            "-i",
+            str(runtime_paths.default_inventory_file),
+            str(execution_playbook_path),
+            "-t",
+            "ai_tools",
+            "--extra-vars",
+        ]
+        if plan["selected_tags"] != ["ai_tools"]:
+            raise AssertionError("expected JSON dry-run to include selected tags")
+        if plan["source_playbook_path"] != "playbooks/workstation.yml":
+            raise AssertionError("expected JSON dry-run to include the source playbook")
+        if plan["execution_playbook_path"] != str(execution_playbook_path):
+            raise AssertionError("expected JSON dry-run to include execution playbook")
+        if not plan["uses_temporary_execution_playbook"]:
+            raise AssertionError("expected JSON dry-run to flag temporary playbooks")
+        if plan["inventory"] != {
+            "label": "default",
+            "path": str(runtime_paths.default_inventory_file),
+        }:
+            raise AssertionError("expected JSON dry-run to include inventory details")
+        if plan["ask_vault_pass"]:
+            raise AssertionError("expected JSON dry-run to include ask-vault status")
+        if plan["command_argv"][:7] != expected_command_prefix:
+            raise AssertionError("expected JSON dry-run to include command argv")
+        if plan["ai_tools"]["extra_vars"]["ai_tools_manage_codex_override"] is not True:
+            raise AssertionError("expected JSON dry-run to include AI tools extra-vars")
+
+
+def check_install_dry_run_json_keeps_ignored_ai_tools_warning_off_stdout() -> None:
+    with tempfile.TemporaryDirectory() as temp_dir:
+        runtime_paths = ensure_runtime_layout(Path(temp_dir) / ".envmgr")
+        execution_playbook_path = Path(temp_dir) / "execution.yml"
+        execution_playbook_path.write_text("---\n", encoding="utf-8")
+        install_plan = InstallPlan(
+            selected_tags=["zsh"],
+            role_tags=["zsh"],
+            task_tags=[],
+            source_playbook_path="playbooks/workstation.yml",
+            execution_playbook_path=str(execution_playbook_path),
+            uses_temporary_execution_playbook=True,
+            inventory_path=runtime_paths.default_inventory_file,
+            inventory_label="default",
+            runtime_paths=runtime_paths,
+            default_ask_vault_pass=False,
+            ai_tools_defaults=AiToolsInstallDefaults(
+                applicable=False,
+                manage_claude_code=False,
+                manage_codex=False,
+                manage_rtk=False,
+            ),
+        )
+
+        with (
+            patch(
+                "envmgr.commands.install.load_available_tags",
+                return_value=(["zsh"], []),
+            ),
+            patch("envmgr.commands.install.require_setup_completed"),
+            patch(
+                "envmgr.commands.install.build_install_plan",
+                return_value=install_plan,
+            ),
+            patch(
+                "envmgr.commands.install.resolve_ai_tools_install_options",
+                return_value=None,
+            ),
+            patch(
+                "envmgr.commands.install.popen_runtime_subprocess",
+                side_effect=AssertionError("dry-run must not start Ansible"),
+            ),
+            patch("envmgr.commands.install.console.print") as mock_console_print,
+            patch("envmgr.commands.install.error_console.print") as mock_error_print,
+        ):
+            result = CLI_RUNNER.invoke(
+                app,
+                ["install", "zsh", "--dry-run", "--json", "--codex"],
+                prog_name="envmgr",
+            )
+
+        if result.exit_code != 0:
+            raise AssertionError(
+                f"expected JSON dry-run to exit successfully\noutput:\n{result.output}"
+            )
+        if mock_console_print.called:
+            raise AssertionError("expected JSON dry-run to avoid Rich stdout output")
+        if not mock_error_print.called:
+            raise AssertionError("expected ignored AI-tools warning to use stderr")
+
+        plan = json.loads(result.output)
+        if plan["selected_tags"] != ["zsh"]:
+            raise AssertionError("expected JSON dry-run stdout to remain parseable")
+        if plan["ai_tools"] != {"applicable": False}:
+            raise AssertionError(
+                "expected JSON dry-run to report inapplicable AI tools"
+            )
 
 
 def check_install_wizard_cancellation_reports_via_rich_console() -> None:

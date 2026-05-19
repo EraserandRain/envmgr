@@ -6,7 +6,12 @@ from pathlib import Path
 
 import yaml
 
-from envmgr.catalog import CatalogError, get_available_tags, load_playbook_tags
+from envmgr.catalog import (
+    CatalogError,
+    get_available_tags,
+    load_playbook_tags,
+    load_role_catalog,
+)
 from envmgr.services.assets import resolve_runtime_assets
 from envmgr.services.install import (
     build_execution_playbook,
@@ -114,6 +119,84 @@ def check_github_cli_task_tag_catalog_and_execution_playbook() -> None:
             )
     finally:
         Path(generated_playbook).unlink(missing_ok=True)
+
+
+def _read_playbook_role_names(playbook_path: Path) -> set[str]:
+    with playbook_path.open(encoding="utf-8") as file:
+        playbook_data = yaml.safe_load(file)
+
+    if not isinstance(playbook_data, list):
+        raise AssertionError(f"expected {playbook_path} to contain a play list")
+
+    role_names: set[str] = set()
+    for play in playbook_data:
+        if not isinstance(play, dict):
+            raise AssertionError(f"expected {playbook_path} plays to be mappings")
+
+        roles = play.get("roles", [])
+        if not isinstance(roles, list):
+            raise AssertionError(f"expected {playbook_path} roles to be a list")
+
+        for role_entry in roles:
+            role_names.add(read_playbook_role_name(role_entry, playbook_path))
+
+    return role_names
+
+
+def check_builtin_playbooks_match_enabled_role_metadata() -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    roles_dir = repo_root / "roles"
+    built_in_playbooks = {
+        "workstation": repo_root / "playbooks" / "workstation.yml",
+        "node": repo_root / "playbooks" / "node.yml",
+    }
+    playbook_roles = {
+        scenario: _read_playbook_role_names(playbook_path)
+        for scenario, playbook_path in built_in_playbooks.items()
+    }
+
+    enabled_metadata = [
+        metadata for metadata in load_role_catalog(roles_dir) if metadata.enabled
+    ]
+    declared_playbook_roles = {
+        role_name
+        for metadata in enabled_metadata
+        for role_name in metadata.playbook_roles
+    }
+    declared_external_roles = {
+        role_name
+        for metadata in enabled_metadata
+        for role_name in metadata.galaxy_roles
+    }
+    allowed_playbook_roles = declared_playbook_roles | declared_external_roles
+
+    undeclared_by_playbook = {
+        scenario: sorted(role_names - allowed_playbook_roles)
+        for scenario, role_names in playbook_roles.items()
+        if role_names - allowed_playbook_roles
+    }
+    if undeclared_by_playbook:
+        raise AssertionError(
+            "expected built-in playbook roles to be declared by enabled metadata "
+            f"or known external Galaxy roles; got {undeclared_by_playbook}"
+        )
+
+    missing_by_metadata: dict[str, list[str]] = {}
+    for metadata in enabled_metadata:
+        for target in metadata.targets:
+            if target not in playbook_roles:
+                continue
+            missing_roles = sorted(
+                set(metadata.playbook_roles) - playbook_roles[target]
+            )
+            if missing_roles:
+                missing_by_metadata[f"{metadata.name}:{target}"] = missing_roles
+
+    if missing_by_metadata:
+        raise AssertionError(
+            "expected enabled role metadata playbook_roles to appear in each target "
+            f"built-in playbook; got {missing_by_metadata}"
+        )
 
 
 def check_catalog_defaults_resolve_outside_repo_cwd() -> None:
