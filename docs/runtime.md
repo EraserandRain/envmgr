@@ -32,6 +32,30 @@ Repository-local files keep their source-control purpose. `roles/` and
 metadata used by envmgr internals and checks, and Python modules under
 `src/envmgr/` are implementation details.
 
+## Shell Environment Drop-ins
+
+Workstation roles use XDG-style shell environment drop-ins instead of appending
+large tool-specific blocks directly to `~/.zshrc`, `~/.bashrc`, or `~/.profile`.
+Unless `XDG_CONFIG_HOME` is set, envmgr uses these paths:
+
+- envmgr-managed profile snippets: `~/.config/envmgr/profile.d/*.sh`
+- envmgr-managed zsh snippets: `~/.config/envmgr/zsh/*.zsh`
+- user-owned profile snippets: `~/.config/envmgr/user/profile.d/*.sh`
+- user-owned zsh snippets: `~/.config/envmgr/user/zsh.d/*.zsh`
+
+The `init_core` role installs a guarded profile loader in `~/.profile`,
+`~/.bashrc`, `~/.zprofile`, and `~/.zshrc`. The `zsh` role installs a zsh-only
+loader for `~/.config/envmgr/zsh/*.zsh` and
+`~/.config/envmgr/user/zsh.d/*.zsh` after oh-my-zsh writes its base
+configuration.
+
+Runtime roles write only envmgr-managed files under `profile.d`. Users can add
+or remove private files under `user/profile.d` and `user/zsh.d`; envmgr creates
+those directories but does not manage their contents. Do not store secrets in
+managed envmgr files or committed role templates. Use semantic file names such
+as `java.sh` or `node-volta.sh`; add numeric prefixes only when files in the
+same directory need a strict order.
+
 ## Default Config
 
 The default `~/.envmgr/config.toml` points runtime commands at an inventory

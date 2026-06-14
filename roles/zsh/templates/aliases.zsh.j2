@@ -1,0 +1,4 @@
+# Managed by envmgr. Add private aliases in ~/.config/envmgr/user/zsh.d/*.zsh.
+{% for name, command in zsh_alias | dictsort %}
+alias {{ name }}={{ command | quote }}
+{% endfor %}

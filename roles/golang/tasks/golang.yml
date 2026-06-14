@@ -22,15 +22,23 @@
     executable: /bin/bash
     creates: "{{ gvm_root }}"
 
-- name: Setting gvm in profile files
-  blockinfile:
-    path: "{{ item }}"
-    block: |
-      [[ -s "$HOME/.gvm/scripts/gvm" ]] && source "$HOME/.gvm/scripts/gvm"
-  loop:
-    - "{{ ansible_facts['env']['HOME'] }}/.bashrc"
-    - "{{ ansible_facts['env']['HOME'] }}/.zshrc"
-    - "{{ ansible_facts['env']['HOME'] }}/.profile"
+- name: Create envmgr profile.d directory
+  file:
+    path: "{{ envmgr_profile_dir }}"
+    state: directory
+    mode: "0755"
+
+- name: Remove legacy numbered GVM profile drop-in
+  file:
+    path: "{{ envmgr_profile_dir }}/30-golang-gvm.sh"
+    state: absent
+
+- name: Write GVM profile drop-in
+  copy:
+    dest: "{{ envmgr_profile_dir }}/golang-gvm.sh"
+    mode: "0644"
+    content: |
+      [ -s "$HOME/.gvm/scripts/gvm" ] && . "$HOME/.gvm/scripts/gvm"
 
 - name: Install golang (Default Version is {{ golang_default_version }})
   shell: |

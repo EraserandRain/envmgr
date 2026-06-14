@@ -12,12 +12,23 @@
   args:
     creates: "{{ conda_bin }}/conda"
 
-- name: Setting conda in profile files
-  blockinfile:
-    path: "{{ item }}"
-    block: |
-      export PATH="{{ conda_bin }}:$PATH"
-  loop:
-    - "{{ ansible_facts['env']['HOME'] }}/.bashrc"
-    - "{{ ansible_facts['env']['HOME'] }}/.zshrc"
-    - "{{ ansible_facts['env']['HOME'] }}/.profile"
+- name: Create envmgr profile.d directory
+  file:
+    path: "{{ envmgr_profile_dir }}"
+    state: directory
+    mode: "0755"
+
+- name: Remove legacy numbered conda profile drop-in
+  file:
+    path: "{{ envmgr_profile_dir }}/40-python-conda.sh"
+    state: absent
+
+- name: Write conda profile drop-in
+  copy:
+    dest: "{{ envmgr_profile_dir }}/python-conda.sh"
+    mode: "0644"
+    content: |
+      case ":$PATH:" in
+        *":{{ conda_bin }}:"*) ;;
+        *) export PATH="{{ conda_bin }}:$PATH" ;;
+      esac

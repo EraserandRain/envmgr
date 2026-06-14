@@ -3,6 +3,25 @@
 # Installers cache directory
 installers_cache_dir: "{{ ansible_facts['env']['HOME'] }}/.cache/envmgr/installers"
 
+# Shell environment drop-in directories
+envmgr_config_home: "{{ ansible_facts['env']['XDG_CONFIG_HOME'] | default(ansible_facts['env']['HOME'] ~ '/.config', true) }}"
+envmgr_shell_config_dir: "{{ envmgr_config_home }}/envmgr"
+envmgr_profile_dir: "{{ envmgr_shell_config_dir }}/profile.d"
+envmgr_user_profile_dir: "{{ envmgr_shell_config_dir }}/user/profile.d"
+envmgr_user_zsh_dir: "{{ envmgr_shell_config_dir }}/user/zsh.d"
+envmgr_profile_loader_block: |
+  if [ -z "${_ENVMGR_PROFILE_D_LOADED:-}" ]; then
+    _ENVMGR_PROFILE_D_LOADED=1
+    envmgr_config_home="${XDG_CONFIG_HOME:-$HOME/.config}"
+    for envmgr_profile in \
+      "$envmgr_config_home"/envmgr/profile.d/*.sh \
+      "$envmgr_config_home"/envmgr/user/profile.d/*.sh
+    do
+      [ -r "$envmgr_profile" ] && . "$envmgr_profile"
+    done
+    unset envmgr_profile envmgr_config_home
+  fi
+
 # Java
 java_default_version: 8
 java_home: /usr/bin/java

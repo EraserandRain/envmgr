@@ -17,6 +17,29 @@
     executable: /bin/bash
     creates: "{{ volta_root }}"
 
+- name: Create envmgr profile.d directory
+  file:
+    path: "{{ envmgr_profile_dir }}"
+    state: directory
+    mode: "0755"
+
+- name: Remove legacy numbered Volta profile drop-in
+  file:
+    path: "{{ envmgr_profile_dir }}/30-node-volta.sh"
+    state: absent
+
+- name: Write Volta profile drop-in
+  copy:
+    dest: "{{ envmgr_profile_dir }}/node-volta.sh"
+    mode: "0644"
+    content: |
+      export VOLTA_HOME="${VOLTA_HOME:-$HOME/.volta}"
+      case ":$PATH:" in
+        *":$VOLTA_HOME/bin:"*) ;;
+        *) export PATH="$VOLTA_HOME/bin:$PATH" ;;
+      esac
+      export VOLTA_FEATURE_PNPM=1
+
 - name: Check whether Node.js is already available through Volta
   command: node --version
   register: node_version_check

@@ -5,12 +5,20 @@
     pkg:
       - openjdk-8-jdk
 
-- name: Setting java in profile files
-  blockinfile:
-    path: "{{ item }}"
-    block: |
-      export JAVA_HOME={{ java_home }}
-  loop:
-    - "{{ ansible_facts['env']['HOME'] }}/.bashrc"
-    - "{{ ansible_facts['env']['HOME'] }}/.zshrc"
-    - "{{ ansible_facts['env']['HOME'] }}/.profile"
+- name: Create envmgr profile.d directory
+  file:
+    path: "{{ envmgr_profile_dir }}"
+    state: directory
+    mode: "0755"
+
+- name: Remove legacy numbered Java profile drop-in
+  file:
+    path: "{{ envmgr_profile_dir }}/20-java.sh"
+    state: absent
+
+- name: Write Java profile drop-in
+  copy:
+    dest: "{{ envmgr_profile_dir }}/java.sh"
+    mode: "0644"
+    content: |
+      export JAVA_HOME="{{ java_home }}"
