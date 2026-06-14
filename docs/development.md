@@ -83,6 +83,9 @@ When adding or changing a role:
 - Update the relevant built-in scenario playbook.
 - Keep tasks idempotent when practical and verify scoped tag runs select only
   the intended role/task closure.
+- Put long-lived shell environment exports in envmgr profile drop-ins under
+  `~/.config/envmgr/profile.d/`; keep zsh-only UX in
+  `~/.config/envmgr/zsh/*.zsh`.
 - Update README, docs, AGENTS, and docs contract tests when public behavior or
   examples change.
 

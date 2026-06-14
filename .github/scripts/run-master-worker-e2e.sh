@@ -168,6 +168,6 @@ printf 'Installing zsh from the master across the workstation group...\n'
 run_in_master "uv run envmgr install -i ${inventory_alias} zsh"
 
 printf 'Verifying zsh and oh-my-zsh assets on every workstation node...\n'
-run_uv_ansible_in_master ansible -i "$inventory_file" workstation -m shell -a 'test -d "$HOME/.oh-my-zsh" && test -d "$HOME/.oh-my-zsh/custom/plugins/zsh-autosuggestions" && test -f "$HOME/.zshrc" && grep -q "ANSIBLE MANAGED CUSTOM BLOCK" "$HOME/.zshrc"'
+run_uv_ansible_in_master ansible -i "$inventory_file" workstation -m shell -a 'test -d "$HOME/.oh-my-zsh" && test -d "$HOME/.oh-my-zsh/custom/plugins/zsh-autosuggestions" && test -f "$HOME/.zshrc" && grep -q "ENVMGR PROFILE.D LOADER" "$HOME/.zshrc" && grep -q "ENVMGR ZSH.D LOADER" "$HOME/.zshrc" && ! grep -q "ANSIBLE MANAGED CUSTOM BLOCK" "$HOME/.zshrc" && test -f "$HOME/.config/envmgr/zsh/aliases.zsh" && test -f "$HOME/.config/envmgr/zsh/prompt.zsh" && test -d "$HOME/.config/envmgr/user/zsh.d"'
 
 printf 'Multi-node master-to-workers e2e completed successfully.\n'

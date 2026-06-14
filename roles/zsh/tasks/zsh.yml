@@ -15,35 +15,61 @@
 - name: Include alias varsfile
   include_vars: alias.yml
 
-- name: Add alias to zshrc
-  lineinfile:
-    dest: "{{ ansible_facts['env']['HOME'] }}/.zshrc"
-    line: "alias {{ item.key }}='{{ item.value }}' "
-  with_dict: "{{ zsh_alias }}"
+- name: Create envmgr zsh configuration directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - "{{ envmgr_profile_dir }}"
+    - "{{ envmgr_user_profile_dir }}"
+    - "{{ envmgr_zsh_config_dir }}"
+    - "{{ envmgr_user_zsh_dir }}"
 
-- name: Customize Lines
+- name: Write envmgr zsh aliases
+  template:
+    src: aliases.zsh.j2
+    dest: "{{ envmgr_zsh_config_dir }}/aliases.zsh"
+    mode: "0644"
+
+- name: Write envmgr zsh prompt
+  template:
+    src: prompt.zsh.j2
+    dest: "{{ envmgr_zsh_config_dir }}/prompt.zsh"
+    mode: "0644"
+
+- name: Remove legacy inline aliases from zshrc
+  lineinfile:
+    path: "{{ ansible_facts['env']['HOME'] }}/.zshrc"
+    line: "alias {{ item.key }}='{{ item.value }}' "
+    state: absent
+  loop: "{{ zsh_alias | dict2items }}"
+
+- name: Remove legacy zsh custom block
+  replace:
+    path: "{{ ansible_facts['env']['HOME'] }}/.zshrc"
+    regexp: |-
+      (?ms)^### ANSIBLE MANAGED CUSTOM BLOCK ###\n.*?\n### ANSIBLE MANAGED CUSTOM BLOCK ###\n?
+    replace: ""
+
+- name: Install envmgr profile.d loader for zsh
   blockinfile:
     path: "{{ ansible_facts['env']['HOME'] }}/.zshrc"
-    block: |
-      # Settings java
-      export JAVA_HOME="{{ java_home }}"
+    create: true
+    mode: "0644"
+    marker: "# {mark} ENVMGR PROFILE.D LOADER"
+    block: "{{ envmgr_profile_loader_block }}"
 
-      # Settings gvm
-      [[ -s "$HOME/.gvm/scripts/gvm" ]] && source "$HOME/.gvm/scripts/gvm"
-
-      # Customize ZSH PROMPT
-      PROMPT='%F{cyan}[$(whoami) $(hostname)]%f λ %~/ $(git_prompt_info)%{$reset_color%}'
-
-      # Enable volta pnpm support
-      export VOLTA_HOME="$HOME/.volta"
-      export PATH="$VOLTA_HOME/bin:$PATH"
-      export VOLTA_FEATURE_PNPM=1
-
-      source $HOME/.profile
-    marker: "### ANSIBLE MANAGED CUSTOM BLOCK ###"
+- name: Install envmgr zsh.d loader
+  blockinfile:
+    path: "{{ ansible_facts['env']['HOME'] }}/.zshrc"
+    create: true
+    mode: "0644"
+    marker: "# {mark} ENVMGR ZSH.D LOADER"
+    block: "{{ envmgr_zsh_loader_block }}"
 
 - name: Create ~/.zprofile if not exists
   file:
     path: "{{ ansible_facts['env']['HOME'] }}/.zprofile"
     state: touch
-    mode: "0664"
+    mode: "0644"

@@ -1,11 +1,12 @@
 name: zsh
-description: Shell setup with oh-my-zsh and aliases
+description: Shell setup with oh-my-zsh, env drop-in loading, and aliases
 enabled: true
 targets:
   - workstation
 tags:
   - zsh
-depends_on: []
+depends_on:
+  - init_core
 task_tags: []
 vars_files:
   - roles/zsh/vars/gantsign.oh-my-zsh.yml

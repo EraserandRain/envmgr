@@ -130,6 +130,10 @@ and release contracts.
 - [ ] Tasks are idempotent when practical and use clear imperative task names.
 - [ ] Role metadata in `roles/<role>/meta/envmgr.yml` drives tag discovery,
   dependency closure, generated execution playbooks, and docs.
+- [ ] Long-lived shell environment exports use envmgr profile drop-ins under
+  `~/.config/envmgr/profile.d/`; zsh-only aliases, prompt, and UX snippets live
+  under `~/.config/envmgr/zsh/*.zsh`, while user-private files stay under
+  `~/.config/envmgr/user/` and are not managed by roles.
 - [ ] New roles are created with `uv run create <role>`, then
   `roles/<role>/meta/envmgr.yml`, `tasks/main.yml`, and the appropriate
   scenario playbook are updated together.

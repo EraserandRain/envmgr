@@ -5,7 +5,8 @@ targets:
   - workstation
 tags:
   - java
-depends_on: []
+depends_on:
+  - init_core
 task_tags: []
 vars_files: []
 playbook_roles:

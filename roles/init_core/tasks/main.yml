@@ -10,3 +10,26 @@
     path: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
     state: directory
     mode: "0755"
+
+- name: Create envmgr shell environment directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - "{{ envmgr_profile_dir }}"
+    - "{{ envmgr_user_profile_dir }}"
+    - "{{ envmgr_user_zsh_dir }}"
+
+- name: Install envmgr profile.d loader
+  blockinfile:
+    path: "{{ item }}"
+    create: true
+    mode: "0644"
+    marker: "# {mark} ENVMGR PROFILE.D LOADER"
+    block: "{{ envmgr_profile_loader_block }}"
+  loop:
+    - "{{ ansible_facts['env']['HOME'] }}/.profile"
+    - "{{ ansible_facts['env']['HOME'] }}/.bashrc"
+    - "{{ ansible_facts['env']['HOME'] }}/.zprofile"
+    - "{{ ansible_facts['env']['HOME'] }}/.zshrc"

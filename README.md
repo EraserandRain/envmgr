@@ -70,6 +70,18 @@ resolution is not implemented. `envmgr self uninstall` prompts unless `--yes` or
 `-y` is provided. Both commands are limited to `install.sh`-managed GitHub
 Release installs recorded in `~/.envmgr/install.toml`.
 
+## Shell Environment
+
+Workstation roles write default shell environment snippets under
+`~/.config/envmgr/profile.d/`. The `init_core` and `zsh` roles install thin
+loaders in common shell profiles so these snippets are sourced without keeping
+large `export` blocks in `~/.zshrc`.
+
+User-owned environment files go under `~/.config/envmgr/user/profile.d/*.sh`.
+User-owned zsh-only files, such as private aliases or prompt overrides, go under
+`~/.config/envmgr/user/zsh.d/*.zsh`. envmgr creates these directories but does
+not manage their contents.
+
 ## Scenarios And Tags
 
 ### Built-in Scenarios

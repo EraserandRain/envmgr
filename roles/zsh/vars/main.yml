@@ -4,3 +4,34 @@ omz:
   root: "{{ ansible_facts['env']['HOME'] }}/.oh-my-zsh"
   plugins: "{{ ansible_facts['env']['HOME'] }}/.oh-my-zsh/plugins"
   custom_plugins: "{{ ansible_facts['env']['HOME'] }}/.oh-my-zsh/custom/plugins"
+
+envmgr_config_home: "{{ ansible_facts['env']['XDG_CONFIG_HOME'] | default(ansible_facts['env']['HOME'] ~ '/.config', true) }}"
+envmgr_shell_config_dir: "{{ envmgr_config_home }}/envmgr"
+envmgr_profile_dir: "{{ envmgr_shell_config_dir }}/profile.d"
+envmgr_user_profile_dir: "{{ envmgr_shell_config_dir }}/user/profile.d"
+envmgr_zsh_config_dir: "{{ envmgr_shell_config_dir }}/zsh"
+envmgr_user_zsh_dir: "{{ envmgr_shell_config_dir }}/user/zsh.d"
+envmgr_profile_loader_block: |
+  if [ -z "${_ENVMGR_PROFILE_D_LOADED:-}" ]; then
+    _ENVMGR_PROFILE_D_LOADED=1
+    envmgr_config_home="${XDG_CONFIG_HOME:-$HOME/.config}"
+    for envmgr_profile in \
+      "$envmgr_config_home"/envmgr/profile.d/*.sh \
+      "$envmgr_config_home"/envmgr/user/profile.d/*.sh
+    do
+      [ -r "$envmgr_profile" ] && . "$envmgr_profile"
+    done
+    unset envmgr_profile envmgr_config_home
+  fi
+envmgr_zsh_loader_block: |
+  if [ -z "${_ENVMGR_ZSH_D_LOADED:-}" ]; then
+    _ENVMGR_ZSH_D_LOADED=1
+    envmgr_config_home="${XDG_CONFIG_HOME:-$HOME/.config}"
+    for envmgr_zsh in \
+      "$envmgr_config_home"/envmgr/zsh/*.zsh \
+      "$envmgr_config_home"/envmgr/user/zsh.d/*.zsh
+    do
+      [ -r "$envmgr_zsh" ] && source "$envmgr_zsh"
+    done
+    unset envmgr_zsh envmgr_config_home
+  fi
