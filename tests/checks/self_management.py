@@ -5,6 +5,7 @@ import shlex
 import stat
 import tempfile
 import urllib.error
+from email.message import Message
 from pathlib import Path
 from unittest.mock import patch
 
@@ -342,7 +343,7 @@ def check_self_update_handles_http_error() -> None:
             url="https://api.github.com/repos/EraserandRain/envmgr/releases/latest",
             code=403,
             msg="rate limit exceeded",
-            hdrs={},
+            hdrs=Message(),
             fp=None,
         )
         with patch(
