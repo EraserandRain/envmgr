@@ -31,7 +31,7 @@ safe to rerun.
 | `envmgr ping [-i alias]` | Run Ansible ping against an inventory alias. |
 | `envmgr doctor [--json]` | Check runtime health without changing runtime files. |
 | `envmgr history [--limit N] [--json]` | Show recent runtime subprocess records. |
-| `envmgr self update --version VERSION` | Update an installer-managed GitHub Release install. |
+| `envmgr self update [--version VERSION]` | Update an installer-managed GitHub Release install (latest if omitted). |
 | `envmgr self uninstall [--yes]` | Remove the installer-managed tool and keep runtime data. |
 
 Useful public options include `--playbook`, `--inventory`, `--ask-vault-pass`,
@@ -61,14 +61,15 @@ envmgr history --limit 20
 envmgr history --json
 
 # Installer-managed lifecycle
+envmgr self update
 envmgr self update --version 0.1.0
 envmgr self uninstall --yes
 ```
 
-`envmgr self update` requires an explicit `--version`; automatic latest-release
-resolution is not implemented. `envmgr self uninstall` prompts unless `--yes` or
-`-y` is provided. Both commands are limited to `install.sh`-managed GitHub
-Release installs recorded in `~/.envmgr/install.toml`.
+`envmgr self update` resolves the latest GitHub Release by default; pass
+`--version` to pin a specific release. `envmgr self uninstall` prompts unless
+`--yes` or `-y` is provided. Both commands are limited to `install.sh`-managed
+GitHub Release installs recorded in `~/.envmgr/install.toml`.
 
 ## Shell Environment
 

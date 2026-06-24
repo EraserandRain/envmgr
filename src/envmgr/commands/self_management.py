@@ -43,8 +43,8 @@ def _update_command(
         typer.Option(
             "--version",
             help=(
-                "Update to a specific GitHub Release version, for example "
-                "0.1.0 or v0.1.0."
+                "Update to a specific GitHub Release version (default: latest). "
+                "For example: 0.1.0 or v0.1.0."
             ),
             rich_help_panel=SELF_OPTIONS_HELP_PANEL,
         ),
