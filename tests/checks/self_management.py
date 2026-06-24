@@ -4,6 +4,7 @@ import os
 import shlex
 import stat
 import tempfile
+import urllib.error
 from pathlib import Path
 from unittest.mock import patch
 
@@ -192,7 +193,92 @@ manager = "pip"
             raise AssertionError("expected unsupported state guidance")
 
 
-def check_self_update_requires_explicit_version_without_network() -> None:
+def _mock_github_latest_response(fake_response: str) -> object:
+    """Return a context manager that mocks urlopen to return *fake_response*."""
+
+    class _FakeResponse:
+        def __init__(self, body: str) -> None:
+            self._body = body
+
+        def __enter__(self) -> _FakeResponse:
+            return self
+
+        def __exit__(
+            self,
+            exc_type: type[BaseException] | None,
+            exc_val: BaseException | None,
+            exc_tb: object,
+        ) -> None:
+            pass
+
+        def read(self) -> bytes:
+            return self._body.encode("utf-8")
+
+    return _FakeResponse(fake_response)
+
+
+def check_self_update_resolves_latest_release_from_github() -> None:
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_path = Path(temp_dir)
+        envmgr_home = temp_path / ".envmgr"
+        fake_bin_dir = temp_path / "fake-bin"
+        fake_bin_dir.mkdir()
+        fake_log = temp_path / "uv.log"
+        tool_bin_dir = temp_path / "uv-bin"
+        fake_uv = _write_fake_uv(
+            fake_bin_dir,
+            fake_log=fake_log,
+            tool_bin_dir=tool_bin_dir,
+            version_output="envmgr 2.0.0",
+        )
+        state_file = _write_installer_state(
+            envmgr_home,
+            uv_path=fake_uv,
+            uv_tool_bin_dir=tool_bin_dir,
+        )
+
+        with patch(
+            "urllib.request.urlopen",
+            return_value=_mock_github_latest_response('{"tag_name": "v2.0.0"}'),
+        ):
+            result = _invoke_envmgr_with_home(envmgr_home, "self", "update")
+
+        if result.exit_code != 0:
+            raise AssertionError(
+                _format_failure(
+                    "expected self update without --version to succeed with mocked latest",
+                    result,
+                )
+            )
+
+        expected_url = (
+            "https://github.com/EraserandRain/envmgr/releases/download/"
+            "v2.0.0/envmgr-2.0.0-py3-none-any.whl"
+        )
+        uv_log = fake_log.read_text(encoding="utf-8")
+        if f"tool install --force {expected_url}" not in uv_log:
+            raise AssertionError("expected latest self update to call uv tool install")
+        if "Verified envmgr: envmgr 2.0.0" not in result.output:
+            raise AssertionError("expected latest self update to verify envmgr")
+
+        state_text = state_file.read_text(encoding="utf-8")
+        expected_state_fragments = (
+            'source = "github-release"',
+            'manager = "install.sh"',
+            'version = "2.0.0"',
+            'release_tag = "v2.0.0"',
+            f'wheel_url = "{expected_url}"',
+            'updated_at = "',
+        )
+        for fragment in expected_state_fragments:
+            if fragment not in state_text:
+                raise AssertionError(
+                    f"expected updated state to include {fragment!r}"
+                    f"\nstate:\n{state_text}"
+                )
+
+
+def check_self_update_handles_network_failure() -> None:
     with tempfile.TemporaryDirectory() as temp_dir:
         temp_path = Path(temp_dir)
         envmgr_home = temp_path / ".envmgr"
@@ -211,17 +297,142 @@ def check_self_update_requires_explicit_version_without_network() -> None:
             uv_tool_bin_dir=tool_bin_dir,
         )
 
-        result = _invoke_envmgr_with_home(envmgr_home, "self", "update")
+        with patch(
+            "urllib.request.urlopen",
+            side_effect=urllib.error.URLError("connection refused"),
+        ):
+            result = _invoke_envmgr_with_home(envmgr_home, "self", "update")
+
         if result.exit_code != 1:
             raise AssertionError(
                 _format_failure(
-                    "expected self update without --version to fail", result
+                    "expected network failure during latest resolution to fail", result
                 )
             )
-        if "--version" not in result.output or "VERSION to update" not in result.output:
-            raise AssertionError("expected no-network latest guidance")
+        if "network" not in result.output.lower():
+            raise AssertionError("expected network failure guidance")
+        if "--version" not in result.output:
+            raise AssertionError(
+                "expected network failure to suggest --version fallback"
+            )
         if fake_log.exists():
-            raise AssertionError("expected missing --version to avoid running uv")
+            raise AssertionError("expected network failure to avoid running uv")
+
+
+def check_self_update_handles_http_error() -> None:
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_path = Path(temp_dir)
+        envmgr_home = temp_path / ".envmgr"
+        fake_bin_dir = temp_path / "fake-bin"
+        fake_bin_dir.mkdir()
+        fake_log = temp_path / "uv.log"
+        tool_bin_dir = temp_path / "uv-bin"
+        fake_uv = _write_fake_uv(
+            fake_bin_dir,
+            fake_log=fake_log,
+            tool_bin_dir=tool_bin_dir,
+        )
+        _write_installer_state(
+            envmgr_home,
+            uv_path=fake_uv,
+            uv_tool_bin_dir=tool_bin_dir,
+        )
+
+        http_error = urllib.error.HTTPError(
+            url="https://api.github.com/repos/EraserandRain/envmgr/releases/latest",
+            code=403,
+            msg="rate limit exceeded",
+            hdrs={},
+            fp=None,
+        )
+        with patch(
+            "urllib.request.urlopen",
+            side_effect=http_error,
+        ):
+            result = _invoke_envmgr_with_home(envmgr_home, "self", "update")
+
+        if result.exit_code != 1:
+            raise AssertionError(
+                _format_failure(
+                    "expected HTTP error during latest resolution to fail", result
+                )
+            )
+        if "HTTP 403" not in result.output:
+            raise AssertionError("expected HTTP error code in output")
+        if "--version" not in result.output:
+            raise AssertionError("expected HTTP error to suggest --version fallback")
+        if fake_log.exists():
+            raise AssertionError("expected HTTP error to avoid running uv")
+
+
+def check_self_update_handles_invalid_github_response() -> None:
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_path = Path(temp_dir)
+        envmgr_home = temp_path / ".envmgr"
+        fake_bin_dir = temp_path / "fake-bin"
+        fake_bin_dir.mkdir()
+        fake_log = temp_path / "uv.log"
+        tool_bin_dir = temp_path / "uv-bin"
+        fake_uv = _write_fake_uv(
+            fake_bin_dir,
+            fake_log=fake_log,
+            tool_bin_dir=tool_bin_dir,
+        )
+        _write_installer_state(
+            envmgr_home,
+            uv_path=fake_uv,
+            uv_tool_bin_dir=tool_bin_dir,
+        )
+
+        with patch(
+            "urllib.request.urlopen",
+            return_value=_mock_github_latest_response("not json"),
+        ):
+            result = _invoke_envmgr_with_home(envmgr_home, "self", "update")
+
+        if result.exit_code != 1:
+            raise AssertionError(
+                _format_failure("expected invalid JSON response to fail", result)
+            )
+        if "--version" not in result.output or "VERSION to update" not in result.output:
+            raise AssertionError("expected invalid response to suggest --version")
+        if fake_log.exists():
+            raise AssertionError("expected invalid response to avoid running uv")
+
+
+def check_self_update_handles_empty_tag_name() -> None:
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_path = Path(temp_dir)
+        envmgr_home = temp_path / ".envmgr"
+        fake_bin_dir = temp_path / "fake-bin"
+        fake_bin_dir.mkdir()
+        fake_log = temp_path / "uv.log"
+        tool_bin_dir = temp_path / "uv-bin"
+        fake_uv = _write_fake_uv(
+            fake_bin_dir,
+            fake_log=fake_log,
+            tool_bin_dir=tool_bin_dir,
+        )
+        _write_installer_state(
+            envmgr_home,
+            uv_path=fake_uv,
+            uv_tool_bin_dir=tool_bin_dir,
+        )
+
+        with patch(
+            "urllib.request.urlopen",
+            return_value=_mock_github_latest_response('{"tag_name": ""}'),
+        ):
+            result = _invoke_envmgr_with_home(envmgr_home, "self", "update")
+
+        if result.exit_code != 1:
+            raise AssertionError(
+                _format_failure("expected empty tag_name to fail", result)
+            )
+        if "--version" not in result.output or "VERSION to update" not in result.output:
+            raise AssertionError("expected empty tag_name to suggest --version")
+        if fake_log.exists():
+            raise AssertionError("expected empty tag_name to avoid running uv")
 
 
 def check_self_update_uses_fake_uv_and_rewrites_installer_state() -> None:

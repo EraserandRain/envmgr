@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import importlib
+import json
 import os
 import subprocess
 import sys
+import urllib.error
+import urllib.request
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -129,6 +132,54 @@ def load_installer_state(envmgr_home: str | Path | None = None) -> InstallState:
     )
 
 
+def _fetch_latest_release_tag(state: InstallState) -> str:
+    """Resolve the latest GitHub Release tag from the GitHub API."""
+    api_url = f"https://api.github.com/repos/{state.owner}/{state.repo}/releases/latest"
+    request = urllib.request.Request(
+        api_url,
+        headers={
+            "Accept": "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28",
+        },
+    )
+    try:
+        # S310 (ssrf): safe — URL is constructed from installer state
+        # values (state.owner / state.repo), not user-supplied input.
+        with urllib.request.urlopen(request, timeout=10) as response:  # noqa: S310
+            body = response.read().decode("utf-8")
+    except urllib.error.HTTPError as error:
+        raise SelfManagementError(
+            f"GitHub returned HTTP {error.code} while resolving the latest "
+            f"release. Pass --version VERSION to update to a specific "
+            f"GitHub Release."
+        ) from error
+    except urllib.error.URLError as error:
+        raise SelfManagementError(
+            "Could not reach GitHub to resolve the latest release. "
+            "Check your network connection or pass --version VERSION "
+            "to update to a specific GitHub Release."
+        ) from error
+
+    try:
+        release_data = json.loads(body)
+    except json.JSONDecodeError as error:
+        raise SelfManagementError(
+            "GitHub returned an unexpected response while resolving "
+            "the latest release. Pass --version VERSION to update to "
+            "a specific GitHub Release."
+        ) from error
+
+    tag_name = release_data.get("tag_name")
+    if not isinstance(tag_name, str) or not tag_name.strip():
+        raise SelfManagementError(
+            "Could not determine the latest release tag from the GitHub "
+            "API response. Pass --version VERSION to update to a "
+            "specific GitHub Release."
+        )
+
+    return tag_name.strip()
+
+
 def update_installer_managed_envmgr(
     *,
     requested_version: str | None,
@@ -136,13 +187,9 @@ def update_installer_managed_envmgr(
 ) -> SelfUpdateResult:
     """Update envmgr through the wheel URL derived from installer state."""
     state = load_installer_state(envmgr_home)
-    if requested_version is None:
-        raise SelfManagementError(
-            "Automatic latest-release resolution is not available yet. "
-            "Pass --version VERSION to update to a specific GitHub Release."
-        )
+    version = requested_version or _fetch_latest_release_tag(state)
 
-    target_state = _build_target_state(state, requested_version)
+    target_state = _build_target_state(state, version)
     _require_executable(state.uv, "recorded uv executable")
     _run_uv_command(
         [str(state.uv), "tool", "install", "--force", target_state.wheel_url]

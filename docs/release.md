@@ -71,12 +71,13 @@ profiles or hidden PATH files. `--version VERSION` pins a release, and
 Installer-managed GitHub Release installs can update or remove themselves:
 
 ```bash
+envmgr self update
 envmgr self update --version 0.1.0
 envmgr self uninstall --yes
 ```
 
-`envmgr self update` requires an explicit `--version` because automatic
-latest-release resolution is not implemented. `envmgr self uninstall` prompts
+`envmgr self update` resolves the latest GitHub Release by default. Pass
+`--version` to pin a specific release. `envmgr self uninstall` prompts
 through Rich unless `--yes` or `-y` is provided, removes installer state and the
 uv tool install, and preserves runtime data under `~/.envmgr/`.
 
@@ -92,7 +93,7 @@ fixed guidance that includes:
 
 - Install guidance that links to `install.sh`.
 - SHA256 verification guidance.
-- Upgrade guidance with `envmgr self update --version <version>`.
+- Upgrade guidance with `envmgr self update [--version <version>]`.
 - Uninstall guidance with `envmgr self uninstall [--yes]`.
 - Clean-reinstall guidance for stale shims.
 
