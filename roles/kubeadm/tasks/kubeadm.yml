@@ -1,4 +1,21 @@
 ---
+- name: Discover latest Kubernetes stable version
+  uri:
+    url: https://dl.k8s.io/release/stable.txt
+    return_content: true
+  register: k8s_stable_release
+  until: k8s_stable_release is succeeded
+  retries: 3
+  delay: 5
+
+- name: Set kubernetes major version
+  set_fact:
+    kubernetes_major_version: "{{ k8s_stable_release.content | trim | regex_replace('^v([0-9]+\\.[0-9]+).*', '\\1') }}"
+
+- name: Show discovered Kubernetes version
+  debug:
+    msg: "Discovered latest Kubernetes: {{ k8s_stable_release.content | trim }} → APT repo v{{ kubernetes_major_version }}"
+
 - name: Install dependencies for role {{ role_name }}
   become: true
   apt:
@@ -14,10 +31,21 @@
     state: directory
     mode: "0755"
 
+- name: Download kubeadm apt key
+  become: true
+  get_url:
+    url: "https://pkgs.k8s.io/core:/stable:/v{{ kubernetes_major_version }}/deb/Release.key"
+    dest: /tmp/kubernetes-apt-keyring.gpg
+    mode: "0644"
+  register: k8s_key_download
+  until: k8s_key_download is succeeded
+  retries: 5
+  delay: 5
+
 - name: Add kubeadm apt key
   become: true
   apt_key:
-    url: "https://pkgs.k8s.io/core:/stable:/v{{ kubernetes_major_version }}/deb/Release.key"
+    file: /tmp/kubernetes-apt-keyring.gpg
     keyring: /etc/apt/keyrings/kubernetes-apt-keyring.gpg
     state: present
 
@@ -27,25 +55,50 @@
     repo: "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v{{ kubernetes_major_version }}/deb/ /"
     state: present
     filename: kubeadm
+    update_cache: false
 
-- name: Install kubelet kubeadm kubectl
+- name: Update apt cache (kubeadm source only)  # noqa: command-instead-of-module
   become: true
-  apt:
-    update_cache: true
-    pkg:
-      - "kubelet={{ kubernetes_default_version }}"
-      - "kubeadm={{ kubernetes_default_version }}"
-      - "kubectl={{ kubernetes_default_version }}"
+  command: >
+    apt-get update
+    -o Dir::Etc::sourcelist="sources.list.d/kubeadm.list"
+    -o Dir::Etc::sourceparts="-"
+    -o APT::Get::List-Cleanup="0"
+  changed_when: false
 
-- name: Hold kubelet kubeadm kubectl
+- name: Unhold kubelet kubeadm kubectl
   become: true
   dpkg_selections:
     name: "{{ item }}"
-    selection: hold
+    selection: install
   loop:
     - kubelet
     - kubeadm
     - kubectl
+    - cri-tools
+    - kubernetes-cni
+
+- name: Install kubernetes packages
+  become: true
+  apt:
+    pkg:
+      - kubelet
+      - kubeadm
+      - kubectl
+      - cri-tools
+      - kubernetes-cni
+    state: latest
+
+- name: Collect installed versions
+  shell: "dpkg-query -W -f='${binary:Package}: ${Version}\n' kubeadm kubelet kubectl cri-tools kubernetes-cni"
+  register: _k8s_versions
+  changed_when: false
+
+- name: Show installed versions
+  debug:
+    msg: |-
+      Installed:
+      {{ _k8s_versions.stdout }}
 
 - name: Enable CRI plugin
   become: true

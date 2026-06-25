@@ -174,8 +174,8 @@ Role-level tags install complete modules:
 - `golang` - default Go version `1.20.4`.
 - `init` - baseline workstation bootstrap.
 - `java` - default Java version `8`.
-- `kubeadm` - Kubernetes package version `1.31.9-1.1`.
-- `kubernetes_tools` - kubectl default version `1.31`, Helm, crictl, and CNI.
+- `kubeadm` - Kubernetes packages, auto-discovered latest stable via `dl.k8s.io/release/stable.txt`.
+- `kubernetes_tools` - kubectl, cri-tools, kubernetes-cni (auto-discovered latest stable), Helm, and conntrack.
 - `minikube` - latest package from the configured source.
 - `monitoring`
 - `node` - latest Node.js LTS through Volta.
