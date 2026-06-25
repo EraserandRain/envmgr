@@ -33,12 +33,12 @@
           'darwin/amd64': 'x86_64-apple-darwin',
           'darwin/aarch64': 'aarch64-apple-darwin',
           'darwin/arm64': 'aarch64-apple-darwin'
-        }.get((ansible_system | lower) ~ '/' ~ (ansible_architecture | lower), '')
+        }.get((ansible_facts.system | lower) ~ '/' ~ (ansible_facts.architecture | lower), '')
       }}
 
 - name: Fail if RTK does not publish a binary for this platform
   fail:
-    msg: "RTK does not publish a release archive for {{ ansible_system }} {{ ansible_architecture }}"
+    msg: "RTK does not publish a release archive for {{ ansible_facts.system }} {{ ansible_facts.architecture }}"
   when: rtk_release_target == ''
 
 - name: Resolve latest RTK release via GitHub redirects

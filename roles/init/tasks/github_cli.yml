@@ -2,7 +2,7 @@
 - name: Resolve GitHub CLI apt architecture
   set_fact:
     github_cli_apt_architecture: >-
-      {{ github_cli_apt_architecture_map.get(ansible_architecture, '') }}
+      {{ github_cli_apt_architecture_map.get(ansible_facts.architecture, '') }}
   vars:
     github_cli_apt_architecture_map:
       x86_64: amd64
@@ -12,7 +12,7 @@
   fail:
     msg: >-
       GitHub CLI apt repository does not support architecture
-      '{{ ansible_architecture }}'. Supported architectures: x86_64, aarch64.
+      '{{ ansible_facts.architecture }}'. Supported architectures: x86_64, aarch64.
   when: github_cli_apt_architecture == ""
 
 - name: Check if wget is installed
