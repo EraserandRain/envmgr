@@ -1,8 +1,31 @@
 ---
+- name: Download helm apt key
+  become: true
+  get_url:
+    url: https://packages.buildkite.com/helm-linux/helm-debian/gpgkey
+    dest: /tmp/helm.gpg
+    mode: "0644"
+  register: helm_key_download
+  until: helm_key_download is succeeded
+  retries: 5
+  delay: 5
+
+- name: Verify helm apt key fingerprint
+  become: true
+  shell: >
+    set -o pipefail &&
+    gpg --show-keys --with-colons /tmp/helm.gpg
+    | awk -F: '/^pub:/ { getline; if ($1 == "fpr") print $10 }'
+  register: helm_key_fingerprint
+  changed_when: false
+  failed_when:
+    - helm_key_fingerprint.rc != 0
+    - helm_key_fingerprint.stdout | trim != "DDF78C3E6EBB2D2CC223C95C62BA89D07698DBC6"
+
 - name: Add helm apt key
   become: true
   apt_key:
-    url: https://baltocdn.com/helm/signing.asc
+    file: /tmp/helm.gpg
     keyring: /usr/share/keyrings/helm.gpg
     state: present
 
@@ -14,20 +37,39 @@
 - name: Add helm apt repository
   become: true
   apt_repository:
-    repo: "deb [arch={{ arch_output.stdout }} signed-by=/usr/share/keyrings/helm.gpg] https://baltocdn.com/helm/stable/debian/ all main"
+    repo: "deb [arch={{ arch_output.stdout }} signed-by=/usr/share/keyrings/helm.gpg] https://packages.buildkite.com/helm-linux/helm-debian/any/ any main"
     state: present
     filename: helm
+    update_cache: false
+
+- name: Update apt cache (helm source only)  # noqa: command-instead-of-module
+  become: true
+  command: >
+    apt-get update
+    -o Dir::Etc::sourcelist="sources.list.d/helm.list"
+    -o Dir::Etc::sourceparts="-"
+    -o APT::Get::List-Cleanup="0"
+  changed_when: false
 
 - name: Install helm
   become: true
   apt:
-    update_cache: true
     pkg:
       - helm
+    state: latest
+
+- name: Collect installed version
+  shell: "dpkg-query -W -f='${binary:Package}: ${Version}\n' helm"
+  register: _helm_version
+  changed_when: false
+
+- name: Show installed version
+  debug:
+    msg: "Installed: {{ _helm_version.stdout }}"
 
 - name: Install helm-diff plugin
   become: false
-  command: helm plugin install {{ helm.diff_plugin_url }}
+  command: helm plugin install {{ helm.diff_plugin_url }} --verify=false
   register: plugin_result
   changed_when: plugin_result.rc == 0
   failed_when:
