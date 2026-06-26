@@ -90,8 +90,8 @@ shells.
 
 ## Release Notes Checklist
 
-GitHub-generated release notes provide the changelog body. The workflow prepends
-fixed guidance that includes:
+git-cliff generates the changelog body from Conventional Commits history.
+The workflow prepends fixed guidance that includes:
 
 - Install guidance that links to `install.sh`.
 - SHA256 verification guidance.

@@ -87,8 +87,9 @@ def check_release_workflow_publishes_generated_notes_with_fixed_guidance() -> No
             "## Clean Reinstall",
             "uv tool uninstall envmgr || true",
             "hash -r",
-            "--generate-notes",
-            '--notes "$(cat release-notes.md)"',
+            "git-cliff",
+            "cat changelog.md >> release-notes.md",
+            "--notes-file release-notes.md",
         )
     )
 
