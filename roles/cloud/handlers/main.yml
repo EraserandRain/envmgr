@@ -21,5 +21,6 @@
   apt_repository:
     repo: "deb [signed-by={{ hashicorp_keyring }}] {{ hashicorp_repo_url }} {{ ansible_facts.distribution_release }} main"
     state: present
-    filename: /etc/apt/sources.list.d/hashicorp.list
+    filename: hashicorp
+    update_cache: false
   listen: Setup hashicorp
