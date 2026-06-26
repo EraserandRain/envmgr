@@ -30,6 +30,8 @@ jobs:
 
       - name: Check out repository
         uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v6
@@ -158,6 +160,14 @@ jobs:
             fi
           done
 
+      - name: Generate changelog
+        uses: orhun/git-cliff-action@v4.8.0
+        with:
+          config: cliff.toml
+          args: --latest
+        env:
+          OUTPUT: changelog.md
+
       - name: Write fixed release note preface
         run: |
           package_version="${GITHUB_REF_NAME#v}"
@@ -200,6 +210,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          cat changelog.md >> release-notes.md
           gh release create "$GITHUB_REF_NAME" \
             dist/envmgr-*.whl \
             dist/envmgr-*.tar.gz \
@@ -207,5 +218,4 @@ jobs:
             dist/SHA256SUMS \
             --verify-tag \
             --title "$GITHUB_REF_NAME" \
-            --generate-notes \
-            --notes "$(cat release-notes.md)"
+            --notes-file release-notes.md
