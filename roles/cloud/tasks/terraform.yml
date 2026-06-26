@@ -10,12 +10,20 @@
 - name: Flush handlers
   meta: flush_handlers
 
+- name: Update apt cache (hashicorp source only)  # noqa: command-instead-of-module
+  become: true
+  command: >
+    apt-get update
+    -o Dir::Etc::sourcelist="sources.list.d/hashicorp.list"
+    -o Dir::Etc::sourceparts="-"
+    -o APT::Get::List-Cleanup="0"
+  changed_when: false
+
 - name: Install terraform
   become: true
   apt:
-    update_cache: true
     pkg:
-      - "terraform"
+      - terraform
 
 - name: Enable terraform plugin cache
   template:
