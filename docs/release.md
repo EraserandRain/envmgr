@@ -23,12 +23,14 @@ Before publishing a release tag:
 ## Release Workflow
 
 GitHub Release publishing is tag-driven. Push version tags matching `vX.Y.Z`
-only after the release commit is ready. The release workflow should run locked
+only after the release commit is ready. The release workflow runs locked
 dependency sync, setup, validation, smoke tests, release-style builds, artifact
 inspection, installer preparation, SHA256 checksum generation, isolated wheel
-install smoke testing, and `gh release create` with `--generate-notes`. The
+install smoke testing, changelog generation via
+[git-cliff](https://github.com/orhun/git-cliff), and `gh release create`. The
 workflow prepends fixed install, SHA256 verification, upgrade, uninstall, and
-clean-reinstall guidance with `--notes`.
+clean-reinstall guidance; git-cliff appends the changelog from Conventional
+Commits history.
 
 Release artifacts should include only:
 

@@ -1,0 +1,88 @@
+[changelog]
+header = ""
+body = """
+{%- macro remote_url() -%}
+  https://github.com/EraserandRain/envmgr
+{%- endmacro -%}
+{%- set _ = remote_url() -%}
+{% for release in releases -%}
+  {%- if release.version %}
+## [{{ release.version }}] - {{ release.timestamp | date(format="%Y-%m-%d") }}
+  {% else %}
+## [Unreleased]
+  {%- endif %}
+{% for group, commits in release.commits | group_by(attribute="group") %}
+### {{ group }}
+{% for commit in commits %}
+  {%- set scope = commit.scope | default(value="") -%}
+  {%- set separator = ": " if scope else "" -%}
+- {{ commit.message | split(pat="\n") | first | trim }}
+  {%- if commit.github.pr_number -%}
+    ([#{{ commit.github.pr_number }}]({{ remote_url() }}/pull/{{ commit.github.pr_number }}))
+  {%- endif -%}
+  {%- if commit.github.username %} (@{{ commit.github.username }}){% endif %}
+{%- endfor %}
+{% endfor %}
+{% endfor %}
+"""
+footer = """
+{%- for release in releases -%}
+  {%- if release.version -%}
+    {%- if release.previous.version %}
+[{{ release.version }}]: {{ remote_url() }}/compare/{{ release.previous.version }}...{{ release.version }}
+    {%- else %}
+[{{ release.version }}]: {{ remote_url() }}/releases/tag/{{ release.version }}
+    {%- endif %}
+  {%- endif -%}
+{% endfor %}
+"""
+trim = true
+
+[git]
+conventional_commits = true
+filter_unconventional = false
+split_commits = false
+tag_pattern = "v[0-9].*"
+skip_tags = ""
+ignore_tags = ""
+sort_commits = "newest"
+
+[[git.commit_parsers]]
+message = "^feat"
+group = "Added"
+
+[[git.commit_parsers]]
+message = "^fix"
+group = "Fixed"
+
+[[git.commit_parsers]]
+message = "^refactor"
+group = "Changed"
+
+[[git.commit_parsers]]
+message = "^perf"
+group = "Performance"
+
+[[git.commit_parsers]]
+message = "^docs"
+group = "Documentation"
+
+[[git.commit_parsers]]
+message = "^test"
+group = "Testing"
+
+[[git.commit_parsers]]
+message = "^chore"
+group = "Miscellaneous Tasks"
+
+[[git.commit_parsers]]
+message = "^style"
+group = "Styling"
+
+[[git.commit_parsers]]
+message = "^ci"
+group = "CI"
+
+[[git.commit_parsers]]
+message = "^revert"
+group = "Revert"
