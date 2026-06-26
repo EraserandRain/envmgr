@@ -16,15 +16,11 @@
   debug:
     msg: "Discovered latest Kubernetes: {{ k8s_stable_release.content | trim }} -> APT repo v{{ kubernetes_major_version }}"
 
-- name: Install dependencies for role {{ role_name }}
+- name: Remove stale kubectl apt sources
   become: true
-  apt:
-    update_cache: true
-    pkg:
-      - apt-transport-https
-      - ca-certificates
-      - curl
-      - gnupg
+  file:
+    path: /etc/apt/sources.list.d/kubectl.list
+    state: absent
 
 - name: Create /etc/apt/keyrings if not exists
   become: true

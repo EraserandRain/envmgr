@@ -1,3 +1,7 @@
+- name: Install shared dependencies
+  import_tasks: dependencies.yml
+  when: "'master' in group_names"
+
 - name: Install kubectl
   import_tasks: kubectl.yml
   when: "'master' in group_names"

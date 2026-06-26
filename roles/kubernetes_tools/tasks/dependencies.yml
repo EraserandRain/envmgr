@@ -1,0 +1,9 @@
+---
+- name: Install shared dependencies for role {{ role_name }}
+  become: true
+  apt:
+    pkg:
+      - apt-transport-https
+      - ca-certificates
+      - curl
+      - gnupg
