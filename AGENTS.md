@@ -186,8 +186,9 @@ and release contracts.
 ## Release Checklist
 
 - [ ] Tags are created automatically by `.github/workflows/auto-tag.yml` on
-  push to `master`. Do NOT manually create tags — merge to master and let
-  git-cliff determine the next version from Conventional Commits.
+  PR merge to `master`. Do NOT manually create tags — open a PR from `dev`
+  to `master`, merge it, and let git-cliff determine the next version from
+  Conventional Commits.
 - [ ] CI keeps separate validation, smoke, package-surface, init-install, and
   Docker Compose master/worker e2e jobs aligned with the supported runtime and
   helper split.
