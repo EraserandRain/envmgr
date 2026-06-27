@@ -16,6 +16,7 @@ from .commands.setup import run_setup
 from .commands.shared import (
     require_setup_completed as shared_require_setup_completed,
 )
+from .services.update_check import start_update_check_background
 
 HELP_CONTEXT_SETTINGS = {"help_option_names": ["--help", "-h"]}
 RUNTIME_OPTIONS_HELP_PANEL = "Runtime options"
@@ -327,4 +328,5 @@ def setup(argv: list[str] | None = None) -> None:
 
 def main(argv: list[str] | None = None) -> None:
     """Run the Typer-based `envmgr` root app."""
+    start_update_check_background()
     app(args=argv, prog_name=CLI_ROOT_COMMAND)

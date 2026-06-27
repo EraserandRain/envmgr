@@ -106,11 +106,12 @@ and release contracts.
   installer-managed GitHub Release installs with `~/.envmgr/install.toml`;
   unsupported install methods fail with actionable guidance instead of mutating
   the user's tool environment.
-- [ ] Public `envmgr self update --version VERSION` is required because
-  automatic latest-release resolution is not implemented. `envmgr self
-  uninstall` prompts through the shared Rich confirm helper unless `--yes` or
-  `-y` is provided, removes only installer state and the uv tool install, and
-  keeps the rest of `~/.envmgr/` runtime data by default.
+- [ ] Public `envmgr self update` (with optional `--version VERSION`) resolves
+  the latest GitHub Release via the GitHub API when `--version` is omitted,
+  upgrades the install.sh-managed tool, and rewrites `~/.envmgr/install.toml`.
+  `envmgr self uninstall` prompts through the shared Rich confirm helper unless
+  `--yes` or `-y` is provided, removes only installer state and the uv tool
+  install, and keeps the rest of `~/.envmgr/` runtime data by default.
 - [ ] Use Rich for runtime human help, status, warnings, summaries, prompts,
   and the human `envmgr history` table. Keep JSON output and live external
   subprocess stdout/stderr plain.
