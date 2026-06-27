@@ -35,8 +35,8 @@ jobs:
         id: bump
         run: |
           bumped=$(git cliff --bump --bumped-version 2>&1) || {
-            echo "git-cliff --bumped-version failed: $bumped" >&2
-            exit 0
+            echo "::error::git-cliff --bumped-version failed: $bumped" >&2
+            exit 1
           }
           if [ -z "$bumped" ]; then
             echo "No version bump needed (no bump-worthy commits since last tag)"

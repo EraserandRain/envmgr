@@ -15,7 +15,11 @@ body = """
 ### {{ group }}
 {% for commit in commits %}
   {%- set scope = commit.scope | default(value="") -%}
-  {%- set separator = ": " if scope else "" -%}
+  {%- if scope -%}
+    {%- set prefix = scope ~ ": " -%}
+  {%- else -%}
+    {%- set prefix = "" -%}
+  {%- endif -%}
 - {{ commit.message | split(pat="\n") | first | trim }}
   {%- if commit.github.pr_number -%}
     ([#{{ commit.github.pr_number }}]({{ remote_url() }}/pull/{{ commit.github.pr_number }}))
