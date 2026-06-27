@@ -185,10 +185,31 @@ and release contracts.
 
 ## Release Checklist
 
+When the user asks to ship changes, follow this automated PR workflow:
+
+1. **Push**: The user handles `git push` themselves.
+2. **Create PR**: `gh pr create --base master --head dev`, title = commit
+   message (single-commit PRs), no body. Base branch `master` is
+   protected — direct pushes are rejected.
+3. **Wait for CI**: poll `gh pr view <N> --json statusCheckRollup` until all
+   jobs report `SUCCESS`. The required jobs are: Validate, Smoke Tests,
+   Package Surface, Init Install (ubuntu-22.04, ubuntu-24.04),
+   Master/Worker E2E.
+4. **Merge**: `gh pr merge <N> --rebase` (rebase, never squash or merge
+   commit). This triggers `auto-tag.yml` which runs git-cliff to compute the
+   next semver tag, then `release.yml` which builds and publishes the
+   GitHub Release.
+5. **Verify**: check `gh run list` for a successful `Auto Tag` run and
+   confirm `vX.Y.Z` appears in `git ls-remote --tags origin`.
+
 - [ ] Tags are created automatically by `.github/workflows/auto-tag.yml` on
-  PR merge to `master`. Do NOT manually create tags — open a PR from `dev`
-  to `master`, merge it, and let git-cliff determine the next version from
-  Conventional Commits.
+  PR merge to `master`. Do NOT manually create tags.
+- [ ] Version bump is determined by Conventional Commits since the last tag:
+  `feat` → minor, `fix` → patch, `feat!` → major. Multiple commits in one
+  PR produce a single tag at the highest bump level.
+- [ ] `cliff.toml` uses Tera templates — avoid inline `if/else` ternary
+  (`{% set x = "a" if cond else "b" %}`); use `{% if %}`/`{% else %}` blocks
+  instead.
 - [ ] CI keeps separate validation, smoke, package-surface, init-install, and
   Docker Compose master/worker e2e jobs aligned with the supported runtime and
   helper split.
