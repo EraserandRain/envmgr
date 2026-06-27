@@ -1,0 +1,64 @@
+name: Auto Tag
+
+on:
+  push:
+    branches:
+      - master
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  auto_tag:
+    name: Bump and Tag
+    runs-on: ubuntu-latest
+    # Skip if the push is from a release tag workflow (avoids potential loops)
+    if: github.event_name == 'push' && !startsWith(github.event.head_commit.message, 'chore(release):')
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Install git-cliff
+        uses: taiki-e/install-action@v2
+        with:
+          tool: git-cliff
+
+      - name: Compute next version
+        id: bump
+        run: |
+          bumped=$(git cliff --bump --bumped-version 2>&1) || {
+            echo "git-cliff --bumped-version failed: $bumped" >&2
+            exit 0
+          }
+          if [ -z "$bumped" ]; then
+            echo "No version bump needed (no bump-worthy commits since last tag)"
+            exit 0
+          fi
+          echo "version=$bumped" >> "$GITHUB_OUTPUT"
+
+      - name: Create and push tag
+        if: steps.bump.outputs.version != ''
+        run: |
+          version="${{ steps.bump.outputs.version }}"
+
+          # Guard: skip if this tag already exists (locally or on remote)
+          if git rev-parse "$version" >/dev/null 2>&1; then
+            echo "Tag $version already exists locally — skipping"
+            exit 0
+          fi
+          if git ls-remote --tags origin "$version" | grep -q .; then
+            echo "Tag $version already exists on remote — skipping"
+            exit 0
+          fi
+
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "$version" -m "envmgr $version"
+          git push origin "$version"
