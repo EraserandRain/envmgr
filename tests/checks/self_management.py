@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import json
 import os
 import shlex
 import stat
+import sys
 import tempfile
 import urllib.error
+from datetime import datetime, timedelta, timezone
 from email.message import Message
 from pathlib import Path
 from unittest.mock import patch
@@ -608,3 +611,276 @@ def check_self_uninstall_prompts_without_yes_and_can_cancel() -> None:
             raise AssertionError("expected cancellation to keep install.toml")
         if fake_log.exists():
             raise AssertionError("expected cancellation to avoid running uv")
+
+
+# ---------------------------------------------------------------------------
+# update-check helpers
+# ---------------------------------------------------------------------------
+
+
+def _make_empty_cache(cache_path: Path) -> None:
+    cache_path.parent.mkdir(parents=True, exist_ok=True)
+
+
+def _make_fresh_cache(cache_path: Path, version: str) -> None:
+    cache_path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "last_check": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "latest_version": version,
+    }
+    cache_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
+
+def _make_stale_cache(cache_path: Path, version: str) -> None:
+    cache_path.parent.mkdir(parents=True, exist_ok=True)
+    stale_time = datetime.now(timezone.utc) - timedelta(hours=25)
+    payload = {
+        "last_check": stale_time.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "latest_version": version,
+    }
+    cache_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
+
+# ---------------------------------------------------------------------------
+# update check contract tests
+# ---------------------------------------------------------------------------
+
+
+def check_update_newer_recognises_newer_version() -> None:
+    from envmgr.services.update_check import _newer
+
+    if not _newer("v0.2.0", "0.1.0"):
+        raise AssertionError("expected v0.2.0 > 0.1.0")
+    if not _newer("v1.0.0", "0.9.9"):
+        raise AssertionError("expected v1.0.0 > 0.9.9")
+    if not _newer("v0.1.1", "0.1.0"):
+        raise AssertionError("expected v0.1.1 > 0.1.0")
+
+
+def check_update_newer_rejects_same_or_older() -> None:
+    from envmgr.services.update_check import _newer
+
+    if _newer("v0.1.0", "0.1.0"):
+        raise AssertionError("expected v0.1.0 == 0.1.0")
+    if _newer("v0.0.9", "0.1.0"):
+        raise AssertionError("expected v0.0.9 < 0.1.0")
+    if _newer("", "0.1.0"):
+        raise AssertionError("expected empty string to not be newer")
+    if _newer("not-a-version", "0.1.0"):
+        raise AssertionError("expected non-version to not be newer")
+
+
+def check_update_cache_read_write_and_freshness() -> None:
+    from envmgr.services.update_check import (
+        _cache_fresh,
+        _cache_path,
+        _read_cache,
+        _write_cache,
+    )
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        home = Path(temp_dir) / ".envmgr"
+        cache_path = _cache_path(home)
+
+        # Missing cache is not fresh
+        if _cache_fresh(cache_path):
+            raise AssertionError("expected missing cache to not be fresh")
+
+        # Write and read back
+        _write_cache(cache_path, "v0.2.0")
+        version, last_check = _read_cache(cache_path)
+        if version != "v0.2.0":
+            raise AssertionError(f"expected v0.2.0, got {version}")
+        if last_check is None:
+            raise AssertionError("expected a timestamp")
+
+        # Freshly written cache should be fresh
+        if not _cache_fresh(cache_path):
+            raise AssertionError("expected just-written cache to be fresh")
+
+        # Stale cache should not be fresh
+        _make_stale_cache(cache_path, "v0.1.0")
+        if _cache_fresh(cache_path):
+            raise AssertionError("expected stale cache to not be fresh")
+
+
+def check_update_run_check_uses_cached_result_when_fresh() -> None:
+    from envmgr.services.update_check import _run_check
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        home = Path(temp_dir) / ".envmgr"
+        cache_path = home / "update-check.json"
+
+        # Plant a fresh cache claiming v99.0.0 is the latest
+        _make_fresh_cache(cache_path, "v99.0.0")
+
+        # _run_check should trust the cache without touching the network
+        latest_tag, _current = _run_check(home)
+        if latest_tag is None:
+            raise AssertionError(
+                "expected notification because cached v99.0.0 > current version"
+            )
+        if "v99.0.0" not in latest_tag:
+            raise AssertionError(f"expected tag to be v99.0.0, got: {latest_tag}")
+
+
+def check_update_run_check_returns_none_when_current_is_latest() -> None:
+    from envmgr.services.update_check import _current_version, _run_check
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        home = Path(temp_dir) / ".envmgr"
+        cache_path = home / "update-check.json"
+
+        # Plant a fresh cache claiming the *current* version is latest
+        current = _current_version()
+        _make_fresh_cache(cache_path, f"v{current}")
+
+        latest_tag, _current_out = _run_check(home)
+        if latest_tag is not None:
+            raise AssertionError(
+                f"expected no notification when current is latest, got: {latest_tag}"
+            )
+
+
+def check_update_run_check_fetches_when_cache_stale() -> None:
+    from envmgr.services.update_check import _run_check
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        home = Path(temp_dir) / ".envmgr"
+        cache_path = home / "update-check.json"
+
+        # Plant a stale cache with a low version
+        _make_stale_cache(cache_path, "v0.0.1")
+
+        with patch(
+            "envmgr.services.update_check._fetch_latest_tag",
+            return_value="v99.0.0",
+        ):
+            latest_tag, _current = _run_check(home)
+
+        if latest_tag is None:
+            raise AssertionError("expected notification after network fetch")
+        if "v99.0.0" not in latest_tag:
+            raise AssertionError(f"expected tag to be v99.0.0, got: {latest_tag}")
+
+        # Cache should have been refreshed
+        version, _ = __import__(
+            "envmgr.services.update_check", fromlist=["_read_cache"]
+        )._read_cache(cache_path)
+        if version != "v99.0.0":
+            raise AssertionError(
+                f"expected cache to be updated to v99.0.0, got {version}"
+            )
+
+
+def check_update_run_check_handles_network_failure_gracefully() -> None:
+    from envmgr.services.update_check import _run_check
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        home = Path(temp_dir) / ".envmgr"
+        cache_path = home / "update-check.json"
+
+        # No cache at all + network failure → no notification, no crash
+        _make_empty_cache(cache_path)
+        with patch(
+            "envmgr.services.update_check._fetch_latest_tag",
+            return_value=None,
+        ):
+            latest_tag, _current = _run_check(home)
+
+        if latest_tag is not None:
+            raise AssertionError(
+                f"expected no notification on network failure, got: {latest_tag}"
+            )
+
+
+def check_update_run_check_falls_back_to_stale_cache_on_failure() -> None:
+    from envmgr.services.update_check import _run_check
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        home = Path(temp_dir) / ".envmgr"
+        cache_path = home / "update-check.json"
+
+        # Stale cache with a newer version + network failure
+        _make_stale_cache(cache_path, "v99.0.0")
+        with patch(
+            "envmgr.services.update_check._fetch_latest_tag",
+            return_value=None,
+        ):
+            latest_tag, _current = _run_check(home)
+
+        if latest_tag is None:
+            raise AssertionError(
+                "expected notification from stale cache despite network failure"
+            )
+        if "v99.0.0" not in latest_tag:
+            raise AssertionError(
+                f"expected tag to mention cached v99.0.0, got: {latest_tag}"
+            )
+
+
+def check_update_should_notify_skips_in_ci() -> None:
+    from envmgr.services.update_check import _should_notify
+
+    with patch.dict(os.environ, {"CI": "true"}, clear=False):
+        if _should_notify():
+            raise AssertionError("expected _should_notify to return False in CI")
+
+
+def check_update_should_notify_skips_with_env_var() -> None:
+    from envmgr.services.update_check import _should_notify
+
+    with patch.dict(os.environ, {"NO_UPDATE_NOTIFIER": "1"}, clear=False):
+        if _should_notify():
+            raise AssertionError(
+                "expected _should_notify to return False with NO_UPDATE_NOTIFIER"
+            )
+
+
+def check_update_should_notify_skips_during_self_update() -> None:
+    from envmgr.services.update_check import _should_notify
+
+    with (
+        patch.object(sys, "argv", ["envmgr", "self", "update"]),
+        patch.object(sys.stderr, "isatty", return_value=True),
+    ):
+        if _should_notify():
+            raise AssertionError(
+                "expected _should_notify to return False during self update"
+            )
+
+
+def check_update_should_notify_skips_during_self_uninstall() -> None:
+    from envmgr.services.update_check import _should_notify
+
+    with (
+        patch.object(sys, "argv", ["envmgr", "self", "uninstall"]),
+        patch.object(sys.stderr, "isatty", return_value=True),
+    ):
+        if _should_notify():
+            raise AssertionError(
+                "expected _should_notify to return False during self uninstall"
+            )
+
+
+def check_update_render_notice_includes_expected_content() -> None:
+    from io import StringIO
+
+    from envmgr.services.update_check import _render_notice, _stderr
+
+    # Capture Rich-styled stderr output
+    buf = StringIO()
+    original_file = _stderr.file
+    try:
+        _stderr.file = buf
+        _render_notice("v0.2.0", "0.1.0")
+        output = buf.getvalue()
+    finally:
+        _stderr.file = original_file
+
+    if "v0.2.0" not in output:
+        raise AssertionError("expected notice to include latest version")
+    if "0.1.0" not in output:
+        raise AssertionError("expected notice to include current version")
+    if "envmgr self update" not in output:
+        raise AssertionError("expected notice to include update command")
