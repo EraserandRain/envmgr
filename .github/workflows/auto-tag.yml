@@ -1,9 +1,11 @@
 name: Auto Tag
 
 on:
-  push:
+  pull_request:
     branches:
       - master
+    types:
+      - closed
 
 permissions:
   contents: write
@@ -16,8 +18,7 @@ jobs:
   auto_tag:
     name: Bump and Tag
     runs-on: ubuntu-latest
-    # Skip if the push is from a release tag workflow (avoids potential loops)
-    if: github.event_name == 'push' && !startsWith(github.event.head_commit.message, 'chore(release):')
+    if: github.event.pull_request.merged == true
 
     steps:
       - name: Check out repository
