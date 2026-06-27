@@ -34,7 +34,8 @@ jobs:
       - name: Compute next version
         id: bump
         run: |
-          bumped=$(git cliff --bump --bumped-version 2>&1) || {
+          set -o pipefail
+          bumped=$(git cliff --bump --bumped-version 2>&1 | tail -1) || {
             echo "::error::git-cliff --bumped-version failed: $bumped" >&2
             exit 1
           }
