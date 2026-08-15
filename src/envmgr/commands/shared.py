@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from pathlib import Path
-from typing import Literal, NoReturn
+from typing import Any, Literal, NoReturn
 
 import typer
 from rich.console import Console
@@ -10,15 +10,10 @@ from rich.prompt import Confirm, Prompt
 from rich.rule import Rule
 from rich.text import Text
 
-from ..catalog import CatalogError
-from ..command_text import SETUP_HINT
-from ..runtime_config import (
-    ConfigError,
-    get_runtime_paths,
-    is_runtime_setup_complete,
-    resolve_inventory_reference,
+from ..runtime_config import ConfigError, resolve_inventory_reference
+from ..services.runtime import (
+    require_setup_completed as _services_require_setup_completed,
 )
-from ..services.install import load_available_tags as load_available_tags_service
 
 console = Console()
 error_console = Console(stderr=True)
@@ -37,6 +32,25 @@ _STATUS_STYLES: dict[StatusTone, str] = {
     "success": "green",
     "warning": "yellow",
 }
+
+
+class RichInstallConsole:
+    """Bind the shared Rich console and prompt helpers into the Install console seam."""
+
+    def print(self, *args: Any, **kwargs: Any) -> None:
+        console.print(*args, **kwargs)
+
+    def warn(self, message: str) -> None:
+        error_console.print(Text(message, style="yellow"))
+
+    def error(self, message: str) -> None:
+        error_console.print(Text(message, style="red"))
+
+    def confirm(self, message: str, *, default: bool) -> bool:
+        return confirm_choice(message, default=default)
+
+    def prompt_text(self, message: str, *, default: str | None = None) -> str:
+        return prompt_text(message, default=default)
 
 
 def _abort_from_interrupt(error: KeyboardInterrupt) -> NoReturn:
@@ -74,14 +88,6 @@ def exit_with_error(message: str, *, code: int = 1) -> NoReturn:
     raise typer.Exit(code=code)
 
 
-def load_available_tags() -> tuple[list[str], list[str]]:
-    """Load role-level and task-level tags and surface metadata errors."""
-    try:
-        return load_available_tags_service()
-    except CatalogError as error:
-        exit_with_error(f"Metadata error: {error}")
-
-
 def resolve_inventory_option(selected_inventory: str | None) -> tuple[Path, str]:
     """Resolve an inventory alias from ~/.envmgr/config.toml."""
     try:
@@ -96,18 +102,11 @@ def require_setup_completed(
     envmgr_home: str | Path | None = None,
 ) -> None:
     """Exit with setup guidance when the runtime has not been bootstrapped yet."""
-    runtime_paths = get_runtime_paths(envmgr_home)
-    if is_runtime_setup_complete(runtime_paths):
-        return
-
-    error_console.print(
-        Text.assemble(
-            ("Setup required: ", "bold yellow"),
-            f"'{command_name}' needs a bootstrapped envmgr runtime at "
-            f"{runtime_paths.home}. Please {SETUP_HINT}.",
-        )
+    _services_require_setup_completed(
+        command_name,
+        envmgr_home=envmgr_home,
+        console=error_console,
     )
-    raise typer.Exit(code=1)
 
 
 def print_command_heading(title: str, *, subtitle: str | None = None) -> None:

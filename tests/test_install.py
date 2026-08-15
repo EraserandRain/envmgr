@@ -16,6 +16,7 @@ from tests.checks.install import (
     check_install_list_tags_uses_rich_console,
     check_install_rejects_all_plus_other_tags,
     check_install_rejects_unknown_tags_with_exit_code,
+    check_install_reports_catalog_metadata_errors,
     check_install_scoped_runs_rewrite_vars_files_to_absolute_paths,
     check_install_scoped_runs_use_runtime_scratch_outside_repo_cwd,
     check_install_summary_uses_rich_console_and_keeps_raw_subprocess_output,
@@ -65,6 +66,10 @@ INSTALL_TEST_CHECKS: tuple[Check, ...] = (
     (
         "install rejects unknown tags with exit code 1",
         check_install_rejects_unknown_tags_with_exit_code,
+    ),
+    (
+        "install reports catalog metadata errors with exit code 1",
+        check_install_reports_catalog_metadata_errors,
     ),
     (
         "install error output preserves markup-like text",
