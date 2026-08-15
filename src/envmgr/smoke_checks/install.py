@@ -2,12 +2,13 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
-from ..commands.install import resolve_ai_tools_install_options
+from ..commands.shared import RichInstallConsole
+from ..services.install_ai_tools import resolve_ai_tools_choices
 
 
 def check_ai_tools_setup_wizard_flow() -> None:
     with (
-        patch("envmgr.commands.install.console.print"),
+        patch("envmgr.commands.shared.console.print"),
         patch(
             "envmgr.commands.shared.confirm_backend",
             side_effect=[True, True, True, True, True],
@@ -23,7 +24,7 @@ def check_ai_tools_setup_wizard_flow() -> None:
             ),
         ),
     ):
-        options = resolve_ai_tools_install_options(
+        options = resolve_ai_tools_choices(
             ["ai_tools"],
             execution_playbook_path="workstation",
             manage_claude_code=None,
@@ -33,6 +34,7 @@ def check_ai_tools_setup_wizard_flow() -> None:
             claude_context7_method=None,
             codex_context7_method=None,
             interactive=True,
+            console=RichInstallConsole(),
         )
 
     if options is None:

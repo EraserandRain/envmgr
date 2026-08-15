@@ -5,6 +5,7 @@ import os
 import tempfile
 from io import StringIO
 from pathlib import Path
+from typing import NoReturn, TextIO
 from unittest.mock import patch
 
 import typer
@@ -12,23 +13,26 @@ import yaml
 from rich.console import Console
 from typer.testing import CliRunner
 
+from envmgr.catalog import CatalogError
 from envmgr.commands import shared as shared_commands
-from envmgr.commands.install import (
-    WizardCancelled,
-    resolve_ai_tools_install_options,
-    run_install,
-)
-from envmgr.commands.shared import exit_with_error
+from envmgr.commands.shared import RichInstallConsole, exit_with_error
 from envmgr.main import app
 from envmgr.runtime_config import ensure_runtime_layout
 from envmgr.services.assets import resolve_runtime_assets
 from envmgr.services.install import (
     AiToolsInstallDefaults,
     AiToolsInstallOptions,
+    InstallOptions,
     InstallPlan,
+    InstallProcess,
     build_ai_tools_extra_vars,
     build_install_plan,
     cleanup_install_plan,
+    install,
+)
+from envmgr.services.install_ai_tools import (
+    WizardCancelled,
+    resolve_ai_tools_choices,
 )
 
 CLI_RUNNER = CliRunner()
@@ -38,20 +42,60 @@ class _FakeRuntimeProcess:
     """Minimal subprocess double for install command tests."""
 
     def __init__(self, output: str) -> None:
-        self.stdout = StringIO(output)
+        self.stdout: TextIO | None = StringIO(output)
 
-    def wait(self) -> int:
+    def wait(self, timeout: float | None = None) -> int:
         return 0
 
-    def poll(self) -> int:
+    def poll(self) -> int | None:
         return 0
 
     def terminate(self) -> None:
         raise AssertionError("terminate should not be called for a successful run")
 
 
+class _RecordingConsole:
+    """Capturing InstallConsole double for install interface tests."""
+
+    def __init__(self) -> None:
+        self.print_calls: list[tuple[tuple[object, ...], dict[str, object]]] = []
+        self.warn_calls: list[str] = []
+        self.error_calls: list[str] = []
+
+    def print(self, *args: object, **kwargs: object) -> None:
+        self.print_calls.append((args, kwargs))
+
+    def warn(self, message: str) -> None:
+        self.warn_calls.append(message)
+
+    def error(self, message: str) -> None:
+        self.error_calls.append(message)
+
+    def confirm(self, message: str, *, default: bool) -> bool:
+        raise AssertionError("install tests must avoid interactive prompts")
+
+    def prompt_text(self, message: str, *, default: str | None = None) -> str:
+        raise AssertionError("install tests must avoid interactive prompts")
+
+
+def _rendered_output(console: _RecordingConsole) -> str:
+    """Reconstruct console output the way the Rich print contract renders it."""
+    return "\n".join(
+        "" if not args else str(args[0]) for args, _kwargs in console.print_calls
+    )
+
+
+def _fail_process_factory(*args: object, **kwargs: object) -> NoReturn:
+    raise AssertionError("install must not start a subprocess")
+
+
+def _interrupt_process_factory(*args: object, **kwargs: object) -> NoReturn:
+    raise KeyboardInterrupt
+
+
 def check_ai_tools_install_option_resolution() -> None:
-    options = resolve_ai_tools_install_options(
+    console = _RecordingConsole()
+    options = resolve_ai_tools_choices(
         ["ai_tools"],
         execution_playbook_path="workstation",
         manage_claude_code=None,
@@ -61,6 +105,7 @@ def check_ai_tools_install_option_resolution() -> None:
         claude_context7_method=None,
         codex_context7_method="remote",
         interactive=False,
+        console=console,
     )
 
     if options is None:
@@ -76,7 +121,7 @@ def check_ai_tools_install_option_resolution() -> None:
     if options.codex_context7_method != "remote":
         raise AssertionError("expected Codex Context7 method override to be honored")
 
-    rtk_only_options = resolve_ai_tools_install_options(
+    rtk_only_options = resolve_ai_tools_choices(
         ["rtk"],
         execution_playbook_path="workstation",
         manage_claude_code=None,
@@ -86,6 +131,7 @@ def check_ai_tools_install_option_resolution() -> None:
         claude_context7_method=None,
         codex_context7_method=None,
         interactive=False,
+        console=console,
     )
     if rtk_only_options is None:
         raise AssertionError("expected rtk task tag to resolve AI tools options")
@@ -94,7 +140,7 @@ def check_ai_tools_install_option_resolution() -> None:
     if rtk_only_options.enable_context7:
         raise AssertionError("expected RTK-only installs to skip Context7")
 
-    node_options = resolve_ai_tools_install_options(
+    node_options = resolve_ai_tools_choices(
         ["all"],
         execution_playbook_path="node",
         manage_claude_code=None,
@@ -104,6 +150,7 @@ def check_ai_tools_install_option_resolution() -> None:
         claude_context7_method=None,
         codex_context7_method=None,
         interactive=False,
+        console=console,
     )
     if node_options is not None:
         raise AssertionError("expected node playbook to skip AI tools resolution")
@@ -195,7 +242,7 @@ def check_shared_prompt_helpers_use_rich_defaults_and_patchable_backends() -> No
 
 def check_ai_tools_setup_wizard_uses_shared_prompt_path() -> None:
     with (
-        patch("envmgr.commands.install.console.print"),
+        patch("envmgr.commands.shared.console.print"),
         patch(
             "envmgr.commands.shared.confirm_backend",
             side_effect=[True, True, True, True, True],
@@ -211,7 +258,7 @@ def check_ai_tools_setup_wizard_uses_shared_prompt_path() -> None:
             ),
         ),
     ):
-        options = resolve_ai_tools_install_options(
+        options = resolve_ai_tools_choices(
             ["ai_tools"],
             execution_playbook_path="workstation",
             manage_claude_code=None,
@@ -221,6 +268,7 @@ def check_ai_tools_setup_wizard_uses_shared_prompt_path() -> None:
             claude_context7_method=None,
             codex_context7_method=None,
             interactive=True,
+            console=RichInstallConsole(),
         )
 
     if options is None:
@@ -241,14 +289,14 @@ def check_ai_tools_setup_wizard_uses_shared_prompt_path() -> None:
 
 def check_ai_tools_setup_wizard_prompt_interrupt_exits_130() -> None:
     with (
-        patch("envmgr.commands.install.console.print"),
+        patch("envmgr.commands.shared.console.print"),
         patch(
             "envmgr.commands.shared.confirm_backend",
             side_effect=KeyboardInterrupt,
         ),
     ):
         try:
-            resolve_ai_tools_install_options(
+            resolve_ai_tools_choices(
                 ["ai_tools"],
                 execution_playbook_path="workstation",
                 manage_claude_code=None,
@@ -258,6 +306,7 @@ def check_ai_tools_setup_wizard_prompt_interrupt_exits_130() -> None:
                 claude_context7_method=None,
                 codex_context7_method=None,
                 interactive=True,
+                console=RichInstallConsole(),
             )
         except typer.Exit as error:
             if error.exit_code != 130:
@@ -410,35 +459,25 @@ def check_install_scoped_runs_rewrite_vars_files_to_absolute_paths() -> None:
 
 
 def check_install_list_tags_uses_rich_console() -> None:
+    console = _RecordingConsole()
     with (
         patch(
-            "envmgr.commands.install.load_available_tags",
+            "envmgr.services.install.load_available_tags",
             return_value=(["init"], ["codex", "github_cli", "rtk"]),
         ),
-        patch("envmgr.commands.install.console.print") as mock_console_print,
         patch("builtins.print") as mock_print,
     ):
-        run_install(
-            tags=[],
-            list_tags=True,
-            playbook=None,
-            inventory=None,
-            ask_vault_pass=False,
-            manage_claude_code=None,
-            manage_codex=None,
-            manage_rtk=None,
-            enable_context7=None,
-            claude_context7_method=None,
-            codex_context7_method=None,
+        install(
+            [],
+            options=InstallOptions(list_tags=True),
+            console=console,
+            process_factory=_fail_process_factory,
         )
 
     if mock_print.called:
         raise AssertionError("expected list-tags flow to avoid plain print calls")
 
-    output = "\n".join(
-        "" if not call.args else str(call.args[0])
-        for call in mock_console_print.call_args_list
-    )
+    output = _rendered_output(console)
     for expected_fragment in (
         "Envmgr available tags:",
         "Built-in scenarios:",
@@ -458,26 +497,17 @@ def check_install_list_tags_uses_rich_console() -> None:
 
 
 def check_install_rejects_unknown_tags_with_exit_code() -> None:
-    with (
-        patch("envmgr.commands.shared.error_console.print") as mock_error_print,
-        patch(
-            "envmgr.commands.install.load_available_tags",
-            return_value=(["zsh"], ["codex"]),
-        ),
+    console = _RecordingConsole()
+    with patch(
+        "envmgr.services.install.load_available_tags",
+        return_value=(["zsh"], ["codex"]),
     ):
         try:
-            run_install(
-                tags=["does-not-exist"],
-                list_tags=False,
-                playbook=None,
-                inventory=None,
-                ask_vault_pass=False,
-                manage_claude_code=None,
-                manage_codex=None,
-                manage_rtk=None,
-                enable_context7=None,
-                claude_context7_method=None,
-                codex_context7_method=None,
+            install(
+                ["does-not-exist"],
+                options=InstallOptions(),
+                console=console,
+                process_factory=_fail_process_factory,
             )
         except typer.Exit as error:
             if error.exit_code != 1:
@@ -487,11 +517,48 @@ def check_install_rejects_unknown_tags_with_exit_code() -> None:
         else:
             raise AssertionError("expected install to reject unknown tags")
 
-    output = str(mock_error_print.call_args.args[0])
+    if not console.error_calls:
+        raise AssertionError("expected install to report the unknown tag")
+    output = console.error_calls[0]
     if "unknown tags: does-not-exist" not in output.lower():
         raise AssertionError("expected install to report the unknown tag")
     if "Use -l or --list-tags to see all available tags" not in output:
         raise AssertionError("expected install to suggest listing available tags")
+
+
+def check_install_reports_catalog_metadata_errors() -> None:
+    catalog_error = CatalogError("broken role metadata")
+    for list_tags in (False, True):
+        console = _RecordingConsole()
+        with patch(
+            "envmgr.services.install.load_available_tags",
+            side_effect=catalog_error,
+        ):
+            try:
+                install(
+                    ["zsh"],
+                    options=InstallOptions(list_tags=list_tags),
+                    console=console,
+                    process_factory=_fail_process_factory,
+                )
+            except typer.Exit as error:
+                if error.exit_code != 1:
+                    raise AssertionError(
+                        "expected catalog failures to exit with code 1"
+                    ) from error
+            else:
+                raise AssertionError(
+                    "expected catalog failures to exit instead of bubbling"
+                )
+
+        if not console.error_calls:
+            raise AssertionError(
+                "expected catalog failure to surface through the install console"
+            )
+        if "Metadata error: broken role metadata" not in console.error_calls[0]:
+            raise AssertionError(
+                "expected the friendly Metadata error message on stderr"
+            )
 
 
 def check_install_error_output_preserves_markup_like_text() -> None:
@@ -542,51 +609,53 @@ def check_install_summary_uses_rich_console_and_keeps_raw_subprocess_output() ->
                 manage_rtk=False,
             ),
         )
-        process = _FakeRuntimeProcess("PLAY [all]\nok: [localhost]\n")
+        process_calls: list[tuple[tuple[object, ...], dict[str, object]]] = []
 
+        def _fake_process_factory(*args: object, **kwargs: object) -> InstallProcess:
+            process_calls.append((args, kwargs))
+            return _FakeRuntimeProcess("PLAY [all]\nok: [localhost]\n")
+
+        console = _RecordingConsole()
         with (
             patch(
-                "envmgr.commands.install.load_available_tags",
+                "envmgr.services.install.load_available_tags",
                 return_value=(["zsh"], []),
             ),
-            patch("envmgr.commands.install.require_setup_completed"),
+            patch("envmgr.services.install.require_setup_completed"),
             patch(
-                "envmgr.commands.install.build_install_plan",
+                "envmgr.services.install.build_install_plan",
                 return_value=install_plan,
             ),
             patch(
-                "envmgr.commands.install.resolve_ai_tools_install_options",
+                "envmgr.services.install.resolve_ai_tools_choices",
                 return_value=None,
             ),
             patch(
-                "envmgr.commands.install.build_install_command",
+                "envmgr.services.install.build_install_command",
                 return_value=["ansible-playbook", "playbooks/workstation.yml"],
             ),
-            patch(
-                "envmgr.commands.install.popen_runtime_subprocess",
-                return_value=process,
-            ),
-            patch("envmgr.commands.install.console.print") as mock_console_print,
             patch("builtins.print") as mock_print,
         ):
-            run_install(
-                tags=["zsh"],
-                list_tags=False,
-                playbook=None,
-                inventory=None,
-                ask_vault_pass=False,
-                manage_claude_code=None,
-                manage_codex=True,
-                manage_rtk=None,
-                enable_context7=None,
-                claude_context7_method=None,
-                codex_context7_method=None,
+            install(
+                ["zsh"],
+                options=InstallOptions(manage_codex=True),
+                console=console,
+                process_factory=_fake_process_factory,
             )
 
-        output = "\n".join(
-            "" if not call.args else str(call.args[0])
-            for call in mock_console_print.call_args_list
-        )
+        if not process_calls:
+            raise AssertionError("expected install to run through the process seam")
+        process_args, process_kwargs = process_calls[0]
+        if process_args[0] != ["ansible-playbook", "playbooks/workstation.yml"]:
+            raise AssertionError(
+                "expected install to pass the built command to the process seam"
+            )
+        if process_kwargs.get("runtime_paths") != runtime_paths:
+            raise AssertionError(
+                "expected install to pass runtime paths to the process seam"
+            )
+
+        output = _rendered_output(console)
         for expected_fragment in (
             "Warning: AI-tools flags were ignored because this run does not include the ai_tools role",
             "Running Ansible playbook with:",
@@ -639,41 +708,28 @@ def check_install_dry_run_reports_plan_without_subprocess_and_cleans_temp() -> N
             ),
         )
 
+        console = _RecordingConsole()
         with (
             patch(
-                "envmgr.commands.install.load_available_tags",
+                "envmgr.services.install.load_available_tags",
                 return_value=(["zsh"], []),
             ),
-            patch("envmgr.commands.install.require_setup_completed"),
+            patch("envmgr.services.install.require_setup_completed"),
             patch(
-                "envmgr.commands.install.build_install_plan",
+                "envmgr.services.install.build_install_plan",
                 return_value=install_plan,
             ),
             patch(
-                "envmgr.commands.install.resolve_ai_tools_install_options",
+                "envmgr.services.install.resolve_ai_tools_choices",
                 return_value=None,
             ),
-            patch(
-                "envmgr.commands.install.popen_runtime_subprocess",
-                side_effect=AssertionError("dry-run must not start Ansible"),
-            ),
-            patch("envmgr.commands.install.console.print") as mock_console_print,
             patch("builtins.print") as mock_print,
         ):
-            run_install(
-                tags=["zsh"],
-                list_tags=False,
-                dry_run=True,
-                json_output=False,
-                playbook=None,
-                inventory=None,
-                ask_vault_pass=False,
-                manage_claude_code=None,
-                manage_codex=None,
-                manage_rtk=None,
-                enable_context7=None,
-                claude_context7_method=None,
-                codex_context7_method=None,
+            install(
+                ["zsh"],
+                options=InstallOptions(dry_run=True),
+                console=console,
+                process_factory=_fail_process_factory,
             )
 
         if mock_print.called:
@@ -681,10 +737,7 @@ def check_install_dry_run_reports_plan_without_subprocess_and_cleans_temp() -> N
         if execution_playbook_path.exists():
             raise AssertionError("expected dry-run to clean temporary playbooks")
 
-        output = "\n".join(
-            "" if not call.args else str(call.args[0])
-            for call in mock_console_print.call_args_list
-        )
+        output = _rendered_output(console)
         for expected_fragment in (
             "Install dry run:",
             "  Playbook: playbooks/workstation.yml",
@@ -735,23 +788,19 @@ def check_install_dry_run_json_outputs_machine_readable_plan() -> None:
 
         with (
             patch(
-                "envmgr.commands.install.load_available_tags",
+                "envmgr.services.install.load_available_tags",
                 return_value=(["ai_tools"], []),
             ),
-            patch("envmgr.commands.install.require_setup_completed"),
+            patch("envmgr.services.install.require_setup_completed"),
             patch(
-                "envmgr.commands.install.build_install_plan",
+                "envmgr.services.install.build_install_plan",
                 return_value=install_plan,
             ),
             patch(
-                "envmgr.commands.install.resolve_ai_tools_install_options",
+                "envmgr.services.install.resolve_ai_tools_choices",
                 return_value=ai_tools_options,
             ),
-            patch(
-                "envmgr.commands.install.popen_runtime_subprocess",
-                side_effect=AssertionError("dry-run must not start Ansible"),
-            ),
-            patch("envmgr.commands.install.console.print") as mock_console_print,
+            patch("envmgr.commands.shared.console.print") as mock_console_print,
         ):
             result = CLI_RUNNER.invoke(
                 app,
@@ -825,24 +874,20 @@ def check_install_dry_run_json_keeps_ignored_ai_tools_warning_off_stdout() -> No
 
         with (
             patch(
-                "envmgr.commands.install.load_available_tags",
+                "envmgr.services.install.load_available_tags",
                 return_value=(["zsh"], []),
             ),
-            patch("envmgr.commands.install.require_setup_completed"),
+            patch("envmgr.services.install.require_setup_completed"),
             patch(
-                "envmgr.commands.install.build_install_plan",
+                "envmgr.services.install.build_install_plan",
                 return_value=install_plan,
             ),
             patch(
-                "envmgr.commands.install.resolve_ai_tools_install_options",
+                "envmgr.services.install.resolve_ai_tools_choices",
                 return_value=None,
             ),
-            patch(
-                "envmgr.commands.install.popen_runtime_subprocess",
-                side_effect=AssertionError("dry-run must not start Ansible"),
-            ),
-            patch("envmgr.commands.install.console.print") as mock_console_print,
-            patch("envmgr.commands.install.error_console.print") as mock_error_print,
+            patch("envmgr.commands.shared.console.print") as mock_console_print,
+            patch("envmgr.commands.shared.error_console.print") as mock_error_print,
         ):
             result = CLI_RUNNER.invoke(
                 app,
@@ -892,39 +937,32 @@ def check_install_wizard_cancellation_reports_via_rich_console() -> None:
             ),
         )
 
+        console = _RecordingConsole()
         with (
             patch(
-                "envmgr.commands.install.load_available_tags",
+                "envmgr.services.install.load_available_tags",
                 return_value=(["ai_tools"], []),
             ),
-            patch("envmgr.commands.install.require_setup_completed"),
+            patch("envmgr.services.install.require_setup_completed"),
             patch(
-                "envmgr.commands.install.build_install_plan",
+                "envmgr.services.install.build_install_plan",
                 return_value=install_plan,
             ),
             patch(
-                "envmgr.commands.install.resolve_ai_tools_install_options",
+                "envmgr.services.install.resolve_ai_tools_choices",
                 side_effect=WizardCancelled(
                     "AI Tools Setup cancelled before installation."
                 ),
             ),
-            patch("envmgr.commands.install.cleanup_install_plan") as mock_cleanup,
-            patch("envmgr.commands.install.console.print") as mock_console_print,
+            patch("envmgr.services.install.cleanup_install_plan") as mock_cleanup,
             patch("builtins.print") as mock_print,
         ):
             try:
-                run_install(
-                    tags=["ai_tools"],
-                    list_tags=False,
-                    playbook=None,
-                    inventory=None,
-                    ask_vault_pass=False,
-                    manage_claude_code=None,
-                    manage_codex=None,
-                    manage_rtk=None,
-                    enable_context7=None,
-                    claude_context7_method=None,
-                    codex_context7_method=None,
+                install(
+                    ["ai_tools"],
+                    options=InstallOptions(),
+                    console=console,
+                    process_factory=_fail_process_factory,
                 )
             except WizardCancelled as error:
                 raise AssertionError(
@@ -936,10 +974,7 @@ def check_install_wizard_cancellation_reports_via_rich_console() -> None:
                 "expected wizard cancellation messaging to avoid plain print calls"
             )
         mock_cleanup.assert_called_once_with(install_plan)
-        output = "\n".join(
-            "" if not call.args else str(call.args[0])
-            for call in mock_console_print.call_args_list
-        )
+        output = _rendered_output(console)
         if "AI Tools Setup cancelled before installation." not in output:
             raise AssertionError(
                 "expected wizard cancellation messaging to stay user-friendly"
@@ -947,30 +982,25 @@ def check_install_wizard_cancellation_reports_via_rich_console() -> None:
 
 
 def check_install_rejects_all_plus_other_tags() -> None:
-    with patch("envmgr.commands.shared.error_console.print") as mock_error_print:
-        try:
-            run_install(
-                tags=["all", "zsh"],
-                list_tags=False,
-                playbook=None,
-                inventory=None,
-                ask_vault_pass=False,
-                manage_claude_code=None,
-                manage_codex=None,
-                manage_rtk=None,
-                enable_context7=None,
-                claude_context7_method=None,
-                codex_context7_method=None,
-            )
-        except typer.Exit as error:
-            if error.exit_code != 1:
-                raise AssertionError(
-                    "expected install to exit with code 1 for mixed all-tag selections"
-                ) from error
-        else:
-            raise AssertionError("expected install to reject mixed all-tag selections")
+    console = _RecordingConsole()
+    try:
+        install(
+            ["all", "zsh"],
+            options=InstallOptions(),
+            console=console,
+            process_factory=_fail_process_factory,
+        )
+    except typer.Exit as error:
+        if error.exit_code != 1:
+            raise AssertionError(
+                "expected install to exit with code 1 for mixed all-tag selections"
+            ) from error
+    else:
+        raise AssertionError("expected install to reject mixed all-tag selections")
 
-    message = str(mock_error_print.call_args.args[0])
+    if not console.error_calls:
+        raise AssertionError("expected install to report the mixed all-tag error")
+    message = console.error_calls[0]
     if "tag 'all' cannot be combined with other tags" not in message:
         raise AssertionError(
             "expected install to explain that `all` cannot be mixed with other tags"
@@ -1002,32 +1032,22 @@ def check_install_interrupt_exits_cleanly() -> None:
         )
 
         with (
-            patch("envmgr.commands.install.require_setup_completed"),
+            patch("envmgr.services.install.require_setup_completed"),
             patch(
-                "envmgr.commands.install.build_install_plan", return_value=install_plan
+                "envmgr.services.install.build_install_plan",
+                return_value=install_plan,
             ),
             patch(
-                "envmgr.commands.install.resolve_ai_tools_install_options",
+                "envmgr.services.install.resolve_ai_tools_choices",
                 return_value=None,
-            ),
-            patch(
-                "envmgr.commands.install.popen_runtime_subprocess",
-                side_effect=KeyboardInterrupt,
             ),
         ):
             try:
-                run_install(
-                    tags=["zsh"],
-                    list_tags=False,
-                    playbook=None,
-                    inventory=None,
-                    ask_vault_pass=True,
-                    manage_claude_code=None,
-                    manage_codex=None,
-                    manage_rtk=None,
-                    enable_context7=None,
-                    claude_context7_method=None,
-                    codex_context7_method=None,
+                install(
+                    ["zsh"],
+                    options=InstallOptions(ask_vault_pass=True),
+                    console=_RecordingConsole(),
+                    process_factory=_interrupt_process_factory,
                 )
             except typer.Exit as error:
                 if error.exit_code != 130:

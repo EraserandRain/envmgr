@@ -11,10 +11,20 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
-from ..runtime_config import RuntimePaths
+import typer
+from rich.console import Console
+from rich.text import Text
+
+from ..command_text import SETUP_HINT
+from ..runtime_config import (
+    RuntimePaths,
+    get_runtime_paths,
+    is_runtime_setup_complete,
+)
 from .assets import RuntimeAssets, resolve_runtime_assets
 
 RUNTIME_RUN_RECORD_SCHEMA_VERSION = 1
+_STDERR_CONSOLE = Console(stderr=True)
 
 
 @dataclass(frozen=True)
@@ -70,6 +80,27 @@ class RuntimePopenProcess:
         if return_code is not None:
             self._finalize(return_code)
         return output
+
+
+def require_setup_completed(
+    command_name: str,
+    *,
+    envmgr_home: str | Path | None = None,
+    console: Console | None = None,
+) -> None:
+    """Exit with setup guidance when the runtime has not been bootstrapped yet."""
+    runtime_paths = get_runtime_paths(envmgr_home)
+    if is_runtime_setup_complete(runtime_paths):
+        return
+
+    (console or _STDERR_CONSOLE).print(
+        Text.assemble(
+            ("Setup required: ", "bold yellow"),
+            f"'{command_name}' needs a bootstrapped envmgr runtime at "
+            f"{runtime_paths.home}. Please {SETUP_HINT}.",
+        )
+    )
+    raise typer.Exit(code=1)
 
 
 def merge_path_entries(entries: list[str]) -> str:

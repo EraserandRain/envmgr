@@ -140,7 +140,7 @@ def check_dispatcher_routes_install_subcommand() -> None:
         )
 
     with patch(
-        "envmgr.commands.install.load_available_tags",
+        "envmgr.services.install.load_available_tags",
         return_value=(["zsh"], ["codex"]),
     ):
         result = invoke_envmgr("install", "-l")
