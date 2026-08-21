@@ -3,13 +3,15 @@ from __future__ import annotations
 import unittest
 
 from tests.checks.install import (
+    check_ai_tools_config_rejects_all_disabled,
     check_ai_tools_extra_vars_match_role_contract,
     check_ai_tools_install_option_resolution,
     check_ai_tools_setup_wizard_prompt_interrupt_exits_130,
     check_ai_tools_setup_wizard_uses_shared_prompt_path,
     check_install_all_uses_runtime_default_playbook,
-    check_install_dry_run_json_keeps_ignored_ai_tools_warning_off_stdout,
+    check_install_config_command_updates_ai_tools,
     check_install_dry_run_json_outputs_machine_readable_plan,
+    check_install_dry_run_json_reports_inapplicable_ai_tools,
     check_install_dry_run_reports_plan_without_subprocess_and_cleans_temp,
     check_install_error_output_preserves_markup_like_text,
     check_install_interrupt_exits_cleanly,
@@ -20,7 +22,6 @@ from tests.checks.install import (
     check_install_scoped_runs_rewrite_vars_files_to_absolute_paths,
     check_install_scoped_runs_use_runtime_scratch_outside_repo_cwd,
     check_install_summary_uses_rich_console_and_keeps_raw_subprocess_output,
-    check_install_typer_flags_preserve_tri_state_bools,
     check_install_wizard_cancellation_reports_via_rich_console,
     check_shared_prompt_helpers_use_rich_defaults_and_patchable_backends,
 )
@@ -34,6 +35,10 @@ INSTALL_TEST_CHECKS: tuple[Check, ...] = (
     (
         "AI tools extra-vars match the role contract",
         check_ai_tools_extra_vars_match_role_contract,
+    ),
+    (
+        "AI tools config rejects all-disabled selections",
+        check_ai_tools_config_rejects_all_disabled,
     ),
     (
         "shared prompt helpers use Rich defaults and patchable backends",
@@ -88,16 +93,16 @@ INSTALL_TEST_CHECKS: tuple[Check, ...] = (
         check_install_dry_run_json_outputs_machine_readable_plan,
     ),
     (
-        "install dry-run JSON keeps ignored AI-tools warning off stdout",
-        check_install_dry_run_json_keeps_ignored_ai_tools_warning_off_stdout,
+        "install dry-run JSON reports inapplicable AI tools",
+        check_install_dry_run_json_reports_inapplicable_ai_tools,
     ),
     (
         "install rejects mixed all-tag selections",
         check_install_rejects_all_plus_other_tags,
     ),
     (
-        "install Typer flags preserve tri-state bool semantics",
-        check_install_typer_flags_preserve_tri_state_bools,
+        "install config command updates AI tools config",
+        check_install_config_command_updates_ai_tools,
     ),
     (
         "install wizard cancellation reports through Rich console",

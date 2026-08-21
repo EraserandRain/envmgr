@@ -16,12 +16,6 @@ def run_install(
     playbook: str | None,
     inventory: str | None,
     ask_vault_pass: bool,
-    manage_claude_code: bool | None,
-    manage_codex: bool | None,
-    manage_rtk: bool | None,
-    enable_context7: bool | None,
-    claude_context7_method: str | None,
-    codex_context7_method: str | None,
 ) -> None:
     """Run `envmgr install` by assembling InstallOptions at the CLI boundary."""
     options = InstallOptions(
@@ -32,12 +26,6 @@ def run_install(
         inventory=inventory,
         ask_vault_pass=ask_vault_pass,
         interactive=sys.stdin.isatty() and sys.stdout.isatty(),
-        manage_claude_code=manage_claude_code,
-        manage_codex=manage_codex,
-        manage_rtk=manage_rtk,
-        enable_context7=enable_context7,
-        claude_context7_method=claude_context7_method,
-        codex_context7_method=codex_context7_method,
     )
     install(
         tags,

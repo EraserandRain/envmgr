@@ -12,23 +12,26 @@ import typer
 from rich.text import Text
 
 from ..catalog import CatalogError
-from ..runtime_config import ConfigError
+from ..runtime_config import (
+    AiToolsConfig,
+    ConfigError,
+    load_runtime_config,
+    save_ai_tools_config,
+)
 from .console import (
     InstallConsole,
     print_bullet_list,
     print_labeled_value,
     print_section_title,
-    print_warning,
 )
 from .install_ai_tools import (
-    AI_TOOLS_CONTEXT7_METHODS,
     AiToolsInstallDefaults,
     AiToolsInstallOptions,
+    AiToolsResolution,
     WizardCancelled,
     build_ai_tools_extra_vars,
     build_ai_tools_install_defaults,
     resolve_ai_tools_choices,
-    resolve_noninteractive_ai_tools_install_options,
 )
 from .install_command import (
     InstallPlan,
@@ -67,9 +70,6 @@ BUILTIN_SCENARIOS = (
         "Kubernetes node setup: node prerequisites plus master-only tools.",
     ),
 )
-IGNORED_AI_TOOLS_FLAGS_WARNING = (
-    "AI-tools flags were ignored because this run does not include the ai_tools role"
-)
 
 
 @dataclass(frozen=True)
@@ -83,12 +83,6 @@ class InstallOptions:
     inventory: str | None = None
     ask_vault_pass: bool = False
     interactive: bool = False
-    manage_claude_code: bool | None = None
-    manage_codex: bool | None = None
-    manage_rtk: bool | None = None
-    enable_context7: bool | None = None
-    claude_context7_method: str | None = None
-    codex_context7_method: str | None = None
 
 
 class InstallProcess(Protocol):
@@ -189,6 +183,19 @@ def _render_ai_tools_summary(
             )
 
 
+def _config_from_options(options: AiToolsInstallOptions) -> AiToolsConfig:
+    """Build a configured `[ai_tools]` config from resolved install options."""
+    return AiToolsConfig(
+        configured=True,
+        manage_claude_code=options.manage_claude_code,
+        manage_codex=options.manage_codex,
+        manage_rtk=options.manage_rtk,
+        enable_context7=options.enable_context7,
+        claude_context7_method=options.claude_context7_method,
+        codex_context7_method=options.codex_context7_method,
+    )
+
+
 def _print_install_plan_summary(
     console: InstallConsole,
     *,
@@ -260,18 +267,6 @@ def _install_plan_json(
     }
 
 
-def _print_ignored_ai_tools_flags_warning(
-    console: InstallConsole,
-    *,
-    json_output: bool,
-) -> None:
-    if json_output:
-        console.warn(f"Warning: {IGNORED_AI_TOOLS_FLAGS_WARNING}")
-        return
-
-    print_warning(console, IGNORED_AI_TOOLS_FLAGS_WARNING)
-
-
 def install(
     tags: list[str],
     *,
@@ -329,35 +324,28 @@ def install(
     except (CatalogError, ConfigError) as error:
         _exit_with_error(console, f"Error: {error}")
 
-    ai_tools_flags_provided = any(
-        value is not None
-        for value in (
-            options.manage_claude_code,
-            options.manage_codex,
-            options.manage_rtk,
-            options.enable_context7,
-            options.claude_context7_method,
-            options.codex_context7_method,
-        )
-    )
-    use_ai_tools_wizard = (
-        options.interactive and not ai_tools_flags_provided and not options.dry_run
-    )
-
     process: InstallProcess | None = None
     try:
-        ai_tools_options = resolve_ai_tools_choices(
+        if install_plan.ai_tools_defaults.applicable:
+            ai_tools_config = load_runtime_config(
+                envmgr_home=install_plan.runtime_paths.home,
+            ).ai_tools
+        else:
+            ai_tools_config = AiToolsConfig.unconfigured_defaults()
+
+        resolution = resolve_ai_tools_choices(
             install_plan.selected_tags,
             execution_playbook_path=install_plan.execution_playbook_path,
-            manage_claude_code=options.manage_claude_code,
-            manage_codex=options.manage_codex,
-            manage_rtk=options.manage_rtk,
-            enable_context7=options.enable_context7,
-            claude_context7_method=options.claude_context7_method,
-            codex_context7_method=options.codex_context7_method,
-            interactive=use_ai_tools_wizard,
+            ai_tools_config=ai_tools_config,
+            interactive=options.interactive and not options.dry_run,
             console=console,
         )
+        ai_tools_options = resolution.options
+        if resolution.persist and ai_tools_options is not None:
+            save_ai_tools_config(
+                install_plan.runtime_paths,
+                _config_from_options(ai_tools_options),
+            )
     except WizardCancelled as error:
         console.print(Text(str(error), style="yellow"))
         cleanup_install_plan(install_plan)
@@ -365,17 +353,14 @@ def install(
     except CatalogError as error:
         cleanup_install_plan(install_plan)
         _exit_with_error(console, f"Error: {error}")
+    except ConfigError as error:
+        cleanup_install_plan(install_plan)
+        _exit_with_error(console, f"Error: {error}")
     except typer.Exit:
         cleanup_install_plan(install_plan)
         raise
 
     try:
-        if not install_plan.ai_tools_defaults.applicable and ai_tools_flags_provided:
-            _print_ignored_ai_tools_flags_warning(
-                console,
-                json_output=options.json_output,
-            )
-
         effective_ask_vault_pass = (
             options.ask_vault_pass or install_plan.default_ask_vault_pass
         )
@@ -453,12 +438,12 @@ def install(
 
 
 __all__ = [
-    "AI_TOOLS_CONTEXT7_METHODS",
     "ALL_TAG",
     "BUILTIN_SCENARIOS",
     "DEFAULT_PLAYBOOKS",
     "AiToolsInstallDefaults",
     "AiToolsInstallOptions",
+    "AiToolsResolution",
     "InstallConsole",
     "InstallOptions",
     "InstallPlan",
@@ -482,7 +467,6 @@ __all__ = [
     "resolve_ai_tools_choices",
     "resolve_default_playbook_path",
     "resolve_install_playbook",
-    "resolve_noninteractive_ai_tools_install_options",
     "resolve_playbook_file_reference",
     "resolve_selected_role_metadata",
     "validate_selected_tags",

@@ -113,7 +113,7 @@ GitHub Actions should keep these paths aligned:
 - Package surface: wheel/sdist inspection and runtime command exposure checks.
 - Init install: installer and first-run bootstrap coverage.
 - Docker Compose e2e: one master plus two workers for representative runtime
-  flows such as `envmgr install zsh` and `envmgr install ai_tools --codex`.
+  flows such as `envmgr install zsh` and `envmgr install codex`.
 
 Before opening a PR, run the smallest relevant local check first, then the full
 `uv run validate` or `uv run smoke-test` path when the change affects shared

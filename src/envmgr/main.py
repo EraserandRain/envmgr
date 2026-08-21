@@ -2,11 +2,12 @@ from __future__ import annotations
 
 from importlib import metadata
 from pathlib import Path
-from typing import Annotated, Literal
+from typing import Annotated
 
 import typer
 
 from .command_text import CLI_APP_HELP, CLI_ROOT_COMMAND
+from .commands.config import config_app
 from .commands.doctor import run_doctor
 from .commands.history import run_history
 from .commands.install import run_install
@@ -20,7 +21,6 @@ from .services.update_check import start_update_check_background
 
 HELP_CONTEXT_SETTINGS = {"help_option_names": ["--help", "-h"]}
 RUNTIME_OPTIONS_HELP_PANEL = "Runtime options"
-AI_TOOLS_HELP_PANEL = "AI tools"
 OUTPUT_HELP_PANEL = "Output"
 VERSION_FALLBACK = "0+unknown"
 
@@ -37,8 +37,11 @@ app.add_typer(
     name="self",
     help="Manage installer-managed envmgr releases.",
 )
-
-Context7Method = Literal["remote", "local"]
+app.add_typer(
+    config_app,
+    name="config",
+    help="Inspect and update envmgr runtime configuration.",
+)
 
 # Only the Typer app, its root-command shims, and the setup guard remain the
 # intentional public surface here.
@@ -194,60 +197,6 @@ def _install_command(
             rich_help_panel=RUNTIME_OPTIONS_HELP_PANEL,
         ),
     ] = False,
-    manage_claude_code: Annotated[
-        bool | None,
-        typer.Option(
-            "--claude-code/--no-claude-code",
-            help="When AI tools are selected, explicitly install Claude Code",
-            show_default=False,
-            rich_help_panel=AI_TOOLS_HELP_PANEL,
-        ),
-    ] = None,
-    manage_codex: Annotated[
-        bool | None,
-        typer.Option(
-            "--codex/--no-codex",
-            help="When AI tools are selected, explicitly install Codex CLI",
-            show_default=False,
-            rich_help_panel=AI_TOOLS_HELP_PANEL,
-        ),
-    ] = None,
-    manage_rtk: Annotated[
-        bool | None,
-        typer.Option(
-            "--rtk/--no-rtk",
-            help="When AI tools are selected, explicitly install RTK",
-            show_default=False,
-            rich_help_panel=AI_TOOLS_HELP_PANEL,
-        ),
-    ] = None,
-    enable_context7: Annotated[
-        bool | None,
-        typer.Option(
-            "--context7/--no-context7",
-            help="When AI tools are selected, enable Context7 integration",
-            show_default=False,
-            rich_help_panel=AI_TOOLS_HELP_PANEL,
-        ),
-    ] = None,
-    claude_context7_method: Annotated[
-        Context7Method | None,
-        typer.Option(
-            "--claude-context7-method",
-            help="Choose the Context7 transport for Claude Code",
-            show_default=False,
-            rich_help_panel=AI_TOOLS_HELP_PANEL,
-        ),
-    ] = None,
-    codex_context7_method: Annotated[
-        Context7Method | None,
-        typer.Option(
-            "--codex-context7-method",
-            help="Choose the Context7 transport for Codex CLI",
-            show_default=False,
-            rich_help_panel=AI_TOOLS_HELP_PANEL,
-        ),
-    ] = None,
 ) -> None:
     """Run Ansible roles and task tags."""
     if not list_tags and not tags:
@@ -262,12 +211,6 @@ def _install_command(
         playbook=playbook,
         inventory=inventory,
         ask_vault_pass=ask_vault_pass,
-        manage_claude_code=manage_claude_code,
-        manage_codex=manage_codex,
-        manage_rtk=manage_rtk,
-        enable_context7=enable_context7,
-        claude_context7_method=claude_context7_method,
-        codex_context7_method=codex_context7_method,
     )
 
 

@@ -17,12 +17,14 @@ from envmgr.commands.setup import run_setup
 from envmgr.main import require_setup_completed
 from envmgr.runtime_config import (
     SETUP_SCHEMA_VERSION,
+    AiToolsConfig,
     ConfigError,
     ensure_runtime_layout,
     is_runtime_setup_complete,
     load_runtime_config,
     mark_runtime_setup_complete,
     resolve_inventory_reference,
+    save_ai_tools_config,
 )
 from envmgr.services.assets import resolve_runtime_assets
 from envmgr.services.runtime import (
@@ -706,3 +708,87 @@ def check_missing_runtime_inventory_file_is_recreated() -> None:
             raise AssertionError(
                 "expected missing runtime inventory file to be recreated"
             )
+
+
+def check_ai_tools_config_round_trip_preserves_other_tables() -> None:
+    with tempfile.TemporaryDirectory() as temp_dir:
+        runtime_paths = ensure_runtime_layout(Path(temp_dir) / ".envmgr")
+        runtime_paths.config_file.write_text(
+            "\n".join(
+                [
+                    "# User-editable envmgr config",
+                    "[default]",
+                    'inventory = "default"',
+                    'playbook = "workstation"',
+                    "ask_vault_pass = false",
+                    "",
+                    "[inventory]",
+                    'default = "inventory/default.yaml"',
+                    'remote = "inventory/remote.yaml"',
+                    "",
+                    "# A user-defined section is preserved verbatim.",
+                    "[custom]",
+                    "ports = [80, 443]  # inline array with brackets",
+                    "",
+                    "[[custom.children]]",
+                    'name = "alice"',
+                    "[[custom.children]]",
+                    'name = "bob"',
+                    "",
+                    "# Managed AI tools banner",
+                    "[ai_tools]",
+                    "configured = true",
+                    "manage_claude_code = true",
+                    "manage_codex = false",
+                    "manage_rtk = true",
+                    "enable_context7 = true",
+                    'claude_context7_method = "remote"',
+                    'codex_context7_method = "remote"',
+                ]
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+
+        save_ai_tools_config(
+            runtime_paths,
+            AiToolsConfig(
+                configured=True,
+                manage_claude_code=True,
+                manage_codex=True,
+                manage_rtk=False,
+                enable_context7=False,
+                claude_context7_method="local",
+                codex_context7_method="remote",
+            ),
+        )
+
+        text = runtime_paths.config_file.read_text(encoding="utf-8")
+        for fragment in (
+            "# User-editable envmgr config",
+            "[default]",
+            "[inventory]",
+            "[custom]",
+            "ports = [80, 443]  # inline array with brackets",
+            "[[custom.children]]",
+            'name = "alice"',
+            "# A user-defined section is preserved verbatim.",
+            "# Managed AI tools banner",
+        ):
+            if fragment not in text:
+                raise AssertionError(f"expected config rewrite to keep {fragment!r}")
+
+        if text.count("[ai_tools]") != 1:
+            raise AssertionError("expected exactly one [ai_tools] table")
+
+        config = load_runtime_config(runtime_paths.home).ai_tools
+        if not config.configured:
+            raise AssertionError("expected rewritten config to stay configured")
+        if not config.manage_codex:
+            raise AssertionError("expected rewritten config to update manage_codex")
+        if config.manage_rtk:
+            raise AssertionError("expected rewritten config to update manage_rtk")
+        if config.enable_context7:
+            raise AssertionError("expected rewritten config to update enable_context7")
+        if config.claude_context7_method != "local":
+            raise AssertionError("expected rewritten config to update the method")
