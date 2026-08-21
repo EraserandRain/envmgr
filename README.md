@@ -123,25 +123,24 @@ Role-level tags include `ai_tools`, `cloud`, `docker`, `dotnet`, `golang`,
 ## AI Tools
 
 The `ai_tools` role depends on `node`. It installs Claude Code plus RTK by
-default; Codex CLI is opt-in through `--codex`, the `codex` task tag, or `all`.
-Context7 integration is enabled for selected Claude Code or Codex CLI installs
-unless disabled.
+default; Codex CLI is opt-in through the `codex` task tag or `all`. AI tools are
+selected by task tags, and the durable choices (which tools to manage plus the
+Context7 connection) live in `~/.envmgr/config.toml` under `[ai_tools]`.
 
-Interactive `envmgr install ai_tools` launches an AI Tools Setup wizard when no
-AI-tools flags are provided. Scripted runs can pass flags directly:
+The first interactive `envmgr install ai_tools` (or `envmgr install all`) run
+launches an AI Tools Setup wizard once and writes your choices into `[ai_tools]`.
+Later runs use that configuration as the source of truth without prompting. Use
+the `envmgr config` command to review or change the saved configuration:
 
 ```bash
-envmgr install ai_tools --claude-code --rtk
-envmgr install ai_tools --codex
-envmgr install ai_tools --no-rtk
-envmgr install ai_tools --no-context7
-envmgr install ai_tools --codex --codex-context7-method remote
+envmgr install ai_tools            # first run: wizard + persist; later runs reuse config
+envmgr install codex               # install only Codex CLI via the codex task tag
+envmgr config show                 # print the saved AI tools config
+envmgr config set ai_tools.manage_codex true
+envmgr config set ai_tools.enable_context7 false
 ```
 
-AI-tools options are `--claude-code`, `--no-claude-code`, `--codex`,
-`--no-codex`, `--rtk`, `--no-rtk`, `--context7`, `--no-context7`,
-`--claude-context7-method`, and `--codex-context7-method`. Export
-`CONTEXT7_API_KEY` first if your Context7 setup needs an API key.
+Export `CONTEXT7_API_KEY` first if your Context7 setup needs an API key.
 
 ## Reference
 

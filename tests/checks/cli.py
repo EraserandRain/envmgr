@@ -241,7 +241,6 @@ def check_runtime_subcommands_use_typer_help() -> None:
                 "custom playbook path",
                 "Output",
                 "Runtime options",
-                "AI tools",
             ),
         ),
         (
@@ -262,7 +261,6 @@ def check_runtime_subcommands_use_typer_help() -> None:
                 "custom playbook path",
                 "Output",
                 "Runtime options",
-                "AI tools",
             ),
         ),
         (
@@ -283,7 +281,6 @@ def check_runtime_subcommands_use_typer_help() -> None:
                 "custom playbook path",
                 "Output",
                 "Runtime options",
-                "AI tools",
             ),
         ),
         (

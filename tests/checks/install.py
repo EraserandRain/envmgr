@@ -17,11 +17,16 @@ from envmgr.catalog import CatalogError
 from envmgr.commands import shared as shared_commands
 from envmgr.commands.shared import RichInstallConsole, exit_with_error
 from envmgr.main import app
-from envmgr.runtime_config import ensure_runtime_layout
+from envmgr.runtime_config import (
+    AiToolsConfig,
+    ensure_runtime_layout,
+    load_runtime_config,
+)
 from envmgr.services.assets import resolve_runtime_assets
 from envmgr.services.install import (
     AiToolsInstallDefaults,
     AiToolsInstallOptions,
+    AiToolsResolution,
     InstallOptions,
     InstallPlan,
     InstallProcess,
@@ -95,65 +100,112 @@ def _interrupt_process_factory(*args: object, **kwargs: object) -> NoReturn:
 
 def check_ai_tools_install_option_resolution() -> None:
     console = _RecordingConsole()
-    options = resolve_ai_tools_choices(
+    configured = AiToolsConfig(
+        configured=True,
+        manage_claude_code=True,
+        manage_codex=True,
+        manage_rtk=True,
+        enable_context7=False,
+        claude_context7_method="local",
+        codex_context7_method="remote",
+    )
+
+    # Configured default-scope run treats the saved config as the source of truth.
+    resolution = resolve_ai_tools_choices(
         ["ai_tools"],
         execution_playbook_path="workstation",
-        manage_claude_code=None,
-        manage_codex=True,
-        manage_rtk=None,
-        enable_context7=False,
-        claude_context7_method=None,
-        codex_context7_method="remote",
+        ai_tools_config=configured,
         interactive=False,
         console=console,
     )
-
+    options = resolution.options
     if options is None:
         raise AssertionError("expected workstation AI tools playbook to resolve")
+    if resolution.persist:
+        raise AssertionError("expected configured run to avoid persisting again")
     if not options.manage_claude_code:
-        raise AssertionError("expected ai_tools tag to keep Claude Code enabled")
+        raise AssertionError("expected saved config to keep Claude Code enabled")
     if not options.manage_codex:
-        raise AssertionError("expected explicit Codex selection to be honored")
+        raise AssertionError("expected saved config to keep Codex CLI enabled")
     if not options.manage_rtk:
-        raise AssertionError("expected ai_tools tag to keep RTK enabled")
+        raise AssertionError("expected saved config to keep RTK enabled")
     if options.enable_context7:
-        raise AssertionError("expected explicit Context7 disable to be honored")
+        raise AssertionError("expected saved config Context7 disable to be honored")
+    if options.claude_context7_method != "local":
+        raise AssertionError("expected saved Claude Context7 method to be honored")
     if options.codex_context7_method != "remote":
-        raise AssertionError("expected Codex Context7 method override to be honored")
+        raise AssertionError("expected saved Codex Context7 method to be honored")
 
-    rtk_only_options = resolve_ai_tools_choices(
+    # Targeted task-tag run selects tools from the tags and never persists.
+    unconfigured = AiToolsConfig.unconfigured_defaults()
+    rtk_resolution = resolve_ai_tools_choices(
         ["rtk"],
         execution_playbook_path="workstation",
-        manage_claude_code=None,
-        manage_codex=None,
-        manage_rtk=None,
-        enable_context7=None,
-        claude_context7_method=None,
-        codex_context7_method=None,
+        ai_tools_config=unconfigured,
         interactive=False,
         console=console,
     )
+    rtk_only_options = rtk_resolution.options
     if rtk_only_options is None:
         raise AssertionError("expected rtk task tag to resolve AI tools options")
+    if rtk_resolution.persist:
+        raise AssertionError("expected targeted run to avoid persisting")
     if not rtk_only_options.manage_rtk:
         raise AssertionError("expected rtk task tag to enable RTK")
     if rtk_only_options.enable_context7:
         raise AssertionError("expected RTK-only installs to skip Context7")
 
-    node_options = resolve_ai_tools_choices(
+    # Non-interactive first-run default-scope run falls back to tag defaults.
+    all_resolution = resolve_ai_tools_choices(
         ["all"],
-        execution_playbook_path="node",
-        manage_claude_code=None,
-        manage_codex=None,
-        manage_rtk=None,
-        enable_context7=None,
-        claude_context7_method=None,
-        codex_context7_method=None,
+        execution_playbook_path="workstation",
+        ai_tools_config=unconfigured,
         interactive=False,
         console=console,
     )
-    if node_options is not None:
+    all_options = all_resolution.options
+    if all_options is None:
+        raise AssertionError("expected all tag to resolve AI tools options")
+    if not all_options.manage_codex:
+        raise AssertionError("expected all tag to enable Codex CLI by default")
+
+    node_resolution = resolve_ai_tools_choices(
+        ["all"],
+        execution_playbook_path="node",
+        ai_tools_config=unconfigured,
+        interactive=False,
+        console=console,
+    )
+    if node_resolution.options is not None:
         raise AssertionError("expected node playbook to skip AI tools resolution")
+
+
+def check_ai_tools_config_rejects_all_disabled() -> None:
+    console = _RecordingConsole()
+    all_disabled = AiToolsConfig(
+        configured=True,
+        manage_claude_code=False,
+        manage_codex=False,
+        manage_rtk=False,
+        enable_context7=True,
+        claude_context7_method="remote",
+        codex_context7_method="remote",
+    )
+    try:
+        resolve_ai_tools_choices(
+            ["ai_tools"],
+            execution_playbook_path="workstation",
+            ai_tools_config=all_disabled,
+            interactive=False,
+            console=console,
+        )
+    except CatalogError as error:
+        if "choose at least one tool" not in str(error):
+            raise AssertionError(
+                "expected a user-friendly at-least-one-tool error"
+            ) from error
+    else:
+        raise AssertionError("expected all-disabled AI tools config to be rejected")
 
 
 def check_ai_tools_extra_vars_match_role_contract() -> None:
@@ -258,21 +310,19 @@ def check_ai_tools_setup_wizard_uses_shared_prompt_path() -> None:
             ),
         ),
     ):
-        options = resolve_ai_tools_choices(
+        resolution = resolve_ai_tools_choices(
             ["ai_tools"],
             execution_playbook_path="workstation",
-            manage_claude_code=None,
-            manage_codex=None,
-            manage_rtk=None,
-            enable_context7=None,
-            claude_context7_method=None,
-            codex_context7_method=None,
+            ai_tools_config=AiToolsConfig.unconfigured_defaults(),
             interactive=True,
             console=RichInstallConsole(),
         )
 
+    options = resolution.options
     if options is None:
         raise AssertionError("expected AI tools wizard to return install options")
+    if not resolution.persist:
+        raise AssertionError("expected first-run wizard to request config persistence")
     if mock_confirm.call_count != 5:
         raise AssertionError("expected shared confirm prompts for each yes/no question")
     if mock_prompt.call_count != 2:
@@ -299,12 +349,7 @@ def check_ai_tools_setup_wizard_prompt_interrupt_exits_130() -> None:
             resolve_ai_tools_choices(
                 ["ai_tools"],
                 execution_playbook_path="workstation",
-                manage_claude_code=None,
-                manage_codex=None,
-                manage_rtk=None,
-                enable_context7=None,
-                claude_context7_method=None,
-                codex_context7_method=None,
+                ai_tools_config=AiToolsConfig.unconfigured_defaults(),
                 interactive=True,
                 console=RichInstallConsole(),
             )
@@ -628,7 +673,7 @@ def check_install_summary_uses_rich_console_and_keeps_raw_subprocess_output() ->
             ),
             patch(
                 "envmgr.services.install.resolve_ai_tools_choices",
-                return_value=None,
+                return_value=AiToolsResolution(options=None),
             ),
             patch(
                 "envmgr.services.install.build_install_command",
@@ -638,7 +683,7 @@ def check_install_summary_uses_rich_console_and_keeps_raw_subprocess_output() ->
         ):
             install(
                 ["zsh"],
-                options=InstallOptions(manage_codex=True),
+                options=InstallOptions(),
                 console=console,
                 process_factory=_fake_process_factory,
             )
@@ -657,7 +702,6 @@ def check_install_summary_uses_rich_console_and_keeps_raw_subprocess_output() ->
 
         output = _rendered_output(console)
         for expected_fragment in (
-            "Warning: AI-tools flags were ignored because this run does not include the ai_tools role",
             "Running Ansible playbook with:",
             "  Playbook: playbooks/workstation.yml",
             "  Inventory: default ->",
@@ -721,7 +765,7 @@ def check_install_dry_run_reports_plan_without_subprocess_and_cleans_temp() -> N
             ),
             patch(
                 "envmgr.services.install.resolve_ai_tools_choices",
-                return_value=None,
+                return_value=AiToolsResolution(options=None),
             ),
             patch("builtins.print") as mock_print,
         ):
@@ -798,7 +842,7 @@ def check_install_dry_run_json_outputs_machine_readable_plan() -> None:
             ),
             patch(
                 "envmgr.services.install.resolve_ai_tools_choices",
-                return_value=ai_tools_options,
+                return_value=AiToolsResolution(options=ai_tools_options),
             ),
             patch("envmgr.commands.shared.console.print") as mock_console_print,
         ):
@@ -848,7 +892,7 @@ def check_install_dry_run_json_outputs_machine_readable_plan() -> None:
             raise AssertionError("expected JSON dry-run to include AI tools extra-vars")
 
 
-def check_install_dry_run_json_keeps_ignored_ai_tools_warning_off_stdout() -> None:
+def check_install_dry_run_json_reports_inapplicable_ai_tools() -> None:
     with tempfile.TemporaryDirectory() as temp_dir:
         runtime_paths = ensure_runtime_layout(Path(temp_dir) / ".envmgr")
         execution_playbook_path = Path(temp_dir) / "execution.yml"
@@ -884,14 +928,13 @@ def check_install_dry_run_json_keeps_ignored_ai_tools_warning_off_stdout() -> No
             ),
             patch(
                 "envmgr.services.install.resolve_ai_tools_choices",
-                return_value=None,
+                return_value=AiToolsResolution(options=None),
             ),
             patch("envmgr.commands.shared.console.print") as mock_console_print,
-            patch("envmgr.commands.shared.error_console.print") as mock_error_print,
         ):
             result = CLI_RUNNER.invoke(
                 app,
-                ["install", "zsh", "--dry-run", "--json", "--codex"],
+                ["install", "zsh", "--dry-run", "--json"],
                 prog_name="envmgr",
             )
 
@@ -901,8 +944,6 @@ def check_install_dry_run_json_keeps_ignored_ai_tools_warning_off_stdout() -> No
             )
         if mock_console_print.called:
             raise AssertionError("expected JSON dry-run to avoid Rich stdout output")
-        if not mock_error_print.called:
-            raise AssertionError("expected ignored AI-tools warning to use stderr")
 
         plan = json.loads(result.output)
         if plan["selected_tags"] != ["zsh"]:
@@ -1039,7 +1080,7 @@ def check_install_interrupt_exits_cleanly() -> None:
             ),
             patch(
                 "envmgr.services.install.resolve_ai_tools_choices",
-                return_value=None,
+                return_value=AiToolsResolution(options=None),
             ),
         ):
             try:
@@ -1063,72 +1104,31 @@ def check_install_interrupt_exits_cleanly() -> None:
             )
 
 
-def check_install_typer_flags_preserve_tri_state_bools() -> None:
-    captured_calls: list[dict[str, object]] = []
+def check_install_config_command_updates_ai_tools() -> None:
+    with tempfile.TemporaryDirectory() as temp_dir:
+        envmgr_home = Path(temp_dir) / ".envmgr"
+        ensure_runtime_layout(envmgr_home)
 
-    def _capture_run_install(**kwargs: object) -> None:
-        captured_calls.append(kwargs)
-
-    with patch("envmgr.main.run_install", side_effect=_capture_run_install):
-        default_result = CLI_RUNNER.invoke(
-            app,
-            ["install", "ai_tools"],
-            prog_name="envmgr",
-        )
-        flagged_result = CLI_RUNNER.invoke(
-            app,
-            [
-                "install",
-                "ai_tools",
-                "--no-claude-code",
-                "--codex",
-                "--no-rtk",
-                "--context7",
-                "--claude-context7-method",
-                "local",
-                "--codex-context7-method",
-                "remote",
-            ],
-            prog_name="envmgr",
-        )
-
-    if default_result.exit_code != 0:
-        raise AssertionError(
-            "expected bare `envmgr install ai_tools` invocation to parse successfully"
-            f"\noutput:\n{default_result.output}"
-        )
-    if flagged_result.exit_code != 0:
-        raise AssertionError(
-            "expected paired install flags to parse successfully"
-            f"\noutput:\n{flagged_result.output}"
-        )
-    if len(captured_calls) != 2:
-        raise AssertionError("expected Typer install wrapper to delegate twice")
-
-    default_call, flagged_call = captured_calls
-    for option_name in (
-        "manage_claude_code",
-        "manage_codex",
-        "manage_rtk",
-        "enable_context7",
-        "claude_context7_method",
-        "codex_context7_method",
-    ):
-        if default_call[option_name] is not None:
+        with patch.dict(os.environ, {"ENVMGR_HOME": str(envmgr_home)}):
+            show_result = CLI_RUNNER.invoke(app, ["config", "show"], prog_name="envmgr")
+        if show_result.exit_code != 0:
             raise AssertionError(
-                f"expected {option_name} to stay unset when no install flags are provided"
+                f"expected config show to succeed\n{show_result.output}"
             )
+        if "Configured: no" not in show_result.output:
+            raise AssertionError("expected unconfigured config to report `no`")
 
-    expected_flag_values = {
-        "manage_claude_code": False,
-        "manage_codex": True,
-        "manage_rtk": False,
-        "enable_context7": True,
-        "claude_context7_method": "local",
-        "codex_context7_method": "remote",
-    }
-    for option_name, expected_value in expected_flag_values.items():
-        if flagged_call[option_name] != expected_value:
-            raise AssertionError(
-                f"expected {option_name} to resolve to {expected_value!r}"
+        with patch.dict(os.environ, {"ENVMGR_HOME": str(envmgr_home)}):
+            set_result = CLI_RUNNER.invoke(
+                app,
+                ["config", "set", "ai_tools.manage_codex", "true"],
+                prog_name="envmgr",
             )
+        if set_result.exit_code != 0:
+            raise AssertionError(f"expected config set to succeed\n{set_result.output}")
+
+        config = load_runtime_config(envmgr_home=envmgr_home).ai_tools
+        if not config.configured:
+            raise AssertionError("expected config set to mark AI tools as configured")
+        if not config.manage_codex:
+            raise AssertionError("expected config set to update manage_codex")

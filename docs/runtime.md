@@ -73,6 +73,29 @@ remote = "inventory/remote.yaml"
 password = "inventory/password.yaml"
 ```
 
+AI-tools preferences are stored in an optional `[ai_tools]` table. It is the
+source of truth for which tools `ai_tools`/`all` runs manage and how Context7 is
+connected. It is written once by the first-run AI Tools Setup wizard
+(`envmgr install ai_tools` or `envmgr install all`) and re-used on later runs
+without prompting:
+
+```toml
+[ai_tools]
+configured = true
+manage_claude_code = true
+manage_codex = true
+manage_rtk = true
+enable_context7 = true
+claude_context7_method = "remote"
+codex_context7_method = "remote"
+```
+
+Use `envmgr config show` to inspect the saved values and
+`envmgr config set <key> <value>` to change them without re-running an install.
+Specific tool runs such as `envmgr install codex`, `envmgr install claude_code`,
+and `envmgr install rtk` select tools directly from the task tag and do not open
+the wizard.
+
 Commands that accept `-i` or `--inventory` use aliases from this config. Alias
 targets must stay under the runtime inventory directory; envmgr does not fall
 back to repository-local inventory files or `./.ansible` caches.

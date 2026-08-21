@@ -3,6 +3,7 @@ from __future__ import annotations
 import unittest
 
 from tests.checks.runtime import (
+    check_ai_tools_config_round_trip_preserves_other_tables,
     check_invalid_toml_surfaces_config_error,
     check_inventory_aliases_stay_under_runtime_inventory_dir,
     check_missing_runtime_inventory_file_is_recreated,
@@ -38,6 +39,10 @@ RUNTIME_CONFIG_TEST_CHECKS: tuple[Check, ...] = (
     (
         "missing runtime inventory file is recreated",
         check_missing_runtime_inventory_file_is_recreated,
+    ),
+    (
+        "AI tools config rewrite preserves other tables and comments",
+        check_ai_tools_config_round_trip_preserves_other_tables,
     ),
 )
 

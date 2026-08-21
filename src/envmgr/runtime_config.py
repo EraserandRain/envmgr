@@ -28,6 +28,7 @@ tomllib = cast(_TomlModule, _tomllib)
 ENVMGR_HOME_ENV_VAR = "ENVMGR_HOME"
 DEFAULT_PLAYBOOK = "workstation"
 SETUP_SCHEMA_VERSION = 1
+AI_TOOLS_CONTEXT7_METHODS = ("remote", "local")
 DEFAULT_CONFIG_TEXT = """[default]
 inventory = "default"
 playbook = "workstation"
@@ -156,6 +157,33 @@ class RuntimeConfig:
     default_playbook: str
     default_ask_vault_pass: bool
     inventories: dict[str, Path]
+    ai_tools: AiToolsConfig
+
+
+@dataclass(frozen=True)
+class AiToolsConfig:
+    """Durable AI-tools preferences stored under `[ai_tools]` in config.toml."""
+
+    configured: bool
+    manage_claude_code: bool
+    manage_codex: bool
+    manage_rtk: bool
+    enable_context7: bool
+    claude_context7_method: str
+    codex_context7_method: str
+
+    @classmethod
+    def unconfigured_defaults(cls) -> AiToolsConfig:
+        """Return the not-yet-configured baseline for the AI-tools role."""
+        return cls(
+            configured=False,
+            manage_claude_code=True,
+            manage_codex=False,
+            manage_rtk=True,
+            enable_context7=True,
+            claude_context7_method="remote",
+            codex_context7_method="remote",
+        )
 
 
 def _resolve_envmgr_home(envmgr_home: str | Path | None = None) -> Path:
@@ -350,6 +378,76 @@ def _read_bool(
     return value
 
 
+def _read_ai_tools_method(
+    value: Any,
+    field_name: str,
+    config_path: Path,
+    *,
+    default: str,
+) -> str:
+    if value is None:
+        return default
+    if not isinstance(value, str) or value not in AI_TOOLS_CONTEXT7_METHODS:
+        allowed = ", ".join(repr(method) for method in AI_TOOLS_CONTEXT7_METHODS)
+        raise ConfigError(
+            f"{config_path} field '{field_name}' must be one of {allowed}"
+        )
+    return value
+
+
+def _read_ai_tools_config(data: dict[str, Any], config_path: Path) -> AiToolsConfig:
+    """Read the `[ai_tools]` table, falling back to unconfigured defaults."""
+    table = data.get("ai_tools")
+    if not isinstance(table, dict):
+        return AiToolsConfig.unconfigured_defaults()
+
+    configure = _read_bool(
+        table.get("configured"),
+        "ai_tools.configured",
+        config_path,
+        default=True,
+    )
+    return AiToolsConfig(
+        configured=configure,
+        manage_claude_code=_read_bool(
+            table.get("manage_claude_code"),
+            "ai_tools.manage_claude_code",
+            config_path,
+            default=True,
+        ),
+        manage_codex=_read_bool(
+            table.get("manage_codex"),
+            "ai_tools.manage_codex",
+            config_path,
+            default=False,
+        ),
+        manage_rtk=_read_bool(
+            table.get("manage_rtk"),
+            "ai_tools.manage_rtk",
+            config_path,
+            default=True,
+        ),
+        enable_context7=_read_bool(
+            table.get("enable_context7"),
+            "ai_tools.enable_context7",
+            config_path,
+            default=True,
+        ),
+        claude_context7_method=_read_ai_tools_method(
+            table.get("claude_context7_method"),
+            "ai_tools.claude_context7_method",
+            config_path,
+            default="remote",
+        ),
+        codex_context7_method=_read_ai_tools_method(
+            table.get("codex_context7_method"),
+            "ai_tools.codex_context7_method",
+            config_path,
+            default="remote",
+        ),
+    )
+
+
 def _resolve_config_path(raw_path: str, root: Path) -> Path:
     path = Path(raw_path).expanduser()
     if path.is_absolute():
@@ -452,6 +550,7 @@ def load_runtime_config(
         default_playbook=default_playbook,
         default_ask_vault_pass=default_ask_vault_pass,
         inventories=inventories,
+        ai_tools=_read_ai_tools_config(data, paths.config_file),
     )
 
 
@@ -479,3 +578,91 @@ def resolve_inventory_reference(
         )
 
     return inventory_path, selected
+
+
+def _split_toml_sections(
+    text: str,
+) -> tuple[list[str], list[tuple[str, list[str]]]]:
+    """Split TOML text into leading lines and ordered (header, body) sections."""
+    leading: list[str] = []
+    sections: list[tuple[str, list[str]]] = []
+    header: str | None = None
+    body: list[str] = []
+
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("[") and stripped.endswith("]"):
+            if header is not None:
+                sections.append((header, body))
+            header = stripped
+            body = [line]
+        elif header is None:
+            leading.append(line)
+        else:
+            body.append(line)
+
+    if header is not None:
+        sections.append((header, body))
+    return leading, sections
+
+
+def _format_ai_tools_table(config: AiToolsConfig) -> list[str]:
+    """Render the `[ai_tools]` table for config.toml."""
+    return [
+        "[ai_tools]",
+        f"configured = {str(config.configured).lower()}",
+        f"manage_claude_code = {str(config.manage_claude_code).lower()}",
+        f"manage_codex = {str(config.manage_codex).lower()}",
+        f"manage_rtk = {str(config.manage_rtk).lower()}",
+        f"enable_context7 = {str(config.enable_context7).lower()}",
+        f'claude_context7_method = "{config.claude_context7_method}"',
+        f'codex_context7_method = "{config.codex_context7_method}"',
+    ]
+
+
+def _section_preamble(body: list[str]) -> list[str]:
+    """Return the comment/blank lines that lead a section, after its header."""
+    preamble: list[str] = []
+    for line in body[1:]:
+        stripped = line.strip()
+        if stripped == "" or stripped.startswith("#"):
+            preamble.append(line)
+        else:
+            break
+    return preamble
+
+
+def save_ai_tools_config(paths: RuntimePaths, config: AiToolsConfig) -> None:
+    """Write the `[ai_tools]` table into config.toml, preserving other tables."""
+    existing_text = (
+        paths.config_file.read_text(encoding="utf-8")
+        if paths.config_file.exists()
+        else ""
+    )
+    leading, sections = _split_toml_sections(existing_text)
+    new_table = _format_ai_tools_table(config)
+
+    rebuilt_sections: list[tuple[str, list[str]]] = []
+    replaced = False
+    for header, body in sections:
+        if header == "[ai_tools]":
+            rebuilt_sections.append((header, [*_section_preamble(body), *new_table]))
+            replaced = True
+        else:
+            rebuilt_sections.append((header, body))
+    if not replaced:
+        rebuilt_sections.append(("[ai_tools]", new_table))
+
+    output_lines: list[str] = [*leading]
+    for _header, body in rebuilt_sections:
+        while body and not body[-1].strip():
+            body = body[:-1]
+        output_lines.extend(body)
+        output_lines.append("")
+
+    while output_lines and not output_lines[-1].strip():
+        output_lines.pop()
+    output_lines.append("")
+
+    paths.config_file.parent.mkdir(parents=True, exist_ok=True)
+    paths.config_file.write_text("\n".join(output_lines) + "\n", encoding="utf-8")

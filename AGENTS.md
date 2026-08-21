@@ -101,6 +101,14 @@ and release contracts.
   choices when applicable, and final command argv/readable command.
   `envmgr install --dry-run --json` emits plain JSON with stable plan keys and
   no Rich markup.
+- [ ] AI-tools selection is config-driven, not flag-driven. `envmgr install`
+  exposes no per-tool flags; the durable choices live in the `[ai_tools]`
+  table of `~/.envmgr/config.toml`. The first interactive `ai_tools`/`all` run
+  writes that table through the wizard; later runs reuse it without prompting.
+  Tool-only runs such as `envmgr install codex`, `claude_code`, or `rtk` select
+  tools from the task tag and never trigger the wizard. `envmgr config show` and
+  `envmgr config set ai_tools.<key> <value>` inspect and update the saved
+  configuration.
 - [ ] Public `envmgr doctor` and `envmgr doctor --json` exit non-zero only for failing checks; warning-only reports still exit `0`. The hard command check covers Ansible runtime commands (`ansible`, `ansible-playbook`, `ansible-galaxy`), while invalid installer-recorded `uv` paths produce a self-management warning instead of a generic runtime command failure.
 - [ ] Public `envmgr self update` and `envmgr self uninstall` are limited to
   installer-managed GitHub Release installs with `~/.envmgr/install.toml`;
@@ -240,7 +248,7 @@ When the user asks to ship changes, follow this automated PR workflow:
 - [ ] Do not commit secrets. Store sensitive runtime values under
   `~/.envmgr/inventory/group_vars/all/vault.yml` and encrypt them with
   `ansible-vault`.
-- [ ] For AI tools, prefer install-time CLI flags or the interactive wizard, and
-  pass `CONTEXT7_API_KEY` through the environment when needed.
+- [ ] For AI tools, prefer the first-run interactive wizard or `envmgr config
+  set`, and pass `CONTEXT7_API_KEY` through the environment when needed.
 - [ ] Default playbooks run as the current user; set `become: true` only where a
   role/task needs privilege escalation.
