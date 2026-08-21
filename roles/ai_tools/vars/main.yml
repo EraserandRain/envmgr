@@ -2,7 +2,6 @@
 # Global vars file for ai_tools
 volta_root: "{{ ansible_facts['env']['HOME'] }}/.volta"
 ai_tools_user_bin_path: "{{ ansible_facts['env']['HOME'] }}/.local/bin"
-ai_tools_context7_api_key: "{{ lookup('env', 'CONTEXT7_API_KEY') | default('', true) }}"
 
 # AI tools configuration
 ai_tools_config:
@@ -11,20 +10,11 @@ ai_tools_config:
     package: "@anthropic-ai/claude-code"
     binary: "claude"
     description: "Anthropic's Claude Code CLI"
-    # MCP Context7 configuration
-    mcp_context7:
-      enabled: true
-      remote_url: "https://mcp.context7.com/mcp"
-      package: "@upstash/context7-mcp"
   codex:
     enabled: true
     package: "@openai/codex"
     binary: "codex"
     description: "OpenAI's Codex CLI"
-    # MCP Context7 configuration
-    mcp_context7:
-      enabled: true
-      package: "@upstash/context7-mcp"
   rtk:
     enabled: true
     binary: "rtk"

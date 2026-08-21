@@ -28,7 +28,6 @@ tomllib = cast(_TomlModule, _tomllib)
 ENVMGR_HOME_ENV_VAR = "ENVMGR_HOME"
 DEFAULT_PLAYBOOK = "workstation"
 SETUP_SCHEMA_VERSION = 1
-AI_TOOLS_CONTEXT7_METHODS = ("remote", "local")
 DEFAULT_CONFIG_TEXT = """[default]
 inventory = "default"
 playbook = "workstation"
@@ -168,9 +167,6 @@ class AiToolsConfig:
     manage_claude_code: bool
     manage_codex: bool
     manage_rtk: bool
-    enable_context7: bool
-    claude_context7_method: str
-    codex_context7_method: str
 
     @classmethod
     def unconfigured_defaults(cls) -> AiToolsConfig:
@@ -180,9 +176,6 @@ class AiToolsConfig:
             manage_claude_code=True,
             manage_codex=False,
             manage_rtk=True,
-            enable_context7=True,
-            claude_context7_method="remote",
-            codex_context7_method="remote",
         )
 
 
@@ -378,23 +371,6 @@ def _read_bool(
     return value
 
 
-def _read_ai_tools_method(
-    value: Any,
-    field_name: str,
-    config_path: Path,
-    *,
-    default: str,
-) -> str:
-    if value is None:
-        return default
-    if not isinstance(value, str) or value not in AI_TOOLS_CONTEXT7_METHODS:
-        allowed = ", ".join(repr(method) for method in AI_TOOLS_CONTEXT7_METHODS)
-        raise ConfigError(
-            f"{config_path} field '{field_name}' must be one of {allowed}"
-        )
-    return value
-
-
 def _read_ai_tools_config(data: dict[str, Any], config_path: Path) -> AiToolsConfig:
     """Read the `[ai_tools]` table, falling back to unconfigured defaults."""
     table = data.get("ai_tools")
@@ -426,24 +402,6 @@ def _read_ai_tools_config(data: dict[str, Any], config_path: Path) -> AiToolsCon
             "ai_tools.manage_rtk",
             config_path,
             default=True,
-        ),
-        enable_context7=_read_bool(
-            table.get("enable_context7"),
-            "ai_tools.enable_context7",
-            config_path,
-            default=True,
-        ),
-        claude_context7_method=_read_ai_tools_method(
-            table.get("claude_context7_method"),
-            "ai_tools.claude_context7_method",
-            config_path,
-            default="remote",
-        ),
-        codex_context7_method=_read_ai_tools_method(
-            table.get("codex_context7_method"),
-            "ai_tools.codex_context7_method",
-            config_path,
-            default="remote",
         ),
     )
 
@@ -614,9 +572,6 @@ def _format_ai_tools_table(config: AiToolsConfig) -> list[str]:
         f"manage_claude_code = {str(config.manage_claude_code).lower()}",
         f"manage_codex = {str(config.manage_codex).lower()}",
         f"manage_rtk = {str(config.manage_rtk).lower()}",
-        f"enable_context7 = {str(config.enable_context7).lower()}",
-        f'claude_context7_method = "{config.claude_context7_method}"',
-        f'codex_context7_method = "{config.codex_context7_method}"',
     ]
 
 

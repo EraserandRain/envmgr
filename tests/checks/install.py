@@ -105,9 +105,6 @@ def check_ai_tools_install_option_resolution() -> None:
         manage_claude_code=True,
         manage_codex=True,
         manage_rtk=True,
-        enable_context7=False,
-        claude_context7_method="local",
-        codex_context7_method="remote",
     )
 
     # Configured default-scope run treats the saved config as the source of truth.
@@ -129,12 +126,6 @@ def check_ai_tools_install_option_resolution() -> None:
         raise AssertionError("expected saved config to keep Codex CLI enabled")
     if not options.manage_rtk:
         raise AssertionError("expected saved config to keep RTK enabled")
-    if options.enable_context7:
-        raise AssertionError("expected saved config Context7 disable to be honored")
-    if options.claude_context7_method != "local":
-        raise AssertionError("expected saved Claude Context7 method to be honored")
-    if options.codex_context7_method != "remote":
-        raise AssertionError("expected saved Codex Context7 method to be honored")
 
     # Targeted task-tag run selects tools from the tags and never persists.
     unconfigured = AiToolsConfig.unconfigured_defaults()
@@ -152,8 +143,6 @@ def check_ai_tools_install_option_resolution() -> None:
         raise AssertionError("expected targeted run to avoid persisting")
     if not rtk_only_options.manage_rtk:
         raise AssertionError("expected rtk task tag to enable RTK")
-    if rtk_only_options.enable_context7:
-        raise AssertionError("expected RTK-only installs to skip Context7")
 
     # Non-interactive first-run default-scope run falls back to tag defaults.
     all_resolution = resolve_ai_tools_choices(
@@ -187,9 +176,6 @@ def check_ai_tools_config_rejects_all_disabled() -> None:
         manage_claude_code=False,
         manage_codex=False,
         manage_rtk=False,
-        enable_context7=True,
-        claude_context7_method="remote",
-        codex_context7_method="remote",
     )
     try:
         resolve_ai_tools_choices(
@@ -221,18 +207,12 @@ def check_ai_tools_extra_vars_match_role_contract() -> None:
         manage_claude_code=True,
         manage_codex=False,
         manage_rtk=True,
-        enable_context7=False,
-        claude_context7_method="local",
-        codex_context7_method="remote",
     )
     extra_vars = build_ai_tools_extra_vars(options)
     expected_extra_var_keys = {
         "ai_tools_manage_claude_code_override",
         "ai_tools_manage_codex_override",
         "ai_tools_manage_rtk_override",
-        "ai_tools_context7_enabled",
-        "ai_tools_claude_context7_method",
-        "ai_tools_codex_context7_method",
     }
 
     if set(extra_vars) != expected_extra_var_keys:
@@ -297,12 +277,8 @@ def check_ai_tools_setup_wizard_uses_shared_prompt_path() -> None:
         patch("envmgr.commands.shared.console.print"),
         patch(
             "envmgr.commands.shared.confirm_backend",
-            side_effect=[True, True, True, True, True],
+            side_effect=[True, True, True, True],
         ) as mock_confirm,
-        patch(
-            "envmgr.commands.shared.prompt_backend",
-            side_effect=["1", "1"],
-        ) as mock_prompt,
         patch(
             "builtins.input",
             side_effect=AssertionError(
@@ -323,18 +299,10 @@ def check_ai_tools_setup_wizard_uses_shared_prompt_path() -> None:
         raise AssertionError("expected AI tools wizard to return install options")
     if not resolution.persist:
         raise AssertionError("expected first-run wizard to request config persistence")
-    if mock_confirm.call_count != 5:
+    if mock_confirm.call_count != 4:
         raise AssertionError("expected shared confirm prompts for each yes/no question")
-    if mock_prompt.call_count != 2:
-        raise AssertionError(
-            "expected shared text prompts for each Context7 transport choice"
-        )
     if not options.manage_codex:
         raise AssertionError("expected wizard to allow enabling Codex CLI")
-    if options.claude_context7_method != "remote":
-        raise AssertionError("expected wizard to accept remote transport selections")
-    if options.codex_context7_method != "remote":
-        raise AssertionError("expected wizard to accept remote transport selections")
 
 
 def check_ai_tools_setup_wizard_prompt_interrupt_exits_130() -> None:
@@ -825,9 +793,6 @@ def check_install_dry_run_json_outputs_machine_readable_plan() -> None:
             manage_claude_code=True,
             manage_codex=True,
             manage_rtk=False,
-            enable_context7=True,
-            claude_context7_method="local",
-            codex_context7_method="remote",
         )
 
         with (

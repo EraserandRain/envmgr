@@ -741,9 +741,6 @@ def check_ai_tools_config_round_trip_preserves_other_tables() -> None:
                     "manage_claude_code = true",
                     "manage_codex = false",
                     "manage_rtk = true",
-                    "enable_context7 = true",
-                    'claude_context7_method = "remote"',
-                    'codex_context7_method = "remote"',
                 ]
             )
             + "\n",
@@ -757,9 +754,6 @@ def check_ai_tools_config_round_trip_preserves_other_tables() -> None:
                 manage_claude_code=True,
                 manage_codex=True,
                 manage_rtk=False,
-                enable_context7=False,
-                claude_context7_method="local",
-                codex_context7_method="remote",
             ),
         )
 
@@ -788,7 +782,3 @@ def check_ai_tools_config_round_trip_preserves_other_tables() -> None:
             raise AssertionError("expected rewritten config to update manage_codex")
         if config.manage_rtk:
             raise AssertionError("expected rewritten config to update manage_rtk")
-        if config.enable_context7:
-            raise AssertionError("expected rewritten config to update enable_context7")
-        if config.claude_context7_method != "local":
-            raise AssertionError("expected rewritten config to update the method")

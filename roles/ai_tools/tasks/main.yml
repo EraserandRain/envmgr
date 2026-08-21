@@ -251,12 +251,6 @@
             state: absent
           when: "'codex' in global_ai_tools_status.tools_failed"
 
-        - name: Remove failed Context7 scripts
-          file:
-            path: "{{ ansible_facts['env']['HOME'] }}/.local/bin/context7-codex"
-            state: absent
-          when: "'codex' in global_ai_tools_status.tools_failed"
-
         - name: Remove failed RTK installation
           file:
             path: "{{ ai_tools_config.rtk.install_dir }}/{{ ai_tools_config.rtk.binary }}"

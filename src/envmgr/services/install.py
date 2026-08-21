@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import os
 import shlex
 import subprocess
 from collections.abc import Callable
@@ -159,28 +158,6 @@ def _render_ai_tools_summary(
             f"RTK={ai_tools_options.manage_rtk}"
         ),
     )
-    if ai_tools_options.manage_claude_code or ai_tools_options.manage_codex:
-        context7_status = "enabled" if ai_tools_options.enable_context7 else "disabled"
-        print_labeled_value(console, "Context7", context7_status)
-    if ai_tools_options.enable_context7:
-        if ai_tools_options.manage_claude_code:
-            print_labeled_value(
-                console,
-                "Claude Code Context7 method",
-                ai_tools_options.claude_context7_method,
-            )
-        if ai_tools_options.manage_codex:
-            print_labeled_value(
-                console,
-                "Codex Context7 method",
-                ai_tools_options.codex_context7_method,
-            )
-        if not os.environ.get("CONTEXT7_API_KEY"):
-            print_labeled_value(
-                console,
-                "Context7 API key",
-                "not set (continuing without it)",
-            )
 
 
 def _config_from_options(options: AiToolsInstallOptions) -> AiToolsConfig:
@@ -190,9 +167,6 @@ def _config_from_options(options: AiToolsInstallOptions) -> AiToolsConfig:
         manage_claude_code=options.manage_claude_code,
         manage_codex=options.manage_codex,
         manage_rtk=options.manage_rtk,
-        enable_context7=options.enable_context7,
-        claude_context7_method=options.claude_context7_method,
-        codex_context7_method=options.codex_context7_method,
     )
 
 
@@ -242,9 +216,6 @@ def _install_plan_json(
                 "manage_claude_code": ai_tools_options.manage_claude_code,
                 "manage_codex": ai_tools_options.manage_codex,
                 "manage_rtk": ai_tools_options.manage_rtk,
-                "enable_context7": ai_tools_options.enable_context7,
-                "claude_context7_method": ai_tools_options.claude_context7_method,
-                "codex_context7_method": ai_tools_options.codex_context7_method,
                 "extra_vars": build_ai_tools_extra_vars(ai_tools_options),
             }
         )

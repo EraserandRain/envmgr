@@ -6,7 +6,6 @@ import typer
 from rich.text import Text
 
 from ..runtime_config import (
-    AI_TOOLS_CONTEXT7_METHODS,
     AiToolsConfig,
     load_runtime_config,
     save_ai_tools_config,
@@ -22,11 +21,6 @@ _BOOL_FIELDS = {
     "ai_tools.manage_claude_code": "manage_claude_code",
     "ai_tools.manage_codex": "manage_codex",
     "ai_tools.manage_rtk": "manage_rtk",
-    "ai_tools.enable_context7": "enable_context7",
-}
-_METHOD_FIELDS = {
-    "ai_tools.claude_context7_method": "claude_context7_method",
-    "ai_tools.codex_context7_method": "codex_context7_method",
 }
 
 
@@ -39,14 +33,6 @@ def _parse_bool(value: str) -> bool:
     exit_with_error(f"Error: expected a boolean value, got {value!r}")
 
 
-def _parse_method(value: str) -> str:
-    normalized = value.strip().lower()
-    if normalized in AI_TOOLS_CONTEXT7_METHODS:
-        return normalized
-    allowed = ", ".join(AI_TOOLS_CONTEXT7_METHODS)
-    exit_with_error(f"Error: expected one of {allowed}, got {value!r}")
-
-
 def _config_from_key_value(
     current: AiToolsConfig,
     key: str,
@@ -54,10 +40,6 @@ def _config_from_key_value(
 ) -> AiToolsConfig:
     if key in _BOOL_FIELDS:
         return _updated_bool_config(current, _BOOL_FIELDS[key], _parse_bool(value))
-    if key in _METHOD_FIELDS:
-        return _updated_method_config(
-            current, _METHOD_FIELDS[key], _parse_method(value)
-        )
 
     exit_with_error(
         f"Error: unsupported config key {key!r}; expected an `ai_tools.*` key"
@@ -73,7 +55,6 @@ def _updated_bool_config(
         "manage_claude_code": current.manage_claude_code,
         "manage_codex": current.manage_codex,
         "manage_rtk": current.manage_rtk,
-        "enable_context7": current.enable_context7,
     }
     fields[field] = value
     return AiToolsConfig(
@@ -81,31 +62,6 @@ def _updated_bool_config(
         manage_claude_code=fields["manage_claude_code"],
         manage_codex=fields["manage_codex"],
         manage_rtk=fields["manage_rtk"],
-        enable_context7=fields["enable_context7"],
-        claude_context7_method=current.claude_context7_method,
-        codex_context7_method=current.codex_context7_method,
-    )
-
-
-def _updated_method_config(
-    current: AiToolsConfig,
-    field: str,
-    value: str,
-) -> AiToolsConfig:
-    claude_method = (
-        value if field == "claude_context7_method" else current.claude_context7_method
-    )
-    codex_method = (
-        value if field == "codex_context7_method" else current.codex_context7_method
-    )
-    return AiToolsConfig(
-        configured=True,
-        manage_claude_code=current.manage_claude_code,
-        manage_codex=current.manage_codex,
-        manage_rtk=current.manage_rtk,
-        enable_context7=current.enable_context7,
-        claude_context7_method=claude_method,
-        codex_context7_method=codex_method,
     )
 
 
@@ -118,9 +74,6 @@ def _render_ai_tools_status(config: AiToolsConfig) -> list[tuple[str, str]]:
         ("Claude Code", enabled_status(config.manage_claude_code)),
         ("Codex CLI", enabled_status(config.manage_codex)),
         ("RTK", enabled_status(config.manage_rtk)),
-        ("Context7", enabled_status(config.enable_context7)),
-        ("Claude Code Context7", config.claude_context7_method),
-        ("Codex CLI Context7", config.codex_context7_method),
     ]
 
 
@@ -139,7 +92,7 @@ def _show_command() -> None:
 def _set_command(
     key: Annotated[
         str,
-        typer.Argument(help="Config key to update, e.g. ai_tools.enable_context7"),
+        typer.Argument(help="Config key to update, e.g. ai_tools.manage_codex"),
     ],
     value: Annotated[
         str,

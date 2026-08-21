@@ -44,66 +44,6 @@
     claude_installed: "{{ claude_version_check.rc == 0 }}"
     claude_version: "{{ claude_version_check.stdout if claude_version_check.rc == 0 else 'version check failed' }}"
 
-- block:
-    - name: Install Context7 MCP for Claude Code (Remote Method)
-      shell: |
-        {% set api_key = ai_tools_context7_api_key %}
-        {% if api_key and api_key != "" %}
-        claude mcp add --transport http context7 {{ ai_tools_config.claude_code.mcp_context7.remote_url }} --header "CONTEXT7_API_KEY: {{ api_key }}"
-        {% else %}
-        claude mcp add --transport http context7 {{ ai_tools_config.claude_code.mcp_context7.remote_url }}
-        {% endif %}
-      args:
-        executable: /bin/bash
-      register: mcp_remote_result
-      changed_when: mcp_remote_result.rc == 0
-      failed_when:
-        - mcp_remote_result.rc != 0
-        - "'already exists' not in mcp_remote_result.stderr"
-      when:
-        - claude_installed | default(false)
-        - ai_tools_config.claude_code.mcp_context7.enabled | default(true)
-        - ai_tools_claude_context7_method == "remote"
-        - ai_tools_context7_enabled | bool
-
-    - name: Install Context7 MCP for Claude Code (Local Method)
-      shell: |
-        {% set api_key = ai_tools_context7_api_key %}
-        {% if api_key and api_key != "" %}
-        claude mcp add context7 -- npx -y {{ ai_tools_config.claude_code.mcp_context7.package }} --api-key {{ api_key }}
-        {% else %}
-        claude mcp add context7 -- npx -y {{ ai_tools_config.claude_code.mcp_context7.package }}
-        {% endif %}
-      args:
-        executable: /bin/bash
-      register: mcp_local_result
-      changed_when: mcp_local_result.rc == 0
-      failed_when:
-        - mcp_local_result.rc != 0
-        - "'already exists' not in mcp_local_result.stderr"
-      when:
-        - claude_installed | default(false)
-        - ai_tools_config.claude_code.mcp_context7.enabled | default(true)
-        - ai_tools_claude_context7_method == "local"
-        - ai_tools_context7_enabled | bool
-
-  rescue:
-    - name: Handle MCP installation failure
-      debug:
-        msg: "Context7 MCP installation failed, but Claude Code is still functional"
-
-    - name: Set MCP installation status
-      set_fact:
-        mcp_installed: false
-        mcp_error: "{{ mcp_remote_result.stderr | default(mcp_local_result.stderr) | default('Unknown MCP installation error') }}"
-
-- name: Set MCP installation status (success)
-  set_fact:
-    mcp_installed: true
-  when:
-    - (mcp_remote_result is defined and not mcp_remote_result.skipped | default(false) and mcp_remote_result.rc == 0) or
-      (mcp_local_result is defined and not mcp_local_result.skipped | default(false) and mcp_local_result.rc == 0)
-
 - name: Display Claude Code summary and usage guidance
   include_tasks:
     file: show_tool_summary.yml
@@ -112,16 +52,11 @@
     ai_tool_installed: "{{ claude_installed | default(false) }}"
     ai_tool_version: "{{ claude_version }}"
     ai_tool_summary_footer: "========================================"
-    additional_summary_items:
-      - "MCP Context7 installed: {{ mcp_installed | default(false) }}"
-      - "{% if mcp_error is defined %}MCP Error: {{ mcp_error }}{% endif %}"
     usage_lines:
       - "Claude Code Installation Complete!"
       - ""
       - "Next steps:"
       - "1. Run 'claude' to start the CLI"
       - "2. Authentication may be required on first use"
-      - "{% if mcp_installed | default(false) %}3. Context7 MCP is available - use 'use context7' in prompts{% endif %}"
-      - "{% if not (mcp_installed | default(false)) %}3. Context7 MCP installation failed - check logs above{% endif %}"
       - ""
       - "Claude Code is now available in your PATH via volta."

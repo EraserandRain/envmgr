@@ -74,8 +74,8 @@ password = "inventory/password.yaml"
 ```
 
 AI-tools preferences are stored in an optional `[ai_tools]` table. It is the
-source of truth for which tools `ai_tools`/`all` runs manage and how Context7 is
-connected. It is written once by the first-run AI Tools Setup wizard
+source of truth for which tools `ai_tools`/`all` runs manage. It is written once
+by the first-run AI Tools Setup wizard
 (`envmgr install ai_tools` or `envmgr install all`) and re-used on later runs
 without prompting:
 
@@ -85,9 +85,6 @@ configured = true
 manage_claude_code = true
 manage_codex = true
 manage_rtk = true
-enable_context7 = true
-claude_context7_method = "remote"
-codex_context7_method = "remote"
 ```
 
 Use `envmgr config show` to inspect the saved values and
@@ -190,7 +187,7 @@ a public interface.
 
 Role-level tags install complete modules:
 
-- `ai_tools` - Claude Code, optional Codex CLI, RTK, and Context7 wiring.
+- `ai_tools` - Claude Code, optional Codex CLI, and RTK.
 - `cloud` - HashiCorp repository tooling and Terraform tasks.
 - `docker`
 - `dotnet` - default .NET version `8.0`.

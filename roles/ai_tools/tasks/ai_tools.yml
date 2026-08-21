@@ -19,11 +19,9 @@
       claude_code:
         installed: false
         version: "not installed"
-        mcp_installed: false
       codex:
         installed: false
         version: "not installed"
-        context7_installed: false
       rtk:
         installed: false
         version: "not installed"
@@ -87,16 +85,14 @@
     display_name: "{{ item.display_name }}"
     binary_name: "{{ item.binary }}"
     summary_key: "{{ item.summary_key }}"
-    extra_status_key: "{{ item.extra_key }}"
-    extra_status_default: "{{ item.extra_default }}"
   loop: >-
     {{
       ([] if not (ai_tools_manage_claude_code | default(false)) else [
-        {'display_name': 'Claude Code', 'binary': ai_tools_config.claude_code.binary, 'summary_key': 'claude_code', 'extra_key': 'mcp_installed', 'extra_default': false}
+        {'display_name': 'Claude Code', 'binary': ai_tools_config.claude_code.binary, 'summary_key': 'claude_code'}
       ])
       +
       ([] if not (ai_tools_manage_codex | default(false)) else [
-        {'display_name': 'Codex CLI', 'binary': ai_tools_config.codex.binary, 'summary_key': 'codex', 'extra_key': 'context7_installed', 'extra_default': false}
+        {'display_name': 'Codex CLI', 'binary': ai_tools_config.codex.binary, 'summary_key': 'codex'}
       ])
     }}
   loop_control:

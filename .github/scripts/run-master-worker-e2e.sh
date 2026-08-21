@@ -123,9 +123,6 @@ configured = true
 manage_claude_code = true
 manage_codex = true
 manage_rtk = true
-enable_context7 = false
-claude_context7_method = \"remote\"
-codex_context7_method = \"remote\"
 CONFIG"
 
 run_in_master "cat > ~/.envmgr/inventory/ci-cluster.yaml <<'INVENTORY'
@@ -171,7 +168,7 @@ printf 'Installing AI tools from the master across the workstation group...\n'
 run_in_master "uv run envmgr install -i ${inventory_alias} ai_tools"
 
 printf 'Verifying Node.js, Claude Code, and Codex CLI on every workstation node...\n'
-run_uv_ansible_in_master ansible -i "$inventory_file" workstation -m shell -a 'test -x "$HOME/.volta/bin/node" && test -x "$HOME/.volta/bin/claude" && test -x "$HOME/.volta/bin/codex" && "$HOME/.volta/bin/node" --version >/dev/null 2>&1 && "$HOME/.volta/bin/claude" --version >/dev/null 2>&1 && "$HOME/.volta/bin/codex" --version >/dev/null 2>&1 && test ! -e "$HOME/.local/bin/context7-codex"'
+run_uv_ansible_in_master ansible -i "$inventory_file" workstation -m shell -a 'test -x "$HOME/.volta/bin/node" && test -x "$HOME/.volta/bin/claude" && test -x "$HOME/.volta/bin/codex" && "$HOME/.volta/bin/node" --version >/dev/null 2>&1 && "$HOME/.volta/bin/claude" --version >/dev/null 2>&1 && "$HOME/.volta/bin/codex" --version >/dev/null 2>&1'
 
 printf 'Installing zsh from the master across the workstation group...\n'
 run_in_master "uv run envmgr install -i ${inventory_alias} zsh"
