@@ -15,5 +15,4 @@ current when a new concept is named or a fuzzy term is sharpened.
 - **Role tags / task tags** — the two-level tag vocabulary discovered from role
   metadata; Install validates selections against it.
 - **AI-tools choices** — the resolution of whether Claude Code, Codex CLI, and
-  RTK are installed and how Context7 is wired, from flags, defaults, or
-  interactive prompts.
+  RTK are installed, from defaults or interactive prompts.

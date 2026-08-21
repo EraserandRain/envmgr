@@ -249,6 +249,6 @@ When the user asks to ship changes, follow this automated PR workflow:
   `~/.envmgr/inventory/group_vars/all/vault.yml` and encrypt them with
   `ansible-vault`.
 - [ ] For AI tools, prefer the first-run interactive wizard or `envmgr config
-  set`, and pass `CONTEXT7_API_KEY` through the environment when needed.
+  set`.
 - [ ] Default playbooks run as the current user; set `become: true` only where a
   role/task needs privilege escalation.
