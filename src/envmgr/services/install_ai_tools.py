@@ -7,6 +7,11 @@ from rich.text import Text
 
 from ..catalog import CatalogError
 from ..runtime_config import AiToolsConfig
+from .ai_tools_catalog import (
+    AI_TOOLS,
+    AI_TOOLS_ROLE_TAG,
+    ai_tool_extra_vars,
+)
 from .console import (
     InstallConsole,
     print_labeled_value,
@@ -49,7 +54,7 @@ def build_ai_tools_install_defaults(
     execution_playbook_path: str,
 ) -> AiToolsInstallDefaults:
     """Compute default AI-tools selections for the chosen tag set."""
-    if not playbook_includes_role(execution_playbook_path, "ai_tools"):
+    if not playbook_includes_role(execution_playbook_path, AI_TOOLS_ROLE_TAG):
         return AiToolsInstallDefaults(
             applicable=False,
             manage_claude_code=False,
@@ -58,23 +63,23 @@ def build_ai_tools_install_defaults(
         )
 
     requested_tags = {tag.lower() for tag in selected_tags}
+    enabled = {
+        spec.key: any(tag in requested_tags for tag in spec.trigger_tags)
+        for spec in AI_TOOLS
+    }
     return AiToolsInstallDefaults(
         applicable=True,
-        manage_claude_code=any(
-            tag in requested_tags for tag in ("all", "ai_tools", "claude_code")
-        ),
-        manage_codex=any(tag in requested_tags for tag in ("all", "codex")),
-        manage_rtk=any(tag in requested_tags for tag in ("all", "ai_tools", "rtk")),
+        manage_claude_code=enabled["manage_claude_code"],
+        manage_codex=enabled["manage_codex"],
+        manage_rtk=enabled["manage_rtk"],
     )
 
 
 def build_ai_tools_extra_vars(options: AiToolsInstallOptions) -> dict[str, Any]:
     """Build Ansible extra vars for AI-tools install-time choices."""
-    return {
-        "ai_tools_manage_claude_code_override": options.manage_claude_code,
-        "ai_tools_manage_codex_override": options.manage_codex,
-        "ai_tools_manage_rtk_override": options.manage_rtk,
-    }
+    return ai_tool_extra_vars(
+        {spec.key: bool(getattr(options, spec.key)) for spec in AI_TOOLS}
+    )
 
 
 def _options_from_config(config: AiToolsConfig) -> AiToolsInstallOptions:
@@ -120,9 +125,11 @@ def _build_ai_tools_setup_summary(
 ) -> list[tuple[str, str | Text]]:
     """Build a short setup summary for the interactive AI tools wizard."""
     return [
-        ("Claude Code", _format_enabled_status(options.manage_claude_code)),
-        ("Codex CLI", _format_enabled_status(options.manage_codex)),
-        ("RTK", _format_enabled_status(options.manage_rtk)),
+        (
+            spec.label,
+            _format_enabled_status(bool(getattr(options, spec.key))),
+        )
+        for spec in AI_TOOLS
     ]
 
 
@@ -143,31 +150,24 @@ def _run_ai_tools_setup_wizard(
     console.print(Text("Press Ctrl+C at any time to cancel.", style="dim"))
 
     while True:
-        resolved_manage_claude_code = _prompt_bool(
-            console,
-            "Install Claude Code?",
-            default=defaults.manage_claude_code,
-        )
-        resolved_manage_codex = _prompt_bool(
-            console,
-            "Install Codex CLI?",
-            default=defaults.manage_codex,
-        )
-        resolved_manage_rtk = _prompt_bool(
-            console,
-            "Install RTK?",
-            default=defaults.manage_rtk,
-        )
+        resolved = {
+            spec.key: _prompt_bool(
+                console,
+                f"Install {spec.label}?",
+                default=bool(getattr(defaults, spec.key)),
+            )
+            for spec in AI_TOOLS
+        }
 
-        if resolved_manage_claude_code or resolved_manage_codex or resolved_manage_rtk:
+        if any(resolved.values()):
             break
 
         print_warning(console, "Select at least one tool to continue.")
 
     options = AiToolsInstallOptions(
-        manage_claude_code=resolved_manage_claude_code,
-        manage_codex=resolved_manage_codex,
-        manage_rtk=resolved_manage_rtk,
+        manage_claude_code=resolved["manage_claude_code"],
+        manage_codex=resolved["manage_codex"],
+        manage_rtk=resolved["manage_rtk"],
     )
 
     console.print()

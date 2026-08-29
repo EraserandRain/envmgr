@@ -28,7 +28,12 @@ tomllib = cast(_TomlModule, _tomllib)
 ENVMGR_HOME_ENV_VAR = "ENVMGR_HOME"
 DEFAULT_PLAYBOOK = "workstation"
 SETUP_SCHEMA_VERSION = 1
-DEFAULT_CONFIG_TEXT = """[default]
+# Bump when the shape of config.toml changes incompatibly. A missing/older
+# config_version is treated as the current version and migrated forward.
+CONFIG_SCHEMA_VERSION = 1
+DEFAULT_CONFIG_TEXT = f"""config_version = {CONFIG_SCHEMA_VERSION}
+
+[default]
 inventory = "default"
 playbook = "workstation"
 ask_vault_pass = false
@@ -157,6 +162,7 @@ class RuntimeConfig:
     default_ask_vault_pass: bool
     inventories: dict[str, Path]
     ai_tools: AiToolsConfig
+    config_version: int = CONFIG_SCHEMA_VERSION
 
 
 @dataclass(frozen=True)
@@ -337,6 +343,35 @@ def _require_mapping(value: Any, field_name: str, config_path: Path) -> dict[str
     return value
 
 
+def read_runtime_config_schema_version(
+    data: dict[str, Any],
+    config_path: Path,
+) -> int:
+    """Return the config schema version, falling back to the current version."""
+    value = data.get("config_version")
+    if value is None:
+        return CONFIG_SCHEMA_VERSION
+    if not isinstance(value, int):
+        raise ConfigError(f"{config_path} field 'config_version' must be an integer")
+    return value
+
+
+def migrate_runtime_config_data(
+    data: dict[str, Any],
+    *,
+    from_version: int,
+    config_path: Path,
+) -> dict[str, Any]:
+    """Migrate a config document from an older schema version in place."""
+    # Version 1 is the current baseline; earlier versions would run migrations
+    # here before returning the upgraded document.
+    if from_version < 1:
+        raise ConfigError(
+            f"{config_path} uses unsupported config_version {from_version}"
+        )
+    return data
+
+
 def _read_string(
     value: Any,
     field_name: str,
@@ -454,6 +489,20 @@ def load_runtime_config(
     if not isinstance(data, dict):
         raise ConfigError(f"{paths.config_file} must contain a TOML table")
 
+    config_version = read_runtime_config_schema_version(data, paths.config_file)
+    if config_version > CONFIG_SCHEMA_VERSION:
+        raise ConfigError(
+            f"{paths.config_file} uses config_version {config_version}, but this "
+            f"envmgr supports up to {CONFIG_SCHEMA_VERSION}; rerun `envmgr setup` "
+            "to refresh the runtime"
+        )
+    if config_version < CONFIG_SCHEMA_VERSION:
+        data = migrate_runtime_config_data(
+            data,
+            from_version=config_version,
+            config_path=paths.config_file,
+        )
+
     default_table = _require_mapping(
         data.get("default", {}), "default", paths.config_file
     )
@@ -509,6 +558,7 @@ def load_runtime_config(
         default_ask_vault_pass=default_ask_vault_pass,
         inventories=inventories,
         ai_tools=_read_ai_tools_config(data, paths.config_file),
+        config_version=config_version,
     )
 
 

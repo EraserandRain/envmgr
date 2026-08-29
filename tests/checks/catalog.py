@@ -12,6 +12,7 @@ from envmgr.catalog import (
     load_playbook_tags,
     load_role_catalog,
 )
+from envmgr.services.ai_tools_catalog import validate_ai_tools_registry_task_tags
 from envmgr.services.assets import resolve_runtime_assets
 from envmgr.services.install import (
     build_execution_playbook,
@@ -19,6 +20,18 @@ from envmgr.services.install import (
     read_playbook_role_tags,
     resolve_install_playbook,
 )
+
+
+def check_ai_tools_registry_matches_catalog() -> None:
+    """Require every AI tool tag declared by the registry to surface in roles."""
+    repo_root = Path(__file__).resolve().parents[2]
+    _role_tags, task_tags = get_available_tags(repo_root / "roles")
+    missing = validate_ai_tools_registry_task_tags(task_tags)
+    if missing:
+        raise AssertionError(
+            "expected AI-tool registry task tags to be declared by role metadata: "
+            + ", ".join(missing)
+        )
 
 
 def check_playbook_resolution() -> None:

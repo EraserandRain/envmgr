@@ -5,6 +5,58 @@ the README short for users, put detailed runtime/development/release material
 under `docs/`, and use these checklists to avoid drifting CLI, Ansible, docs,
 and release contracts.
 
+## Architecture Principles
+
+These guardrails keep envmgr's runtime, CLI, and data layers from drifting apart.
+Before adding a new CLI option, command, `--json` field, role metadata field, or
+persisted state, classify it against the rules below, then implement it together
+with the matching docs and contract test.
+
+### State/data is separated from execution
+
+- `InstallPlan` and `DoctorReport` are pure data. Building a plan or a report
+  never mutates `~/.envmgr/` and never launches Ansible. Running it is a
+  separate, thin layer that consumes the plan and returns an exit code.
+- `commands/` is a presentation boundary: it marshals CLI args into a service
+  call, renders the result through Rich, and emits `--json` payloads verbatim.
+  Business logic lives in `services/`.
+
+### Machine output is a versioned contract
+
+- Every `--json` payload carries `schema_version`. Adding or renaming a field is
+  a contract change and must update the JSON payload, `docs/runtime.md`, and the
+  matching `tests/checks/*` contract test together.
+- Rich rendering is only a view over the same data; it never redefines the
+  machine contract.
+
+### Role metadata is the single source of truth
+
+- `roles/<role>/meta/envmgr.yml` drives tag discovery, dependency closure,
+  generated playbooks, and `envmgr install -l`. Do not hard-code role metadata
+  in Python. An inconsistency between metadata, docs, and CLI output is a bug,
+  not a fallback.
+
+### Runtime state lives under `ENVMGR_HOME` / `~/.envmgr/`
+
+- Runtime config, inventories, logs, and installer state are user-local and may
+  be changed by the user. Never treat repo-local files as mutable runtime state.
+- Persisted state is versioned. Bump the schema version and run the migration
+  before changing the shape of `config.toml` or `install.toml`.
+
+### Detection / classification is decoupled and evidence-based
+
+- Tag and role resolution reads role metadata; it never guesses from screen
+  output.
+- When adding an AI-tool integration, drive it from the shared tool registry
+  rather than scattered per-role conditionals.
+
+### Multiplicative loops stay narrow
+
+- Doctor and catalog scans are `O(roles)` or `O(checks)`, not `O(roles × roles)`.
+  Before widening a loop over roles, tags, or checks, keep the work proportional
+  to one pass and add a deterministic behavioral test rather than a wall-clock
+  timeout.
+
 ## Project Map Checklist
 
 - [ ] `playbooks/` contains built-in scenario playbooks: `workstation.yml` and

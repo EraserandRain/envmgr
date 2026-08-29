@@ -16,6 +16,7 @@ from envmgr.command_text import SETUP_COMMAND
 from envmgr.commands.setup import run_setup
 from envmgr.main import require_setup_completed
 from envmgr.runtime_config import (
+    CONFIG_SCHEMA_VERSION,
     SETUP_SCHEMA_VERSION,
     AiToolsConfig,
     ConfigError,
@@ -51,6 +52,59 @@ def check_runtime_config_bootstrap() -> None:
 
         if not config.paths.config_file.exists():
             raise AssertionError("expected bootstrap config.toml to exist")
+
+        if config.config_version != CONFIG_SCHEMA_VERSION:
+            raise AssertionError(
+                "expected bootstrap config to carry the current schema version"
+            )
+
+        config_text = config.paths.config_file.read_text(encoding="utf-8")
+        if f"config_version = {CONFIG_SCHEMA_VERSION}" not in config_text:
+            raise AssertionError(
+                "expected bootstrap config.toml to persist config_version"
+            )
+
+
+def check_missing_config_version_treated_as_current() -> None:
+    with tempfile.TemporaryDirectory() as temp_dir:
+        envmgr_home = Path(temp_dir) / ".envmgr"
+        runtime_paths = ensure_runtime_layout(envmgr_home)
+        runtime_paths.config_file.write_text(
+            """[default]
+inventory = "default"
+
+[inventory]
+default = "inventory/default.yaml"
+""".lstrip(),
+            encoding="utf-8",
+        )
+
+        config = load_runtime_config(envmgr_home)
+        if config.config_version != CONFIG_SCHEMA_VERSION:
+            raise AssertionError(
+                "expected a config without config_version to load as current version"
+            )
+
+
+def check_newer_config_version_is_rejected() -> None:
+    with tempfile.TemporaryDirectory() as temp_dir:
+        envmgr_home = Path(temp_dir) / ".envmgr"
+        runtime_paths = ensure_runtime_layout(envmgr_home)
+        runtime_paths.config_file.write_text(
+            f"config_version = {CONFIG_SCHEMA_VERSION + 1}\n",
+            encoding="utf-8",
+        )
+
+        try:
+            load_runtime_config(envmgr_home)
+        except ConfigError as error:
+            if "supports up to" not in str(error):
+                raise AssertionError(
+                    "expected a too-new config_version to point at envmgr setup"
+                ) from error
+            return
+
+        raise AssertionError("expected a too-new config_version to raise ConfigError")
 
 
 def check_setup_marker_is_written_after_setup() -> None:

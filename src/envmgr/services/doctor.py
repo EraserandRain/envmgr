@@ -22,6 +22,7 @@ DOCTOR_COMMANDS = ("ansible", "ansible-playbook", "ansible-galaxy")
 DOCTOR_OK = "ok"
 DOCTOR_WARN = "warn"
 DOCTOR_FAIL = "fail"
+DOCTOR_REPORT_SCHEMA_VERSION = 1
 REQUIRED_RUNTIME_DIRECTORIES = (
     "inventory_dir",
     "group_vars_all_dir",
@@ -239,6 +240,7 @@ def build_doctor_json_payload(
         resolved_configured_home = str(Path(configured_home).expanduser().resolve())
 
     return {
+        "schema_version": DOCTOR_REPORT_SCHEMA_VERSION,
         "status": get_doctor_overall_status(report),
         "summary": {
             "ok": ok_count,

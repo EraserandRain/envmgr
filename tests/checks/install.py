@@ -39,6 +39,7 @@ from envmgr.services.install_ai_tools import (
     WizardCancelled,
     resolve_ai_tools_choices,
 )
+from envmgr.services.install_command import INSTALL_PLAN_SCHEMA_VERSION
 
 CLI_RUNNER = CliRunner()
 
@@ -827,6 +828,8 @@ def check_install_dry_run_json_outputs_machine_readable_plan() -> None:
             raise AssertionError("expected JSON dry-run to clean temporary playbooks")
 
         plan = json.loads(result.output)
+        if plan["schema_version"] != INSTALL_PLAN_SCHEMA_VERSION:
+            raise AssertionError("expected JSON dry-run to carry a schema version")
         expected_command_prefix = [
             "ansible-playbook",
             "-i",
@@ -911,6 +914,8 @@ def check_install_dry_run_json_reports_inapplicable_ai_tools() -> None:
             raise AssertionError("expected JSON dry-run to avoid Rich stdout output")
 
         plan = json.loads(result.output)
+        if plan["schema_version"] != INSTALL_PLAN_SCHEMA_VERSION:
+            raise AssertionError("expected JSON dry-run to carry a schema version")
         if plan["selected_tags"] != ["zsh"]:
             raise AssertionError("expected JSON dry-run stdout to remain parseable")
         if plan["ai_tools"] != {"applicable": False}:

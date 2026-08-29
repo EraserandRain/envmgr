@@ -3,6 +3,7 @@ from __future__ import annotations
 import unittest
 
 from tests.checks.catalog import (
+    check_ai_tools_registry_matches_catalog,
     check_builtin_playbooks_match_enabled_role_metadata,
     check_catalog_defaults_resolve_outside_repo_cwd,
     check_github_cli_task_tag_catalog_and_execution_playbook,
@@ -11,6 +12,10 @@ from tests.checks.catalog import (
 from tests.support import Check, build_check_suite, build_check_test_case
 
 CATALOG_TEST_CHECKS: tuple[Check, ...] = (
+    (
+        "ai tools registry matches role metadata catalog",
+        check_ai_tools_registry_matches_catalog,
+    ),
     ("playbook resolution", check_playbook_resolution),
     (
         "catalog defaults resolve outside the repo cwd",

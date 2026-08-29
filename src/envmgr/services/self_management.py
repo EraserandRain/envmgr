@@ -37,6 +37,7 @@ HELPER_SHIMS = (
     "validate",
     "smoke-test",
 )
+INSTALL_STATE_SCHEMA_VERSION = 1
 SUPPORTED_INSTALL_GUIDANCE = (
     "envmgr self-management only supports install.sh-managed GitHub Release "
     "installs. Reinstall with the GitHub Release installer, or use the package "
@@ -62,6 +63,7 @@ class InstallState:
     uv_tool_bin_dir: Path
     installed_at: str | None = None
     updated_at: str | None = None
+    schema_version: int = INSTALL_STATE_SCHEMA_VERSION
 
 
 @dataclass(frozen=True)
@@ -106,6 +108,19 @@ def load_installer_state(envmgr_home: str | Path | None = None) -> InstallState:
         )
 
     install = cast(Mapping[str, Any], install_section)
+    schema_version = _read_optional_int(
+        install,
+        "schema_version",
+        state_file,
+        default=INSTALL_STATE_SCHEMA_VERSION,
+    )
+    if schema_version > INSTALL_STATE_SCHEMA_VERSION:
+        raise SelfManagementError(
+            f"Installer state at {state_file} uses schema_version "
+            f"{schema_version}, but this envmgr supports up to "
+            f"{INSTALL_STATE_SCHEMA_VERSION}. Reinstall envmgr to refresh the state. "
+            f"{SUPPORTED_INSTALL_GUIDANCE}"
+        )
     source = _required_string(install, "source", state_file)
     manager = _required_string(install, "manager", state_file)
     if source != "github-release" or manager != "install.sh":
@@ -125,6 +140,7 @@ def load_installer_state(envmgr_home: str | Path | None = None) -> InstallState:
         wheel_url=_required_string(install, "wheel_url", state_file),
         installed_at=_optional_string(install, "installed_at"),
         updated_at=_optional_string(install, "updated_at"),
+        schema_version=schema_version,
         uv=Path(_required_string(install, "uv", state_file)).expanduser(),
         uv_tool_bin_dir=Path(
             _required_string(install, "uv_tool_bin_dir", state_file)
@@ -273,6 +289,7 @@ def write_install_state(state: InstallState) -> None:
     """Rewrite install.toml using the installer-compatible schema."""
     lines = [
         "[install]",
+        f"schema_version = {state.schema_version}",
         f'source = "{_toml_escape(state.source)}"',
         f'manager = "{_toml_escape(state.manager)}"',
         f'owner = "{_toml_escape(state.owner)}"',
@@ -318,6 +335,23 @@ def _required_string(
 def _optional_string(install: Mapping[str, Any], key: str) -> str | None:
     value = install.get(key)
     return value if isinstance(value, str) and value.strip() else None
+
+
+def _read_optional_int(
+    install: Mapping[str, Any],
+    key: str,
+    state_file: Path,
+    *,
+    default: int,
+) -> int:
+    value = install.get(key)
+    if value is None:
+        return default
+    if not isinstance(value, int):
+        raise SelfManagementError(
+            f"Installer state at {state_file} field install.{key} must be an integer"
+        )
+    return value
 
 
 def _build_target_state(state: InstallState, requested_version: str) -> InstallState:
