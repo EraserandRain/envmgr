@@ -15,10 +15,12 @@ from envmgr.services.doctor import (
     DOCTOR_COMMANDS,
     DOCTOR_FAIL,
     DOCTOR_OK,
+    DOCTOR_REPORT_SCHEMA_VERSION,
     DOCTOR_WARN,
     build_doctor_report,
 )
 from envmgr.services.runtime import (
+    RUNTIME_HISTORY_PAYLOAD_SCHEMA_VERSION,
     RUNTIME_RUN_RECORD_SCHEMA_VERSION,
     write_runtime_run_record,
 )
@@ -221,6 +223,8 @@ def check_history_json_output() -> None:
             )
 
         payload = json.loads(result.output)
+        if payload["schema_version"] != RUNTIME_HISTORY_PAYLOAD_SCHEMA_VERSION:
+            raise AssertionError("expected history JSON to carry a schema version")
         if payload["count"] != 1 or payload["total"] != 1:
             raise AssertionError("expected history --json to report record counts")
         if payload["runtime"]["home"] != str(runtime_paths.home):
@@ -522,6 +526,8 @@ def check_doctor_json_output() -> None:
             )
 
         payload = json.loads(result.output)
+        if payload["schema_version"] != DOCTOR_REPORT_SCHEMA_VERSION:
+            raise AssertionError("expected doctor JSON to carry a schema version")
         if payload["status"] != DOCTOR_OK:
             raise AssertionError("expected doctor --json to report ok status")
         if payload["runtime"]["home"] != str(envmgr_home.resolve()):

@@ -6,7 +6,9 @@ from tests.checks.runtime import (
     check_ai_tools_config_round_trip_preserves_other_tables,
     check_invalid_toml_surfaces_config_error,
     check_inventory_aliases_stay_under_runtime_inventory_dir,
+    check_missing_config_version_treated_as_current,
     check_missing_runtime_inventory_file_is_recreated,
+    check_newer_config_version_is_rejected,
     check_outdated_setup_stamp_requires_setup,
     check_runtime_config_bootstrap,
     check_setup_marker_is_written_after_setup,
@@ -36,6 +38,14 @@ RUNTIME_CONFIG_TEST_CHECKS: tuple[Check, ...] = (
         check_inventory_aliases_stay_under_runtime_inventory_dir,
     ),
     ("invalid TOML surfaces config error", check_invalid_toml_surfaces_config_error),
+    (
+        "missing config_version is treated as current",
+        check_missing_config_version_treated_as_current,
+    ),
+    (
+        "newer config_version is rejected",
+        check_newer_config_version_is_rejected,
+    ),
     (
         "missing runtime inventory file is recreated",
         check_missing_runtime_inventory_file_is_recreated,

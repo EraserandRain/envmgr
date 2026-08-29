@@ -2,14 +2,16 @@ from __future__ import annotations
 
 import json
 import os
-from pathlib import Path
 from typing import Any
 
 from rich.table import Table
 from rich.text import Text
 
 from ..runtime_config import get_runtime_paths
-from ..services.runtime import load_runtime_run_history
+from ..services.runtime import (
+    build_runtime_history_json_payload,
+    load_runtime_run_history,
+)
 from .doctor import abbreviate_home_in_text
 from .shared import (
     console,
@@ -81,28 +83,20 @@ def run_history(*, limit: int, json_output: bool) -> None:
     paths = get_runtime_paths()
     configured_home = os.environ.get("ENVMGR_HOME")
     records = load_runtime_run_history(paths)
-    selected_records = records[:limit]
 
     if json_output:
-        payload = {
-            "runtime": {
-                "home": str(paths.home),
-                "configured_home": (
-                    str(Path(configured_home).expanduser().resolve())
-                    if configured_home
-                    else None
-                ),
-                "runs_log_dir": str(paths.runs_log_dir),
-            },
-            "count": len(selected_records),
-            "total": len(records),
-            "records": selected_records,
-        }
+        payload = build_runtime_history_json_payload(
+            paths=paths,
+            records=records,
+            limit=limit,
+            configured_home=configured_home,
+        )
         print(json.dumps(payload, indent=2))
         return
 
     runtime_home_value = abbreviate_home_in_text(str(paths.home))
     runtime_home_suffix = " (from ENVMGR_HOME)" if configured_home else " (default)"
+    selected_records = records[:limit]
 
     print_command_heading("Envmgr History")
     print_summary_line("Runtime home", runtime_home_value + runtime_home_suffix)

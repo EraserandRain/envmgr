@@ -150,7 +150,8 @@ Use `envmgr install --dry-run --json <tag ...>` for plain machine-readable JSON.
 The JSON report includes selected tags, source and execution playbook paths,
 whether the execution playbook was temporary, inventory label and path,
 effective `ask_vault_pass`, AI tools options and extra-vars when applicable,
-and `command_argv`.
+and `command_argv`. Every JSON report carries `schema_version` so consumers can
+detect and migrate contract changes.
 
 ## Doctor And History
 
@@ -164,7 +165,8 @@ non-executable `uv`, doctor reports a self-management warning and still exits
 Use `envmgr doctor --json` for machine-readable reports. Use `envmgr history`
 for recent runtime subprocess records, `envmgr history --limit 5` or
 `envmgr history -n 5` for a shorter window, and `envmgr history --json` for
-plain JSON output.
+plain JSON output. Both JSON payloads are versioned with `schema_version` so
+consumers can detect and migrate contract changes.
 
 ## CLI UX Contracts
 

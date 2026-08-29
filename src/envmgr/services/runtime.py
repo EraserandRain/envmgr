@@ -24,6 +24,7 @@ from ..runtime_config import (
 from .assets import RuntimeAssets, resolve_runtime_assets
 
 RUNTIME_RUN_RECORD_SCHEMA_VERSION = 1
+RUNTIME_HISTORY_PAYLOAD_SCHEMA_VERSION = 1
 _STDERR_CONSOLE = Console(stderr=True)
 
 
@@ -420,3 +421,29 @@ def load_runtime_run_history(paths: RuntimePaths) -> list[dict[str, Any]]:
         payload["record_path"] = str(record_path)
         records.append(payload)
     return records
+
+
+def build_runtime_history_json_payload(
+    *,
+    paths: RuntimePaths,
+    records: list[dict[str, Any]],
+    limit: int,
+    configured_home: str | None,
+) -> dict[str, Any]:
+    """Build a versioned machine-readable payload for `envmgr history --json`."""
+    selected_records = records[:limit]
+    return {
+        "schema_version": RUNTIME_HISTORY_PAYLOAD_SCHEMA_VERSION,
+        "runtime": {
+            "home": str(paths.home),
+            "configured_home": (
+                str(Path(configured_home).expanduser().resolve())
+                if configured_home
+                else None
+            ),
+            "runs_log_dir": str(paths.runs_log_dir),
+        },
+        "count": len(selected_records),
+        "total": len(records),
+        "records": selected_records,
+    }

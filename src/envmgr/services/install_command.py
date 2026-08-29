@@ -28,6 +28,8 @@ from .install_tags import (
     validate_selected_tags,
 )
 
+INSTALL_PLAN_SCHEMA_VERSION = 1
+
 
 @dataclass(frozen=True)
 class InstallPlan:

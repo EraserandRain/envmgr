@@ -10,6 +10,7 @@ from ..runtime_config import (
     load_runtime_config,
     save_ai_tools_config,
 )
+from ..services.ai_tools_catalog import AI_TOOLS
 from .shared import console, exit_with_error
 
 config_app = typer.Typer(
@@ -69,12 +70,14 @@ def _render_ai_tools_status(config: AiToolsConfig) -> list[tuple[str, str]]:
     def enabled_status(enabled: bool) -> str:
         return "enabled" if enabled else "disabled"
 
-    return [
+    rows: list[tuple[str, str]] = [
         ("Configured", "yes" if config.configured else "no"),
-        ("Claude Code", enabled_status(config.manage_claude_code)),
-        ("Codex CLI", enabled_status(config.manage_codex)),
-        ("RTK", enabled_status(config.manage_rtk)),
     ]
+    rows.extend(
+        (spec.label, enabled_status(bool(getattr(config, spec.key))))
+        for spec in AI_TOOLS
+    )
+    return rows
 
 
 @config_app.command("show", context_settings={"help_option_names": ["--help", "-h"]})
