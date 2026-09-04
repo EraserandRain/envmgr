@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sys
 import threading
 import urllib.error
@@ -154,10 +155,13 @@ def _newer(latest_tag: str, current: str) -> bool:
     """Semver-aware comparison: *True* when *latest_tag* > *current*."""
 
     def _parts(version: str) -> list[int]:
-        try:
-            return [int(p) for p in version.lstrip("v").split(".")]
-        except (ValueError, AttributeError):
+        # Take the leading dotted-numeric segment so PEP 440 local/pre-release
+        # suffixes such as ``.dev5`` or ``+g<hash>`` (produced by VCS-versioned
+        # builds) do not break the comparison.
+        match = re.match(r"v?([0-9]+(?:\.[0-9]+)*)", version.strip())
+        if match is None:
             return []
+        return [int(p) for p in match.group(1).split(".")]
 
     latest_parts = _parts(latest_tag)
     current_parts = _parts(current)

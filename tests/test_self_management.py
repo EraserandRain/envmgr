@@ -14,6 +14,7 @@ from tests.checks.self_management import (
     check_self_update_resolves_latest_release_from_github,
     check_self_update_uses_fake_uv_and_rewrites_installer_state,
     check_update_cache_read_write_and_freshness,
+    check_update_newer_handles_vcs_suffixes,
     check_update_newer_recognises_newer_version,
     check_update_newer_rejects_same_or_older,
     check_update_render_notice_includes_expected_content,
@@ -77,6 +78,10 @@ SELF_MANAGEMENT_TEST_CHECKS: tuple[Check, ...] = (
     (
         "update check newer rejects same or older version",
         check_update_newer_rejects_same_or_older,
+    ),
+    (
+        "update check newer handles VCS local/pre-release suffixes",
+        check_update_newer_handles_vcs_suffixes,
     ),
     (
         "update check cache read write and freshness",

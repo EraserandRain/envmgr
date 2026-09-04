@@ -248,17 +248,19 @@ with the matching docs and contract test.
 When the user asks to ship changes, follow this automated PR workflow:
 
 1. **Push**: The user handles `git push` themselves.
-2. **Create PR**: `gh pr create --base master --head dev`, title = commit
-   message (single-commit PRs), no body. Base branch `master` is
-   protected — direct pushes are rejected.
+2. **Create PR**: `gh pr create --base master --head dev`, no body. A release
+   PR may carry multiple Conventional Commits; the title should describe the
+   release scope. Base branch `master` is protected — direct pushes are
+   rejected.
 3. **Wait for CI**: poll `gh pr view <N> --json statusCheckRollup` until all
    jobs report `SUCCESS`. The required jobs are: Validate, Smoke Tests,
    Package Surface, Init Install (ubuntu-22.04, ubuntu-24.04),
    Master/Worker E2E.
-4. **Merge**: `gh pr merge <N> --rebase` (rebase, never squash or merge
-   commit). This triggers `auto-tag.yml` which runs git-cliff to compute the
-   next semver tag, then `release.yml` which builds and publishes the
-   GitHub Release.
+4. **Merge**: `gh pr merge <N> --rebase` (rebase keeps each commit message so
+   git-cliff lists every change in the batch; never squash or merge commit).
+   This triggers `auto-tag.yml` which runs git-cliff to compute the next
+   semver tag from the commits since the last tag, then `release.yml` which
+   builds and publishes the GitHub Release.
 5. **Verify**: check `gh run list` for a successful `Auto Tag` run and
    confirm `vX.Y.Z` appears in `git ls-remote --tags origin`.
 

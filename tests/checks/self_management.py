@@ -670,6 +670,22 @@ def check_update_newer_rejects_same_or_older() -> None:
         raise AssertionError("expected non-version to not be newer")
 
 
+def check_update_newer_handles_vcs_suffixes() -> None:
+    from envmgr.services.update_check import _newer
+
+    # A VCS-derived current build that carries a PEP 440 local/pre-release
+    # suffix at the same release must not be treated as newer than the tag.
+    if _newer("v0.1.0", "0.1.0.dev5+g<hash>"):
+        raise AssertionError("expected v0.1.0 == 0.1.0.dev5+g<hash>")
+    if _newer("v0.1.0", "0.1.0+g<hash>"):
+        raise AssertionError("expected v0.1.0 == 0.1.0+g<hash>")
+    if _newer("v0.1.0", "0.1.0.dev5"):
+        raise AssertionError("expected v0.1.0 == 0.1.0.dev5")
+    # A genuinely newer tag must still win even against a dev-suffixed build.
+    if not _newer("v0.2.0", "0.1.0.dev5+g<hash>"):
+        raise AssertionError("expected v0.2.0 > 0.1.0.dev5+g<hash>")
+
+
 def check_update_cache_read_write_and_freshness() -> None:
     from envmgr.services.update_check import (
         _cache_fresh,
