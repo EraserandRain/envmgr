@@ -81,6 +81,8 @@ with the matching docs and contract test.
 - [ ] `scaffolds/role/` contains templates used by `uv run create <role>`.
 - [ ] `.github/` contains CI, release automation, and the Docker Compose
   master/worker e2e harness.
+- [ ] `.codex/skills/` contains project-level Codex skills; `release` drives the
+  automated `dev`→`master` PR release flow.
 - [ ] Runtime state stays user-local under `ENVMGR_HOME` or `~/.envmgr/`; do
   not treat repository-local files as mutable runtime state.
 
