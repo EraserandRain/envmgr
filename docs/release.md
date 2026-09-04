@@ -9,6 +9,9 @@ writing release notes.
 Before publishing a release tag:
 
 - Confirm the versioned commit is final and the tag will be immutable.
+- Confirm the tag matches `vX.Y.Z`; the package version is derived from that
+  tag at build time by hatch-vcs (`[tool.hatch.version] source = "vcs"`), so
+  the wheel/sdist version always matches the tag.
 - Run `uv sync --locked`.
 - Run `envmgr setup` or `uv run envmgr setup` from the checkout fallback.
 - Run `uv run validate`.
@@ -42,6 +45,55 @@ Release artifacts should include only:
 Never publish an `envmgr-dev-helpers` artifact. Installed wheels must not expose
 checkout-only helper shims such as `create`, `lint`, `ansible-check`,
 `typecheck`, `validate`, or `smoke-test`.
+
+## Developer Release Flow
+
+One release is one PR from `dev` to `master`; that PR may carry multiple
+Conventional Commits. Release timing is manual: merge a `dev`→`master` PR only
+when you want to publish a version.
+
+```bash
+# 0) optional local pre-flight
+uv sync --locked
+uv run validate
+uv run smoke-test
+
+# 1) commit on dev (multiple commits are fine)
+git checkout dev
+git add -A
+git commit -m "feat: ..."
+
+# 2) push, then open one PR for this batch
+git push origin dev
+gh pr create --base master --head dev --title "feat: <release scope>" --body ""
+
+# 3) wait for CI
+gh pr view <PR> --json statusCheckRollup     # or: gh pr checks <PR> --watch
+
+# 4) merge (triggers the release)
+gh pr merge <PR> --rebase
+
+# 5) verify Auto Tag + Release
+gh run list --workflow auto-tag.yml
+gh run list --workflow release.yml
+git ls-remote --tags origin | grep v
+gh release view v0.3.0
+
+# 6) sync dev back to master
+git fetch origin && git checkout master && git pull
+git branch -f dev master && git checkout dev
+```
+
+Notes:
+
+- `master` is the release boundary: merge `dev`→`master` only to publish a
+  version. Regular development stays on `dev` (or feature branches).
+- The release version is computed by git-cliff from the Conventional Commits
+  since the last tag (`feat` → minor, `fix` → patch, `feat!` → major). A batch
+  that only contains `docs`/`chore` produces no tag; add a `feat`/`fix` or a
+  `chore(release)` marker to force a release.
+- The package version is derived from the tag at build time by hatch-vcs, so no
+  manual version bump is needed.
 
 ## Installer Audit
 
