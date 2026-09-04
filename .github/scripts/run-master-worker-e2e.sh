@@ -71,7 +71,6 @@ dc up -d --build
 
 printf 'Copying repository into the master container...\n'
 tar \
-  --exclude=.git \
   --exclude=.codex \
   --exclude=.mypy_cache \
   --exclude=.pytest_cache \
