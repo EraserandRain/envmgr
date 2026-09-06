@@ -223,3 +223,22 @@ jobs:
 
       - name: Run master-to-workers multi-node e2e
         run: .github/scripts/run-master-worker-e2e.sh
+
+  release_readiness:
+    name: Release Readiness
+    if: github.event_name == 'pull_request' && github.base_ref == 'master'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Install git-cliff
+        uses: taiki-e/install-action@v2
+        with:
+          tool: git-cliff
+
+      - name: Check merge would produce a release tag
+        run: .github/scripts/check-release-readiness.sh

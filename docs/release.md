@@ -21,6 +21,7 @@ Before publishing a release tag:
 - Verify installed wheels expose only the public `envmgr` runtime command.
 - Verify checkout-only helpers are not exposed by installed wheels.
 - Generate and verify SHA256 checksums for all release assets.
+- Verify GitHub Artifact Attestations for all release assets.
 - Smoke-test an isolated wheel install with `uv tool install`.
 
 ## Release Workflow
@@ -34,6 +35,14 @@ install smoke testing, changelog generation via
 workflow prepends fixed install, SHA256 verification, upgrade, uninstall, and
 clean-reinstall guidance; git-cliff appends the changelog from Conventional
 Commits history.
+
+The workflow attaches GitHub Artifact Attestations to the release artifacts
+with `actions/attest-build-provenance`, so users can verify that artifacts were
+built from the tagged commit by trusted CI:
+
+```bash
+gh attestation verify <file-path> --repo EraserandRain/envmgr
+```
 
 Release artifacts should include only:
 
@@ -69,6 +78,9 @@ gh pr create --base master --head dev --title "feat: <release scope>" --body ""
 
 # 3) wait for CI
 gh pr view <PR> --json statusCheckRollup     # or: gh pr checks <PR> --watch
+
+# Release Readiness runs on dev→master PRs and fails when the batch would not
+# produce a tag; add it to branch protection as a required check to enforce it.
 
 # 4) merge (triggers the release)
 gh pr merge <PR> --rebase
@@ -111,6 +123,10 @@ curl -fsSLO "${base}/install.sh"
 curl -fsSLO "${base}/SHA256SUMS"
 
 sha256sum -c SHA256SUMS
+
+# Verify provenance (optional but recommended)
+gh attestation verify "${base}/envmgr-${version}-py3-none-any.whl" --repo EraserandRain/envmgr
+
 less install.sh
 bash install.sh --dry-run --version "${version}"
 ```

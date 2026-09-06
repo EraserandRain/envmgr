@@ -7,6 +7,8 @@ on:
 
 permissions:
   contents: write
+  id-token: write
+  attestations: write
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -141,6 +143,12 @@ jobs:
           cd dist
           sha256sum envmgr-*.whl envmgr-*.tar.gz install.sh > SHA256SUMS
           cat SHA256SUMS
+
+      - name: Attest release artifacts
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: dist/*
+          show-summary: true
 
       - name: Smoke-test isolated wheel install
         run: |
