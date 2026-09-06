@@ -12,8 +12,6 @@ import os
 import re
 import sys
 import threading
-import urllib.error
-import urllib.request
 from datetime import datetime, timedelta, timezone
 from importlib import metadata
 from pathlib import Path
@@ -22,12 +20,11 @@ from rich.console import Console
 from rich.style import Style
 from rich.text import Text
 
-from .github import github_api_headers
+from .github import GitHubAPIError, latest_release_tag
 
 _CHECK_INTERVAL = timedelta(hours=24)
 _DEFAULT_OWNER = "EraserandRain"
 _DEFAULT_REPO = "envmgr"
-_GITHUB_LATEST = "https://api.github.com/repos/{owner}/{repo}/releases/latest"
 _CACHE_FILENAME = "update-check.json"
 _SELF_SKIP_COMMANDS = frozenset({"update", "uninstall"})
 
@@ -121,26 +118,10 @@ def _write_cache(cache_path: Path, latest_version: str) -> None:
 
 def _fetch_latest_tag() -> str | None:
     """Return the latest GitHub Release tag name, or *None* on any error."""
-    url = _GITHUB_LATEST.format(owner=_DEFAULT_OWNER, repo=_DEFAULT_REPO)
-    request = urllib.request.Request(
-        url,
-        headers=github_api_headers(),
-    )
     try:
-        with urllib.request.urlopen(request, timeout=3) as response:  # noqa: S310
-            body = response.read().decode("utf-8")
-    except (urllib.error.HTTPError, urllib.error.URLError, OSError):
+        return latest_release_tag(_DEFAULT_OWNER, _DEFAULT_REPO, timeout=3)
+    except GitHubAPIError:
         return None
-
-    try:
-        data = json.loads(body)
-    except json.JSONDecodeError:
-        return None
-
-    tag: str | None = data.get("tag_name") if isinstance(data, dict) else None
-    if isinstance(tag, str) and tag.strip():
-        return tag.strip()
-    return None
 
 
 def _cache_fresh(cache_path: Path) -> bool:

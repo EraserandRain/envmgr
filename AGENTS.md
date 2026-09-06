@@ -36,6 +36,15 @@ with the matching docs and contract test.
   in Python. An inconsistency between metadata, docs, and CLI output is a bug,
   not a fallback.
 
+### Concept ownership is declared and enforced
+
+- A domain or technical concept is owned by exactly one module. Before
+  implementing, search for the domain term, URL, or schema constant; if a module
+  already owns it, deepen that module instead of re-implementing it. New concepts
+  are registered in `tests/checks/single_source_of_truth.yml` and guarded by
+  `tests/checks/single_source_of_truth.py`, so a second implementation fails a
+  contract check instead of silently duplicating logic.
+
 ### Runtime state lives under `ENVMGR_HOME` / `~/.envmgr/`
 
 - Runtime config, inventories, logs, and installer state are user-local and may
@@ -305,6 +314,9 @@ When the user asks to ship changes, follow this automated PR workflow:
   `fix(role): ...`, or `chore(deps): ...`.
 - [ ] Keep diffs focused. PRs include purpose, affected roles/tags,
   user-facing command examples, and relevant logs or screenshots.
+- [ ] Confirm the diff does not introduce a second implementation of a concept
+  that already has an owning module (see `tests/checks/single_source_of_truth.yml`);
+  deepen the existing owner instead of forking it.
 - [ ] Link issues when applicable and pass relevant lint, type, validation,
   smoke, or release-surface checks before review.
 - [ ] Do not commit secrets. Store sensitive runtime values under
