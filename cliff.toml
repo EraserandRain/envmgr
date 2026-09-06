@@ -90,8 +90,11 @@ group = "Revert"
 # Align version bumping with the documented release contract: only features,
 # fixes, and breaking changes advance the version. docs/chore/refactor/perf/
 # test/style/ci/revert commits stay in the changelog but never bump it.
+# While the project is on the 0.x line, breaking changes bump minor (0.4.0 ->
+# 0.5.0) rather than jumping straight to 1.0.0, so a major only happens once
+# this is flipped back to true (or the version is already at 1.x).
 features_always_bump_minor = true
-breaking_always_bump_major = true
+breaking_always_bump_major = false
 no_increment_regex = "chore|ci|docs|test|refactor|perf|style|revert"
 
 [remote.github]
