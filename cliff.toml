@@ -86,6 +86,14 @@ group = "CI"
 message = "^revert"
 group = "Revert"
 
+[bump]
+# Align version bumping with the documented release contract: only features,
+# fixes, and breaking changes advance the version. docs/chore/refactor/perf/
+# test/style/ci/revert commits stay in the changelog but never bump it.
+features_always_bump_minor = true
+breaking_always_bump_major = true
+no_increment_regex = "chore|ci|docs|test|refactor|perf|style|revert"
+
 [remote.github]
 owner = "EraserandRain"
 repo = "envmgr"
