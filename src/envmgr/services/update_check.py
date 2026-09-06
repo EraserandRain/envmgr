@@ -22,6 +22,8 @@ from rich.console import Console
 from rich.style import Style
 from rich.text import Text
 
+from .github import github_api_headers
+
 _CHECK_INTERVAL = timedelta(hours=24)
 _DEFAULT_OWNER = "EraserandRain"
 _DEFAULT_REPO = "envmgr"
@@ -122,10 +124,7 @@ def _fetch_latest_tag() -> str | None:
     url = _GITHUB_LATEST.format(owner=_DEFAULT_OWNER, repo=_DEFAULT_REPO)
     request = urllib.request.Request(
         url,
-        headers={
-            "Accept": "application/vnd.github+json",
-            "X-GitHub-Api-Version": "2022-11-28",
-        },
+        headers=github_api_headers(),
     )
     try:
         with urllib.request.urlopen(request, timeout=3) as response:  # noqa: S310

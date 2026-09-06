@@ -181,6 +181,10 @@ consumers can detect and migrate contract changes.
   shell-friendly exit codes such as `0`, `1`, `2`, and `130`.
 - Installed artifacts expose only `envmgr`; checkout-only helpers run through
   `uv run ...` from the repository.
+- Installer-managed `self update` and the background update check resolve the
+  latest GitHub Release through the GitHub API; setting `GITHUB_TOKEN` sends it
+  as a Bearer token so these requests use an authenticated rate limit instead
+  of the anonymous limit.
 
 Direct `ansible-playbook` or `ansible-galaxy` usage from the repository is not
 a public interface.

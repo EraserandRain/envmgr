@@ -69,7 +69,9 @@ envmgr self uninstall --yes
 `envmgr self update` resolves the latest GitHub Release by default; pass
 `--version` to pin a specific release. `envmgr self uninstall` prompts unless
 `--yes` or `-y` is provided. Both commands are limited to `install.sh`-managed
-GitHub Release installs recorded in `~/.envmgr/install.toml`.
+GitHub Release installs recorded in `~/.envmgr/install.toml`. When resolving
+the latest release over the GitHub API, set `GITHUB_TOKEN` to use an
+authenticated request and avoid the anonymous rate limit.
 
 ## Shell Environment
 
