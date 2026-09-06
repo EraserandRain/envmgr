@@ -101,9 +101,12 @@ Notes:
 - `master` is the release boundary: merge `dev`→`master` only to publish a
   version. Regular development stays on `dev` (or feature branches).
 - The release version is computed by git-cliff from the Conventional Commits
-  since the last tag (`feat` → minor, `fix` → patch, `feat!` → major). A batch
-  that only contains `docs`/`chore` produces no tag; add a `feat`/`fix` or a
-  `chore(release)` marker to force a release.
+  since the last tag (`feat` → minor, `fix` → patch, breaking → major). While
+  the project is on the 0.x line, breaking changes bump minor instead (0.4.0 →
+  0.5.0) because `breaking_always_bump_major` is `false` in `cliff.toml`; flip
+  it to `true` to allow jumping straight to 1.0. A batch that only contains
+  `docs`/`chore` produces no tag; add a `feat`/`fix` or a `chore(release)`
+  marker to force a release.
 - The package version is derived from the tag at build time by hatch-vcs, so no
   manual version bump is needed.
 
