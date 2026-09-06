@@ -2,40 +2,35 @@
 header = ""
 body = """
 {%- macro remote_url() -%}
-  https://github.com/EraserandRain/envmgr
+  https://github.com/{{ remote.github.owner }}/{{ remote.github.repo }}
 {%- endmacro -%}
-{%- set _ = remote_url() -%}
-{% for release in releases -%}
-  {%- if release.version %}
-## [{{ release.version }}] - {{ release.timestamp | date(format="%Y-%m-%d") }}
-  {% else %}
+
+{%- if version -%}
+## [{{ version }}] - {{ timestamp | date(format="%Y-%m-%d") }}
+{%- else -%}
 ## [Unreleased]
-  {%- endif %}
-{% for group, commits in release.commits | group_by(attribute="group") %}
+{%- endif %}
+{% for group, commits in commits | group_by(attribute="group") %}
 ### {{ group }}
 {% for commit in commits %}
-  {%- set scope = commit.scope | default(value="") -%}
-  {%- if scope -%}
-    {%- set prefix = scope ~ ": " -%}
-  {%- else -%}
-    {%- set prefix = "" -%}
-  {%- endif -%}
 - {{ commit.message | split(pat="\n") | first | trim }}
-  {%- if commit.github.pr_number -%}
-    ([#{{ commit.github.pr_number }}]({{ remote_url() }}/pull/{{ commit.github.pr_number }}))
+  {%- if commit.remote.pr_number -%}
+    ([#{{ commit.remote.pr_number }}]({{ self::remote_url() }}/pull/{{ commit.remote.pr_number }}))
   {%- endif -%}
-  {%- if commit.github.username %} (@{{ commit.github.username }}){% endif %}
+  {%- if commit.remote.username %} (@{{ commit.remote.username }}){% endif %}
 {%- endfor %}
-{% endfor %}
 {% endfor %}
 """
 footer = """
+{%- macro remote_url() -%}
+  https://github.com/{{ remote.github.owner }}/{{ remote.github.repo }}
+{%- endmacro -%}
 {%- for release in releases -%}
   {%- if release.version -%}
     {%- if release.previous.version %}
-[{{ release.version }}]: {{ remote_url() }}/compare/{{ release.previous.version }}...{{ release.version }}
+[{{ release.version }}]: {{ self::remote_url() }}/compare/{{ release.previous.version }}...{{ release.version }}
     {%- else %}
-[{{ release.version }}]: {{ remote_url() }}/releases/tag/{{ release.version }}
+[{{ release.version }}]: {{ self::remote_url() }}/releases/tag/{{ release.version }}
     {%- endif %}
   {%- endif -%}
 {% endfor %}
@@ -90,3 +85,7 @@ group = "CI"
 [[git.commit_parsers]]
 message = "^revert"
 group = "Revert"
+
+[remote.github]
+owner = "EraserandRain"
+repo = "envmgr"
