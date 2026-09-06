@@ -1,12 +1,9 @@
 from __future__ import annotations
 
 import importlib
-import json
 import os
 import subprocess
 import sys
-import urllib.error
-import urllib.request
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -14,7 +11,7 @@ from pathlib import Path
 from typing import Any, BinaryIO, Protocol, cast
 
 from ..runtime_config import get_runtime_paths
-from .github import github_api_headers
+from .github import GitHubAPIError, latest_release_tag
 
 if sys.version_info >= (3, 11):
     import tomllib as _tomllib
@@ -151,47 +148,32 @@ def load_installer_state(envmgr_home: str | Path | None = None) -> InstallState:
 
 def _fetch_latest_release_tag(state: InstallState) -> str:
     """Resolve the latest GitHub Release tag from the GitHub API."""
-    api_url = f"https://api.github.com/repos/{state.owner}/{state.repo}/releases/latest"
-    request = urllib.request.Request(
-        api_url,
-        headers=github_api_headers(),
-    )
     try:
-        # S310 (ssrf): safe — URL is constructed from installer state
-        # values (state.owner / state.repo), not user-supplied input.
-        with urllib.request.urlopen(request, timeout=10) as response:  # noqa: S310
-            body = response.read().decode("utf-8")
-    except urllib.error.HTTPError as error:
-        raise SelfManagementError(
-            f"GitHub returned HTTP {error.code} while resolving the latest "
-            f"release. Pass --version VERSION to update to a specific "
-            f"GitHub Release."
-        ) from error
-    except urllib.error.URLError as error:
-        raise SelfManagementError(
-            "Could not reach GitHub to resolve the latest release. "
-            "Check your network connection or pass --version VERSION "
-            "to update to a specific GitHub Release."
-        ) from error
-
-    try:
-        release_data = json.loads(body)
-    except json.JSONDecodeError as error:
-        raise SelfManagementError(
-            "GitHub returned an unexpected response while resolving "
-            "the latest release. Pass --version VERSION to update to "
-            "a specific GitHub Release."
-        ) from error
-
-    tag_name = release_data.get("tag_name")
-    if not isinstance(tag_name, str) or not tag_name.strip():
+        return latest_release_tag(state.owner, state.repo, timeout=10)
+    except GitHubAPIError as error:
+        if error.kind == "http":
+            raise SelfManagementError(
+                f"GitHub returned HTTP {error.status_code} while resolving the "
+                f"latest release. Pass --version VERSION to update to a specific "
+                f"GitHub Release."
+            ) from error
+        if error.kind == "network":
+            raise SelfManagementError(
+                "Could not reach GitHub to resolve the latest release. "
+                "Check your network connection or pass --version VERSION "
+                "to update to a specific GitHub Release."
+            ) from error
+        if error.kind == "parse":
+            raise SelfManagementError(
+                "GitHub returned an unexpected response while resolving "
+                "the latest release. Pass --version VERSION to update to "
+                "a specific GitHub Release."
+            ) from error
         raise SelfManagementError(
             "Could not determine the latest release tag from the GitHub "
             "API response. Pass --version VERSION to update to a "
             "specific GitHub Release."
-        )
-
-    return tag_name.strip()
+        ) from error
 
 
 def update_installer_managed_envmgr(

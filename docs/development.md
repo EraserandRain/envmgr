@@ -118,3 +118,46 @@ GitHub Actions should keep these paths aligned:
 Before opening a PR, run the smallest relevant local check first, then the full
 `uv run validate` or `uv run smoke-test` path when the change affects shared
 runtime behavior.
+
+## Code-quality constraints: single source of truth
+
+envmgr has two "declared, then enforced" mechanisms so a concept does not get
+silently re-implemented in a second module:
+
+- **Role metadata** is the single source of truth for tag discovery and playbook
+  generation; `tests/checks/catalog.py` keeps metadata, docs, and CLI output in
+  sync.
+- **Concept ownership** is the single source of truth for shared module-level
+  concepts. `tests/checks/single_source_of_truth.yml` records each concept → its
+  owning module → a marker string that must appear only inside that module.
+  `tests/checks/single_source_of_truth.py` scans `src/` and fails if any marker
+  leaks into a second module. Adding a new concept is one registry line; the
+  generic check covers it — no new test needed.
+
+The marker must be a literal the owner alone introduces (a URL fragment, a schema
+constant) rather than a symbol that callers legitimately import. The rule itself
+is recorded in AGENTS.md under **Concept ownership is declared and enforced**.
+
+### Why avoid re-implementing an owned concept
+
+This guards the kind of duplication that surfaced in the GitHub release
+resolver, where `services/self_management.py` and `services/update_check.py`
+each built the same releases API URL, request, and `tag_name` parse with only
+their error policy differing. Resolver logic now lives once in
+`services/github.py`, and each caller applies its own policy (strict for `self
+update`, lenient for the background notifier) on top of the shared seam.
+
+The broader rationale comes from how AI-native development tooling treats
+conventions: instructions in a repo file like `AGENTS.md` or `CLAUDE.md` are
+advisory context, while deterministic gates — hooks, CI, tests — are what
+actually constrain behavior. Anthropic's steering guide states this directly
+(“a real guardrail needs to be deterministic”), OpenAI's `AGENTS.md` and skills
+keep instructions discoverable but expect the agent to run the listed program
+checks, and the `agents.md` open standard is intentionally advisory. envmgr's
+analog of the deterministic guardrail is its `tests/checks/` contract suite, so
+the single-source-of-truth registry is enforced there rather than only written
+down.
+
+Sources: [Anthropic, Steering Claude Code](https://claude.com/blog/steering-claude-code-skills-hooks-rules-subagents-and-more),
+[Anthropic, Using CLAUDE.md](https://claude.com/blog/using-claude-md-files),
+[agents.md spec](https://agents.md).

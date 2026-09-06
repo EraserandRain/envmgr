@@ -1,0 +1,26 @@
+# Single-source-of-truth registry.
+#
+# Each row declares one concept and the single module that owns it, plus a
+# *marker*: a distinctive string (URL fragment, schema constant, literal) that
+# must appear ONLY inside the owning module across `src/`.  When a second module
+# introduces the same marker, `tests/checks/single_source_of_truth.py` fails,
+# which is how we force "deepen the existing module" instead of re-implementing a
+# concept that already has an owner.
+#
+# Rules for a marker:
+#   - must be a literal that the owner alone introduces (a URL, a schema-version
+#     constant's name/value, etc.), not a name that is legitimately imported
+#     elsewhere (e.g. a class or function name used by its callers).
+#   - pick a value that stays unique even as callers import and use the owner.
+#
+# To guard a new concept: add one line here and deepen that concept into its
+# owner.  No new test is required — the generic check below scans the whole list.
+
+concepts:
+  - name: github-latest-release
+    owner: src/envmgr/services/github.py
+    marker: releases/latest
+
+  - name: runtime-history-schema
+    owner: src/envmgr/services/runtime.py
+    marker: RUNTIME_HISTORY_PAYLOAD_SCHEMA_VERSION
