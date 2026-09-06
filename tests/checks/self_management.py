@@ -10,7 +10,9 @@ import urllib.error
 from datetime import datetime, timedelta, timezone
 from email.message import Message
 from pathlib import Path
+from typing import cast
 from unittest.mock import patch
+from urllib.request import Request
 
 from click.testing import Result
 from typer.testing import CliRunner
@@ -128,6 +130,38 @@ def _format_failure(description: str, result: Result) -> str:
         f"output:\n{result.output}\n"
         f"exception: {result.exception!r}"
     )
+
+
+def check_github_api_headers_includes_token_when_set() -> None:
+    from envmgr.services.github import GITHUB_TOKEN_ENV_VAR, github_api_headers
+
+    with patch.dict(os.environ, {GITHUB_TOKEN_ENV_VAR: "gh_token_123"}, clear=False):
+        headers = github_api_headers()
+
+    if headers.get("Authorization") != "Bearer gh_token_123":
+        raise AssertionError(
+            f"expected Authorization header to carry the token, "
+            f"got: {headers.get('Authorization')!r}"
+        )
+    if headers.get("Accept") != "application/vnd.github+json":
+        raise AssertionError(f"unexpected Accept header: {headers.get('Accept')!r}")
+    if headers.get("X-GitHub-Api-Version") != "2022-11-28":
+        raise AssertionError(
+            "unexpected X-GitHub-Api-Version header: "
+            f"{headers.get('X-GitHub-Api-Version')!r}"
+        )
+
+
+def check_github_api_headers_omits_token_when_unset() -> None:
+    from envmgr.services.github import github_api_headers
+
+    with patch.dict(os.environ, {}, clear=True):
+        headers = github_api_headers()
+
+    if "Authorization" in headers:
+        raise AssertionError(
+            "expected no Authorization header when GITHUB_TOKEN is unset"
+        )
 
 
 def check_self_update_requires_supported_installer_state() -> None:
@@ -439,6 +473,65 @@ def check_self_update_handles_empty_tag_name() -> None:
             raise AssertionError("expected empty tag_name to avoid running uv")
 
 
+def check_self_update_sends_token_when_github_token_set() -> None:
+    from envmgr.services.github import GITHUB_TOKEN_ENV_VAR
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_path = Path(temp_dir)
+        envmgr_home = temp_path / ".envmgr"
+        fake_bin_dir = temp_path / "fake-bin"
+        fake_bin_dir.mkdir()
+        fake_log = temp_path / "uv.log"
+        tool_bin_dir = temp_path / "uv-bin"
+        fake_uv = _write_fake_uv(
+            fake_bin_dir,
+            fake_log=fake_log,
+            tool_bin_dir=tool_bin_dir,
+            version_output="envmgr 2.0.0",
+        )
+        _write_installer_state(
+            envmgr_home,
+            uv_path=fake_uv,
+            uv_tool_bin_dir=tool_bin_dir,
+        )
+
+        captured: dict[str, object] = {}
+
+        def _side_effect(request: object, timeout: int | None = None) -> object:
+            captured["request"] = request
+            return _mock_github_latest_response('{"tag_name": "v2.0.0"}')
+
+        with patch.dict(
+            os.environ, {GITHUB_TOKEN_ENV_VAR: "gh_token_123"}, clear=False
+        ):
+            with patch("urllib.request.urlopen", side_effect=_side_effect):
+                result = _invoke_envmgr_with_home(envmgr_home, "self", "update")
+
+        if result.exit_code != 0:
+            raise AssertionError(
+                _format_failure(
+                    "expected GITHUB_TOKEN-backed self update to succeed", result
+                )
+            )
+
+        request = cast(Request, captured["request"])
+        if request.get_header("Authorization") != "Bearer gh_token_123":
+            raise AssertionError("expected Authorization header to carry GITHUB_TOKEN")
+        if request.get_header("Accept") != "application/vnd.github+json":
+            raise AssertionError("expected Accept header on the GitHub API request")
+
+        expected_url = (
+            "https://github.com/EraserandRain/envmgr/releases/download/"
+            "v2.0.0/envmgr-2.0.0-py3-none-any.whl"
+        )
+        if f"tool install --force {expected_url}" not in fake_log.read_text(
+            encoding="utf-8"
+        ):
+            raise AssertionError(
+                "expected token-backed latest self update to call uv tool install"
+            )
+
+
 def check_self_update_uses_fake_uv_and_rewrites_installer_state() -> None:
     with tempfile.TemporaryDirectory() as temp_dir:
         temp_path = Path(temp_dir)
@@ -644,6 +737,32 @@ def _make_stale_cache(cache_path: Path, version: str) -> None:
 # ---------------------------------------------------------------------------
 # update check contract tests
 # ---------------------------------------------------------------------------
+
+
+def check_update_fetch_latest_tag_sends_token_when_set() -> None:
+    from envmgr.services.github import GITHUB_TOKEN_ENV_VAR
+    from envmgr.services.update_check import _fetch_latest_tag
+
+    captured: dict[str, object] = {}
+
+    def _side_effect(request: object, timeout: int | None = None) -> object:
+        captured["request"] = request
+        return _mock_github_latest_response('{"tag_name": "v0.2.0"}')
+
+    with patch.dict(os.environ, {GITHUB_TOKEN_ENV_VAR: "gh_token_123"}, clear=False):
+        with patch("urllib.request.urlopen", side_effect=_side_effect):
+            tag = _fetch_latest_tag()
+
+    if tag != "v0.2.0":
+        raise AssertionError(f"expected latest tag v0.2.0, got: {tag!r}")
+
+    request = cast(Request, captured["request"])
+    if request.get_header("Authorization") != "Bearer gh_token_123":
+        raise AssertionError(
+            "expected Authorization header to carry GITHUB_TOKEN in update check"
+        )
+    if request.get_header("Accept") != "application/vnd.github+json":
+        raise AssertionError("expected Accept header on the GitHub API request")
 
 
 def check_update_newer_recognises_newer_version() -> None:

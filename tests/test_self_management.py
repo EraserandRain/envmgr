@@ -3,6 +3,8 @@ from __future__ import annotations
 import unittest
 
 from tests.checks.self_management import (
+    check_github_api_headers_includes_token_when_set,
+    check_github_api_headers_omits_token_when_unset,
     check_self_uninstall_prompts_without_yes_and_can_cancel,
     check_self_uninstall_uses_fake_uv_and_preserves_runtime_data,
     check_self_update_handles_empty_tag_name,
@@ -12,8 +14,10 @@ from tests.checks.self_management import (
     check_self_update_rejects_checkout_only_helper_shims,
     check_self_update_requires_supported_installer_state,
     check_self_update_resolves_latest_release_from_github,
+    check_self_update_sends_token_when_github_token_set,
     check_self_update_uses_fake_uv_and_rewrites_installer_state,
     check_update_cache_read_write_and_freshness,
+    check_update_fetch_latest_tag_sends_token_when_set,
     check_update_newer_handles_vcs_suffixes,
     check_update_newer_recognises_newer_version,
     check_update_newer_rejects_same_or_older,
@@ -56,6 +60,18 @@ SELF_MANAGEMENT_TEST_CHECKS: tuple[Check, ...] = (
         check_self_update_handles_empty_tag_name,
     ),
     (
+        "github API headers include token when GITHUB_TOKEN is set",
+        check_github_api_headers_includes_token_when_set,
+    ),
+    (
+        "github API headers omit token when GITHUB_TOKEN is unset",
+        check_github_api_headers_omits_token_when_unset,
+    ),
+    (
+        "self update sends token when GITHUB_TOKEN is set",
+        check_self_update_sends_token_when_github_token_set,
+    ),
+    (
         "self update uses fake uv and rewrites installer state",
         check_self_update_uses_fake_uv_and_rewrites_installer_state,
     ),
@@ -90,6 +106,10 @@ SELF_MANAGEMENT_TEST_CHECKS: tuple[Check, ...] = (
     (
         "update check uses cached result when fresh",
         check_update_run_check_uses_cached_result_when_fresh,
+    ),
+    (
+        "update check fetch latest tag sends token when GITHUB_TOKEN is set",
+        check_update_fetch_latest_tag_sends_token_when_set,
     ),
     (
         "update check returns none when current is latest",

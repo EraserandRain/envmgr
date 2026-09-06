@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any, BinaryIO, Protocol, cast
 
 from ..runtime_config import get_runtime_paths
+from .github import github_api_headers
 
 if sys.version_info >= (3, 11):
     import tomllib as _tomllib
@@ -153,10 +154,7 @@ def _fetch_latest_release_tag(state: InstallState) -> str:
     api_url = f"https://api.github.com/repos/{state.owner}/{state.repo}/releases/latest"
     request = urllib.request.Request(
         api_url,
-        headers={
-            "Accept": "application/vnd.github+json",
-            "X-GitHub-Api-Version": "2022-11-28",
-        },
+        headers=github_api_headers(),
     )
     try:
         # S310 (ssrf): safe — URL is constructed from installer state
