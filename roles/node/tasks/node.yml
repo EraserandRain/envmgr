@@ -40,26 +40,38 @@
       esac
       export VOLTA_FEATURE_PNPM=1
 
-- name: Check whether Node.js is already available through Volta
-  command: node --version
-  register: node_version_check
+- name: Resolve Node.js binary through Volta before install
+  command: volta which node
+  register: node_binary_before
   changed_when: false
   failed_when: false
 
-- name: Install node (Latest Version)
+- name: Install node (Latest LTS Version)
   command: volta install node@lts
-  register: node_install_result
-  changed_when: node_install_result.rc == 0
-  when: node_version_check.rc != 0
+  changed_when: false
 
-- name: Check whether pnpm is already available through Volta
-  command: pnpm --version
-  register: pnpm_version_check
+- name: Resolve Node.js binary through Volta after install
+  command: volta which node
+  register: node_binary_after
+  changed_when: >-
+    node_binary_after.stdout | default('', true) | trim !=
+    node_binary_before.stdout | default('', true) | trim
+  failed_when: false
+
+- name: Resolve pnpm binary through Volta before install
+  command: volta which pnpm
+  register: pnpm_binary_before
   changed_when: false
   failed_when: false
 
-- name: Install pnpm
+- name: Install pnpm (Latest Version)
   command: volta install pnpm@latest
-  register: pnpm_install_result
-  changed_when: pnpm_install_result.rc == 0
-  when: pnpm_version_check.rc != 0
+  changed_when: false
+
+- name: Resolve pnpm binary through Volta after install
+  command: volta which pnpm
+  register: pnpm_binary_after
+  changed_when: >-
+    pnpm_binary_after.stdout | default('', true) | trim !=
+    pnpm_binary_before.stdout | default('', true) | trim
+  failed_when: false
