@@ -239,6 +239,7 @@ def check_install_list_tags_cli_contract() -> None:
         "  - codex",
         "  - github_cli",
         "  - rtk",
+        "  - herdr",
     ):
         if expected_fragment not in output:
             raise AssertionError(

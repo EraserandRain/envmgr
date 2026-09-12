@@ -80,6 +80,9 @@ When adding or changing a role:
 - Update `roles/<role>/tasks/main.yml` and any imported task files.
 - Update `roles/<role>/meta/envmgr.yml` for tags, dependencies, targets,
   vars files, Galaxy role dependencies, and playbook role names.
+- Use `task_depends_on` when a task tag needs a different dependency closure
+  than the role-level `depends_on`; for example, `ai_tools` depends on `node`
+  but its `herdr` task tag depends only on `init_core`.
 - Update the relevant built-in scenario playbook.
 - Keep tasks idempotent when practical and verify scoped tag runs select only
   the intended role/task closure.

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from typing import Annotated
 
 import typer
@@ -18,11 +19,7 @@ config_app = typer.Typer(
     add_completion=False,
 )
 
-_BOOL_FIELDS = {
-    "ai_tools.manage_claude_code": "manage_claude_code",
-    "ai_tools.manage_codex": "manage_codex",
-    "ai_tools.manage_rtk": "manage_rtk",
-}
+_BOOL_FIELDS = {f"ai_tools.{spec.key}": spec.key for spec in AI_TOOLS}
 
 
 def _parse_bool(value: str) -> bool:
@@ -52,18 +49,7 @@ def _updated_bool_config(
     field: str,
     value: bool,
 ) -> AiToolsConfig:
-    fields = {
-        "manage_claude_code": current.manage_claude_code,
-        "manage_codex": current.manage_codex,
-        "manage_rtk": current.manage_rtk,
-    }
-    fields[field] = value
-    return AiToolsConfig(
-        configured=True,
-        manage_claude_code=fields["manage_claude_code"],
-        manage_codex=fields["manage_codex"],
-        manage_rtk=fields["manage_rtk"],
-    )
+    return replace(current, configured=True, **{field: value})
 
 
 def _render_ai_tools_status(config: AiToolsConfig) -> list[tuple[str, str]]:

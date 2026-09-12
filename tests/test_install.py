@@ -5,7 +5,10 @@ import unittest
 from tests.checks.install import (
     check_ai_tools_config_rejects_all_disabled,
     check_ai_tools_extra_vars_match_role_contract,
+    check_ai_tools_fresh_defaults_match_registry,
     check_ai_tools_install_option_resolution,
+    check_ai_tools_role_tag_triggers_match_registry,
+    check_ai_tools_rollback_preserves_preexisting_herdr,
     check_ai_tools_setup_wizard_prompt_interrupt_exits_130,
     check_ai_tools_setup_wizard_uses_shared_prompt_path,
     check_install_all_uses_runtime_default_playbook,
@@ -35,6 +38,18 @@ INSTALL_TEST_CHECKS: tuple[Check, ...] = (
     (
         "AI tools extra-vars match the role contract",
         check_ai_tools_extra_vars_match_role_contract,
+    ),
+    (
+        "AI tools fresh-install defaults match the registry",
+        check_ai_tools_fresh_defaults_match_registry,
+    ),
+    (
+        "AI tools role tag triggers match the registry",
+        check_ai_tools_role_tag_triggers_match_registry,
+    ),
+    (
+        "AI tools rollback preserves a pre-existing Herdr binary",
+        check_ai_tools_rollback_preserves_preexisting_herdr,
     ),
     (
         "AI tools config rejects all-disabled selections",

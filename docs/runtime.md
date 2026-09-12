@@ -85,13 +85,18 @@ configured = true
 manage_claude_code = true
 manage_codex = true
 manage_rtk = true
+manage_herdr = true
 ```
 
 Use `envmgr config show` to inspect the saved values and
 `envmgr config set <key> <value>` to change them without re-running an install.
+Configs saved before `manage_herdr` existed read the missing key as `false`, so
+upgrading never installs Herdr without an explicit choice. Run
+`envmgr config set ai_tools.manage_herdr true` to opt in; while `[ai_tools]` is
+still unconfigured, the first-run wizard offers Herdr enabled.
 Specific tool runs such as `envmgr install codex`, `envmgr install claude_code`,
-and `envmgr install rtk` select tools directly from the task tag and do not open
-the wizard.
+`envmgr install rtk`, and `envmgr install herdr` select tools directly from the
+task tag and do not open the wizard.
 
 Commands that accept `-i` or `--inventory` use aliases from this config. Alias
 targets must stay under the runtime inventory directory; envmgr does not fall
@@ -136,6 +141,13 @@ caller filesystem paths and do not fall back to packaged playbooks.
 unless `--playbook` is explicit. Specific tags may infer a built-in scenario
 only when they map to exactly one built-in playbook.
 
+Role-level tags pull the role's full `depends_on` closure. A task tag pulls only
+the owning role plus the closure declared for that tag in role metadata
+(`task_depends_on`); a task tag with no entry keeps the role's full `depends_on`
+closure. `ai_tools` narrows `herdr` to `init_core`, so `envmgr install herdr`
+installs the AI tools role's Herdr task without dragging in unrelated role
+dependencies such as `node`.
+
 ## Install Dry Run
 
 Use `envmgr install --dry-run <tag ...>` to inspect the resolved install plan
@@ -151,7 +163,8 @@ The JSON report includes selected tags, source and execution playbook paths,
 whether the execution playbook was temporary, inventory label and path,
 effective `ask_vault_pass`, AI tools options and extra-vars when applicable,
 and `command_argv`. Every JSON report carries `schema_version` so consumers can
-detect and migrate contract changes.
+detect and migrate contract changes; adding a field is additive and keeps the
+current version, while renaming or removing one bumps it.
 
 ## Doctor And History
 
@@ -193,7 +206,7 @@ a public interface.
 
 Role-level tags install complete modules:
 
-- `ai_tools` - Claude Code, optional Codex CLI, and RTK.
+- `ai_tools` - Claude Code, optional Codex CLI, RTK, and Herdr.
 - `cloud` - HashiCorp repository tooling and Terraform tasks.
 - `docker`
 - `dotnet` - default .NET version `8.0`.
@@ -208,7 +221,7 @@ Role-level tags install complete modules:
 - `ruby` - default Ruby version `3.0.5`.
 - `zsh`
 
-Task-level tags include `claude_code`, `codex`, `rtk`, `github_cli`,
+Task-level tags include `claude_code`, `codex`, `rtk`, `herdr`, `github_cli`,
 `hashicorp`, `terraform`, and `tf`.
 
 Use `envmgr install -l` or `envmgr install --list-tags` for the generated,

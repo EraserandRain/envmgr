@@ -22,6 +22,7 @@ class RoleMetadata:
     targets: list[str]
     tags: list[str]
     depends_on: list[str]
+    task_depends_on: dict[str, list[str]]
     task_tags: list[str]
     vars_files: list[str]
     playbook_roles: list[str]
@@ -60,6 +61,38 @@ def _read_string_list(
     return value
 
 
+def _read_string_list_mapping(
+    data: dict[str, Any],
+    field_name: str,
+    metadata_path: Path,
+) -> dict[str, list[str]]:
+    value = data.get(field_name, {})
+    if value is None:
+        return {}
+    if not isinstance(value, dict):
+        raise CatalogError(
+            f"{metadata_path} field '{field_name}' must be a mapping of tag to role lists"
+        )
+
+    mapping: dict[str, list[str]] = {}
+    for key, dependencies in value.items():
+        if not isinstance(key, str) or not key.strip():
+            raise CatalogError(
+                f"{metadata_path} field '{field_name}' keys must be non-empty strings"
+            )
+        if dependencies is None:
+            mapping[key] = []
+            continue
+        if not isinstance(dependencies, list) or not all(
+            isinstance(item, str) for item in dependencies
+        ):
+            raise CatalogError(
+                f"{metadata_path} field '{field_name}.{key}' must be a list of strings"
+            )
+        mapping[key] = dependencies
+    return mapping
+
+
 def load_role_metadata(metadata_path: str | Path) -> RoleMetadata:
     path = Path(metadata_path)
     with path.open(encoding="utf-8") as file:
@@ -74,6 +107,15 @@ def load_role_metadata(metadata_path: str | Path) -> RoleMetadata:
     if not isinstance(enabled, bool):
         raise CatalogError(f"{path} field 'enabled' must be a boolean")
 
+    task_tags = _read_string_list(data, "task_tags", path)
+    task_depends_on = _read_string_list_mapping(data, "task_depends_on", path)
+    unknown_task_dependency_tags = sorted(set(task_depends_on) - set(task_tags))
+    if unknown_task_dependency_tags:
+        raise CatalogError(
+            f"{path} field 'task_depends_on' keys must be declared in 'task_tags'; "
+            f"unknown: {', '.join(unknown_task_dependency_tags)}"
+        )
+
     return RoleMetadata(
         name=name,
         description=description,
@@ -81,7 +123,8 @@ def load_role_metadata(metadata_path: str | Path) -> RoleMetadata:
         targets=_read_string_list(data, "targets", path),
         tags=_read_string_list(data, "tags", path),
         depends_on=_read_string_list(data, "depends_on", path),
-        task_tags=_read_string_list(data, "task_tags", path),
+        task_depends_on=task_depends_on,
+        task_tags=task_tags,
         vars_files=_read_string_list(data, "vars_files", path),
         playbook_roles=_read_string_list(data, "playbook_roles", path, default=[name]),
         galaxy_roles=_read_string_list(data, "galaxy_roles", path),

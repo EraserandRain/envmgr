@@ -24,9 +24,11 @@ matching docs and contract test.
 
 ### Machine output is a versioned contract
 
-- Every `--json` payload carries `schema_version`. Adding or renaming a field is
-  a contract change and must update the JSON payload, `docs/runtime.md`, and the
-  matching `tests/checks/*` contract test together.
+- Every `--json` payload carries `schema_version`. Adding a field is a contract
+  change: keep the current version (consumers detect the new field by presence)
+  and update the JSON payload, `docs/runtime.md`, and the matching
+  `tests/checks/*` contract test together. Renaming or removing a field bumps
+  the version.
 - Rich rendering is only a view over the same data; it never redefines the
   machine contract.
 
@@ -50,8 +52,11 @@ matching docs and contract test.
 
 - Runtime config, inventories, logs, and installer state are user-local and may
   be changed by the user. Never treat repo-local files as mutable runtime state.
-- Persisted state is versioned. Bump the schema version and run the migration
-  before changing the shape of `config.toml` or `install.toml`.
+- Persisted state is versioned. Adding a new optional key with a
+  backward-compatible default keeps the current version and must document that
+  default, matching the `--json` rule; renaming, removing, or making a key
+  required bumps the schema version and runs the migration for
+  `config.toml`/`install.toml`.
 
 ### Detection / classification is decoupled and evidence-based
 

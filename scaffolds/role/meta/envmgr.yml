@@ -5,6 +5,7 @@ targets: []
 tags:
   - "{{ role_name }}"
 depends_on: []
+task_depends_on: {}
 task_tags: []
 vars_files: []
 playbook_roles:
