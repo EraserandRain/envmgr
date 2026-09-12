@@ -23,3 +23,11 @@ ai_tools_config:
     latest_release_url: "https://github.com/rtk-ai/rtk/releases/latest"
     latest_download_base_url: "https://github.com/rtk-ai/rtk/releases/latest/download"
     release_download_base_url: "https://github.com/rtk-ai/rtk/releases/download"
+  herdr:
+    enabled: true
+    binary: "herdr"
+    description: "Herdr coding agent runtime"
+    install_dir: "{{ ai_tools_user_bin_path }}"
+    latest_release_url: "https://github.com/herdrdev/herdr/releases/latest"
+    latest_download_base_url: "https://github.com/herdrdev/herdr/releases/latest/download"
+    release_download_base_url: "https://github.com/herdrdev/herdr/releases/download"

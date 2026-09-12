@@ -7,10 +7,14 @@ tags:
   - ai_tools
 depends_on:
   - node
+task_depends_on:
+  herdr:
+    - init_core
 task_tags:
   - claude_code
   - codex
   - rtk
+  - herdr
 vars_files: []
 playbook_roles:
   - ai_tools

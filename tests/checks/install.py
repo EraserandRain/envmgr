@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import tempfile
 from io import StringIO
 from pathlib import Path
@@ -22,6 +23,7 @@ from envmgr.runtime_config import (
     ensure_runtime_layout,
     load_runtime_config,
 )
+from envmgr.services.ai_tools_catalog import AI_TOOLS, AI_TOOLS_ROLE_TAG
 from envmgr.services.assets import resolve_runtime_assets
 from envmgr.services.install import (
     AiToolsInstallDefaults,
@@ -106,6 +108,7 @@ def check_ai_tools_install_option_resolution() -> None:
         manage_claude_code=True,
         manage_codex=True,
         manage_rtk=True,
+        manage_herdr=True,
     )
 
     # Configured default-scope run treats the saved config as the source of truth.
@@ -127,6 +130,8 @@ def check_ai_tools_install_option_resolution() -> None:
         raise AssertionError("expected saved config to keep Codex CLI enabled")
     if not options.manage_rtk:
         raise AssertionError("expected saved config to keep RTK enabled")
+    if not options.manage_herdr:
+        raise AssertionError("expected saved config to keep Herdr enabled")
 
     # Targeted task-tag run selects tools from the tags and never persists.
     unconfigured = AiToolsConfig.unconfigured_defaults()
@@ -144,6 +149,22 @@ def check_ai_tools_install_option_resolution() -> None:
         raise AssertionError("expected targeted run to avoid persisting")
     if not rtk_only_options.manage_rtk:
         raise AssertionError("expected rtk task tag to enable RTK")
+    if rtk_only_options.manage_herdr:
+        raise AssertionError("expected rtk task tag to leave Herdr disabled")
+
+    # Targeted task-tag run for Herdr selects only Herdr.
+    herdr_resolution = resolve_ai_tools_choices(
+        ["herdr"],
+        execution_playbook_path="workstation",
+        ai_tools_config=unconfigured,
+        interactive=False,
+        console=console,
+    )
+    herdr_only_options = herdr_resolution.options
+    if herdr_only_options is None:
+        raise AssertionError("expected herdr task tag to resolve AI tools options")
+    if not herdr_only_options.manage_herdr:
+        raise AssertionError("expected herdr task tag to enable Herdr")
 
     # Non-interactive first-run default-scope run falls back to tag defaults.
     all_resolution = resolve_ai_tools_choices(
@@ -158,6 +179,8 @@ def check_ai_tools_install_option_resolution() -> None:
         raise AssertionError("expected all tag to resolve AI tools options")
     if not all_options.manage_codex:
         raise AssertionError("expected all tag to enable Codex CLI by default")
+    if not all_options.manage_herdr:
+        raise AssertionError("expected all tag to enable Herdr by default")
 
     node_resolution = resolve_ai_tools_choices(
         ["all"],
@@ -177,6 +200,7 @@ def check_ai_tools_config_rejects_all_disabled() -> None:
         manage_claude_code=False,
         manage_codex=False,
         manage_rtk=False,
+        manage_herdr=False,
     )
     try:
         resolve_ai_tools_choices(
@@ -195,6 +219,89 @@ def check_ai_tools_config_rejects_all_disabled() -> None:
         raise AssertionError("expected all-disabled AI tools config to be rejected")
 
 
+def check_ai_tools_fresh_defaults_match_registry() -> None:
+    """Fresh-install defaults must agree with the shared AI-tool registry."""
+    defaults = AiToolsConfig.unconfigured_defaults()
+    for spec in AI_TOOLS:
+        expected = AI_TOOLS_ROLE_TAG in spec.trigger_tags
+        actual = bool(getattr(defaults, spec.key))
+        if actual != expected:
+            raise AssertionError(
+                f"expected fresh-install default for {spec.key} to be {expected} "
+                f"(registry `{AI_TOOLS_ROLE_TAG}` trigger), got {actual}"
+            )
+
+
+def _find_named_task(tasks: object, name: str) -> dict[str, object] | None:
+    """Return the first task with `name`, searching block/rescue task trees."""
+    if not isinstance(tasks, list):
+        return None
+    for task in tasks:
+        if not isinstance(task, dict):
+            continue
+        if task.get("name") == name:
+            return task
+        for key in ("block", "rescue", "always"):
+            nested = _find_named_task(task.get(key), name)
+            if nested is not None:
+                return nested
+    return None
+
+
+def check_ai_tools_role_tag_triggers_match_registry() -> None:
+    """Keep the role's tag-driven fallback aligned with the shared registry."""
+    repo_root = Path(__file__).resolve().parents[2]
+    tasks_path = repo_root / "roles" / "ai_tools" / "tasks" / "main.yml"
+    tasks_data = yaml.safe_load(tasks_path.read_text(encoding="utf-8"))
+    if not isinstance(tasks_data, list):
+        raise AssertionError("expected ai_tools tasks/main.yml to be a task list")
+
+    scope_task = _find_named_task(tasks_data, "Resolve requested AI tool scope")
+    if not isinstance(scope_task, dict):
+        raise AssertionError(
+            "expected ai_tools tasks/main.yml to resolve the requested tool scope"
+        )
+    set_facts = scope_task.get("set_fact")
+    if not isinstance(set_facts, dict):
+        raise AssertionError(
+            "expected the tool scope task to declare ai_tools_manage_* facts"
+        )
+
+    for spec in AI_TOOLS:
+        fact_name = f"ai_tools_{spec.key}"
+        expression = set_facts.get(fact_name)
+        if not isinstance(expression, str):
+            raise AssertionError(f"expected the tool scope task to declare {fact_name}")
+        triggered_tags = set(re.findall(r"'([^']+)'\s+in\s+requested_tags", expression))
+        if triggered_tags != set(spec.trigger_tags):
+            raise AssertionError(
+                f"expected the role fallback for {fact_name} to trigger on "
+                f"{sorted(spec.trigger_tags)}, got {sorted(triggered_tags)}; "
+                "drive AI-tool triggers from the shared registry"
+            )
+
+
+def check_ai_tools_rollback_preserves_preexisting_herdr() -> None:
+    """Rollback must not delete a Herdr binary the run did not install."""
+    repo_root = Path(__file__).resolve().parents[2]
+    tasks_path = repo_root / "roles" / "ai_tools" / "tasks" / "main.yml"
+    tasks_data = yaml.safe_load(tasks_path.read_text(encoding="utf-8"))
+
+    rollback_task = _find_named_task(tasks_data, "Remove failed Herdr installation")
+    if not isinstance(rollback_task, dict):
+        raise AssertionError(
+            "expected ai_tools tasks/main.yml to roll back failed Herdr installs"
+        )
+    conditions = rollback_task.get("when")
+    if not isinstance(conditions, list) or not any(
+        "herdr_managed_binary_stat" in str(condition) for condition in conditions
+    ):
+        raise AssertionError(
+            "expected the Herdr rollback to keep a binary that predates this run; "
+            f"got {conditions!r}"
+        )
+
+
 def check_ai_tools_extra_vars_match_role_contract() -> None:
     repo_root = Path(__file__).resolve().parents[2]
     defaults_path = repo_root / "roles" / "ai_tools" / "defaults" / "main.yml"
@@ -208,12 +315,14 @@ def check_ai_tools_extra_vars_match_role_contract() -> None:
         manage_claude_code=True,
         manage_codex=False,
         manage_rtk=True,
+        manage_herdr=True,
     )
     extra_vars = build_ai_tools_extra_vars(options)
     expected_extra_var_keys = {
         "ai_tools_manage_claude_code_override",
         "ai_tools_manage_codex_override",
         "ai_tools_manage_rtk_override",
+        "ai_tools_manage_herdr_override",
     }
 
     if set(extra_vars) != expected_extra_var_keys:
@@ -278,7 +387,7 @@ def check_ai_tools_setup_wizard_uses_shared_prompt_path() -> None:
         patch("envmgr.commands.shared.console.print"),
         patch(
             "envmgr.commands.shared.confirm_backend",
-            side_effect=[True, True, True, True],
+            side_effect=[True, True, True, True, True],
         ) as mock_confirm,
         patch(
             "builtins.input",
@@ -300,7 +409,7 @@ def check_ai_tools_setup_wizard_uses_shared_prompt_path() -> None:
         raise AssertionError("expected AI tools wizard to return install options")
     if not resolution.persist:
         raise AssertionError("expected first-run wizard to request config persistence")
-    if mock_confirm.call_count != 4:
+    if mock_confirm.call_count != 5:
         raise AssertionError("expected shared confirm prompts for each yes/no question")
     if not options.manage_codex:
         raise AssertionError("expected wizard to allow enabling Codex CLI")
@@ -477,7 +586,7 @@ def check_install_list_tags_uses_rich_console() -> None:
     with (
         patch(
             "envmgr.services.install.load_available_tags",
-            return_value=(["init"], ["codex", "github_cli", "rtk"]),
+            return_value=(["init"], ["codex", "github_cli", "rtk", "herdr"]),
         ),
         patch("builtins.print") as mock_print,
     ):
@@ -503,6 +612,7 @@ def check_install_list_tags_uses_rich_console() -> None:
         "  - codex",
         "  - github_cli",
         "  - rtk",
+        "  - herdr",
     ):
         if expected_fragment not in output:
             raise AssertionError(
@@ -621,6 +731,7 @@ def check_install_summary_uses_rich_console_and_keeps_raw_subprocess_output() ->
                 manage_claude_code=False,
                 manage_codex=False,
                 manage_rtk=False,
+                manage_herdr=False,
             ),
         )
         process_calls: list[tuple[tuple[object, ...], dict[str, object]]] = []
@@ -718,6 +829,7 @@ def check_install_dry_run_reports_plan_without_subprocess_and_cleans_temp() -> N
                 manage_claude_code=False,
                 manage_codex=False,
                 manage_rtk=False,
+                manage_herdr=False,
             ),
         )
 
@@ -788,12 +900,14 @@ def check_install_dry_run_json_outputs_machine_readable_plan() -> None:
                 manage_claude_code=True,
                 manage_codex=False,
                 manage_rtk=True,
+                manage_herdr=True,
             ),
         )
         ai_tools_options = AiToolsInstallOptions(
             manage_claude_code=True,
             manage_codex=True,
             manage_rtk=False,
+            manage_herdr=False,
         )
 
         with (
@@ -858,6 +972,8 @@ def check_install_dry_run_json_outputs_machine_readable_plan() -> None:
             raise AssertionError("expected JSON dry-run to include command argv")
         if plan["ai_tools"]["extra_vars"]["ai_tools_manage_codex_override"] is not True:
             raise AssertionError("expected JSON dry-run to include AI tools extra-vars")
+        if plan["ai_tools"]["manage_herdr"] is not False:
+            raise AssertionError("expected JSON dry-run to include Herdr selection")
 
 
 def check_install_dry_run_json_reports_inapplicable_ai_tools() -> None:
@@ -881,6 +997,7 @@ def check_install_dry_run_json_reports_inapplicable_ai_tools() -> None:
                 manage_claude_code=False,
                 manage_codex=False,
                 manage_rtk=False,
+                manage_herdr=False,
             ),
         )
 
@@ -945,6 +1062,7 @@ def check_install_wizard_cancellation_reports_via_rich_console() -> None:
                 manage_claude_code=True,
                 manage_codex=False,
                 manage_rtk=True,
+                manage_herdr=True,
             ),
         )
 
@@ -1039,6 +1157,7 @@ def check_install_interrupt_exits_cleanly() -> None:
                 manage_claude_code=False,
                 manage_codex=False,
                 manage_rtk=False,
+                manage_herdr=False,
             ),
         )
 

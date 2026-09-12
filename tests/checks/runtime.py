@@ -795,6 +795,7 @@ def check_ai_tools_config_round_trip_preserves_other_tables() -> None:
                     "manage_claude_code = true",
                     "manage_codex = false",
                     "manage_rtk = true",
+                    "manage_herdr = false",
                 ]
             )
             + "\n",
@@ -808,6 +809,7 @@ def check_ai_tools_config_round_trip_preserves_other_tables() -> None:
                 manage_claude_code=True,
                 manage_codex=True,
                 manage_rtk=False,
+                manage_herdr=True,
             ),
         )
 
@@ -836,3 +838,42 @@ def check_ai_tools_config_round_trip_preserves_other_tables() -> None:
             raise AssertionError("expected rewritten config to update manage_codex")
         if config.manage_rtk:
             raise AssertionError("expected rewritten config to update manage_rtk")
+        if not config.manage_herdr:
+            raise AssertionError("expected rewritten config to update manage_herdr")
+
+
+def check_ai_tools_legacy_config_keeps_herdr_disabled() -> None:
+    """An [ai_tools] table without manage_herdr must not enable Herdr on upgrade."""
+    with tempfile.TemporaryDirectory() as temp_dir:
+        envmgr_home = Path(temp_dir) / ".envmgr"
+        runtime_paths = ensure_runtime_layout(envmgr_home)
+        runtime_paths.config_file.write_text(
+            """config_version = 1
+
+[default]
+inventory = "default"
+playbook = "workstation"
+ask_vault_pass = false
+
+[inventory]
+default = "inventory/default.yaml"
+remote = "inventory/remote.yaml"
+password = "inventory/password.yaml"
+
+[ai_tools]
+configured = true
+manage_claude_code = true
+manage_codex = false
+manage_rtk = true
+""",
+            encoding="utf-8",
+        )
+
+        config = load_runtime_config(envmgr_home).ai_tools
+        if config.manage_herdr:
+            raise AssertionError(
+                "expected a legacy [ai_tools] table without manage_herdr to "
+                "leave Herdr disabled"
+            )
+        if not config.manage_rtk:
+            raise AssertionError("expected legacy RTK preference to be preserved")

@@ -173,15 +173,22 @@ class AiToolsConfig:
     manage_claude_code: bool
     manage_codex: bool
     manage_rtk: bool
+    manage_herdr: bool
 
     @classmethod
     def unconfigured_defaults(cls) -> AiToolsConfig:
-        """Return the not-yet-configured baseline for the AI-tools role."""
+        """Return the not-yet-configured baseline for the AI-tools role.
+
+        These are the fresh-install defaults. A tool is enabled here exactly when
+        the shared AI-tool registry triggers on the `ai_tools` role tag; that
+        agreement is enforced by `tests/checks/install.py`.
+        """
         return cls(
             configured=False,
             manage_claude_code=True,
             manage_codex=False,
             manage_rtk=True,
+            manage_herdr=True,
         )
 
 
@@ -412,6 +419,9 @@ def _read_ai_tools_config(data: dict[str, Any], config_path: Path) -> AiToolsCon
     if not isinstance(table, dict):
         return AiToolsConfig.unconfigured_defaults()
 
+    # Keys missing from a saved table default to the values the table was
+    # introduced with, except for tools added later: Herdr defaults to `false`
+    # so upgrading never installs a tool the user did not choose.
     configure = _read_bool(
         table.get("configured"),
         "ai_tools.configured",
@@ -437,6 +447,12 @@ def _read_ai_tools_config(data: dict[str, Any], config_path: Path) -> AiToolsCon
             "ai_tools.manage_rtk",
             config_path,
             default=True,
+        ),
+        manage_herdr=_read_bool(
+            table.get("manage_herdr"),
+            "ai_tools.manage_herdr",
+            config_path,
+            default=False,
         ),
     )
 
@@ -622,6 +638,7 @@ def _format_ai_tools_table(config: AiToolsConfig) -> list[str]:
         f"manage_claude_code = {str(config.manage_claude_code).lower()}",
         f"manage_codex = {str(config.manage_codex).lower()}",
         f"manage_rtk = {str(config.manage_rtk).lower()}",
+        f"manage_herdr = {str(config.manage_herdr).lower()}",
     ]
 
 

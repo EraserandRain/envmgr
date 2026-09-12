@@ -14,5 +14,9 @@ current when a new concept is named or a fuzzy term is sharpened.
   (non-`all`) installs it is a temporary generated file that Install cleans up.
 - **Role tags / task tags** — the two-level tag vocabulary discovered from role
   metadata; Install validates selections against it.
-- **AI-tools choices** — the resolution of whether Claude Code, Codex CLI, and
-  RTK are installed, from defaults or interactive prompts.
+- **Task-tag dependency scope** — the dependency closure one task tag installs:
+  its role's full `depends_on`, narrowed per tag when role metadata declares a
+  `task_depends_on` entry. Install resolves it before generating the execution
+  playbook.
+- **AI-tools choices** — the resolution of whether Claude Code, Codex CLI, RTK,
+  and Herdr are installed, from defaults or interactive prompts.

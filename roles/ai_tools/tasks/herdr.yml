@@ -1,0 +1,210 @@
+---
+- name: Check whether herdr exists at the managed path
+  stat:
+    path: "{{ ai_tools_config.herdr.install_dir }}/{{ ai_tools_config.herdr.binary }}"
+  register: herdr_managed_binary_stat
+  changed_when: false
+
+- name: Check current herdr version
+  shell: |
+    set -o pipefail
+    if [ -x "{{ ai_tools_config.herdr.install_dir }}/{{ ai_tools_config.herdr.binary }}" ]; then
+      "{{ ai_tools_config.herdr.install_dir }}/{{ ai_tools_config.herdr.binary }}" --version 2>&1 | head -n1
+    elif command -v {{ ai_tools_config.herdr.binary }} >/dev/null 2>&1; then
+      {{ ai_tools_config.herdr.binary }} --version 2>&1 | head -n1
+    else
+      echo "not_installed"
+    fi
+  args:
+    executable: /bin/bash
+  register: herdr_current_version_result
+  changed_when: false
+
+- name: Determine herdr release asset for this platform
+  set_fact:
+    herdr_release_asset: >-
+      {{
+        {
+          'linux/x86_64': 'herdr-linux-x86_64',
+          'linux/amd64': 'herdr-linux-x86_64',
+          'linux/aarch64': 'herdr-linux-aarch64',
+          'linux/arm64': 'herdr-linux-aarch64',
+          'darwin/x86_64': 'herdr-macos-x86_64',
+          'darwin/amd64': 'herdr-macos-x86_64',
+          'darwin/aarch64': 'herdr-macos-aarch64',
+          'darwin/arm64': 'herdr-macos-aarch64'
+        }.get((ansible_facts.system | lower) ~ '/' ~ (ansible_facts.architecture | lower), '')
+      }}
+
+- name: Fail if herdr does not publish a binary for this platform
+  fail:
+    msg: "herdr does not publish a release binary for {{ ansible_facts.system }} {{ ansible_facts.architecture }}"
+  when: herdr_release_asset == ''
+
+- name: Resolve latest herdr release via GitHub redirects
+  uri:
+    url: "{{ ai_tools_config.herdr.latest_release_url }}"
+    method: HEAD
+    follow_redirects: none
+    return_content: false
+    status_code:
+      - 200
+      - 301
+      - 302
+      - 303
+      - 307
+      - 308
+    timeout: 30
+  register: herdr_latest_release_redirect
+  changed_when: false
+  failed_when: false
+
+- name: Record herdr release metadata
+  set_fact:
+    herdr_current_version: "{{ herdr_current_version_result.stdout.strip() }}"
+    herdr_latest_version: >-
+      {{
+        (
+          (herdr_latest_release_redirect.location | default(''))
+          | regex_replace('^.*/tag/', '')
+          | regex_replace('[/?#].*$', '')
+        )
+        if '/tag/' in (herdr_latest_release_redirect.location | default(''))
+        else 'unknown'
+      }}
+
+- name: Determine if herdr needs update
+  set_fact:
+    herdr_download_path: >-
+      {{
+        installers_cache_dir
+        ~ '/herdr-'
+        ~ herdr_release_asset
+        ~ '-'
+        ~ (
+          (herdr_latest_version if herdr_latest_version != 'unknown' else 'latest')
+          | regex_replace('[^A-Za-z0-9._-]', '_')
+        )
+      }}
+    herdr_release_download_url: >-
+      {{
+        ai_tools_config.herdr.latest_download_base_url ~ '/' ~ herdr_release_asset
+        if herdr_latest_version == 'unknown'
+        else ai_tools_config.herdr.release_download_base_url ~ '/' ~ herdr_latest_version ~ '/' ~ herdr_release_asset
+      }}
+    herdr_needs_update: >-
+      {{
+        not (herdr_managed_binary_stat.stat.exists | default(false))
+        or herdr_current_version_result.stdout.strip() == 'not_installed'
+        or (
+          herdr_latest_version != 'unknown'
+          and (
+            (herdr_latest_version | regex_replace('^v', ''))
+            not in herdr_current_version_result.stdout.strip()
+          )
+        )
+      }}
+
+- name: Warn when latest herdr version could not be resolved
+  debug:
+    msg: >-
+      Could not resolve the latest herdr release tag from GitHub.
+      {{
+        'Installing from the latest download URL because the managed herdr binary is missing.'
+        if (herdr_needs_update | bool)
+        else 'Keeping the current managed herdr binary and skipping the update check.'
+      }}
+  when: herdr_latest_version == 'unknown'
+
+- name: Display herdr version information
+  debug:
+    msg:
+      - "=== herdr Version Check ==="
+      - "Current version: {{ herdr_current_version }}"
+      - "Latest version: {{ herdr_latest_version if herdr_latest_version != 'unknown' else 'unavailable (redirect lookup failed)' }}"
+      - "Action: {{ 'Install/Update needed' if (herdr_needs_update | bool) else 'Already up-to-date, skipping' }}"
+      - "==========================="
+
+- block:
+    - name: Ensure herdr install directory exists
+      file:
+        path: "{{ ai_tools_config.herdr.install_dir }}"
+        state: directory
+        mode: "0755"
+      when: herdr_needs_update | bool
+
+    - name: Download herdr release binary if update is needed
+      get_url:
+        url: "{{ herdr_release_download_url }}"
+        dest: "{{ herdr_download_path }}"
+        mode: "0755"
+        force: true
+        timeout: 30
+      register: herdr_binary_download
+      retries: 3
+      delay: 5
+      until: herdr_binary_download is succeeded
+      when: herdr_needs_update | bool
+
+    - name: Install or update herdr binary
+      copy:
+        src: "{{ herdr_download_path }}"
+        dest: "{{ ai_tools_config.herdr.install_dir }}/{{ ai_tools_config.herdr.binary }}"
+        mode: "0755"
+        remote_src: true
+      when: herdr_needs_update | bool
+
+    - name: Verify herdr binary exists
+      stat:
+        path: "{{ ai_tools_config.herdr.install_dir }}/{{ ai_tools_config.herdr.binary }}"
+      register: herdr_binary_stat
+
+    - name: Fail if herdr binary is not found
+      fail:
+        msg: "herdr installation failed - binary not found at {{ ai_tools_config.herdr.install_dir }}/{{ ai_tools_config.herdr.binary }}"
+      when: not herdr_binary_stat.stat.exists
+
+  rescue:
+    - name: Handle herdr installation failure
+      debug:
+        msg: "herdr installation failed: {{ ansible_failed_result.msg | default(ansible_failed_result.stderr | default('Unknown error')) }}"
+
+    - name: Clean up failed herdr installation
+      file:
+        path: "{{ ai_tools_config.herdr.install_dir }}/{{ ai_tools_config.herdr.binary }}"
+        state: absent
+      when:
+        - not (herdr_managed_binary_stat.stat.exists | default(false))
+        - herdr_binary_stat.stat.exists | default(false)
+
+    - name: Re-raise herdr installation failure
+      fail:
+        msg: "herdr installation failed and cleanup completed"
+
+- name: Verify herdr installation and get version
+  command: "{{ ai_tools_config.herdr.install_dir }}/{{ ai_tools_config.herdr.binary }} --version"
+  register: herdr_version_check
+  changed_when: false
+  failed_when: false
+
+- name: Set herdr installation status
+  set_fact:
+    herdr_installed: "{{ herdr_version_check.rc == 0 }}"
+    herdr_version: "{{ herdr_version_check.stdout if herdr_version_check.rc == 0 else 'version check failed' }}"
+
+- name: Display herdr summary and usage guidance
+  include_tasks:
+    file: show_tool_summary.yml
+  vars:
+    ai_tool_display_name: "Herdr"
+    ai_tool_installed: "{{ herdr_installed | default(false) }}"
+    ai_tool_version: "{{ herdr_version }}"
+    ai_tool_summary_footer: "==============================="
+    usage_lines:
+      - "Herdr Installation Complete!"
+      - ""
+      - "Next steps:"
+      - "1. Run 'herdr --help' to inspect the available Herdr commands"
+      - "2. Run 'herdr' to start the agent runtime"
+      - ""
+      - "Herdr is now available in ~/.local/bin."

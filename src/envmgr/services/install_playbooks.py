@@ -51,17 +51,14 @@ def resolve_selected_role_metadata(
     metadata_by_name = {metadata.name: metadata for metadata in catalog}
     resolved_metadata: dict[str, RoleMetadata] = {}
 
-    def add_metadata(metadata: RoleMetadata) -> None:
-        if metadata.name in resolved_metadata:
-            return
-        resolved_metadata[metadata.name] = metadata
-        for dependency_name in metadata.depends_on:
-            dependency = metadata_by_name.get(dependency_name)
-            if dependency is None:
-                raise CatalogError(
-                    f"role '{metadata.name}' depends on unknown role '{dependency_name}'"
-                )
-            add_metadata(dependency)
+    # A task tag can narrow its owning role's dependency closure via
+    # `task_depends_on`. Role-level tags and every role pulled in as a
+    # dependency install at role scope, so they keep the role's full
+    # `depends_on` closure. Resolve that up front so the result does not depend
+    # on which selected tag happened to be processed first.
+    narrowed_dependencies: dict[str, list[str]] = {}
+    full_closure_roles: set[str] = set()
+    selected_metadata: dict[str, RoleMetadata] = {}
 
     for selected_tag in selected_tags:
         matched_metadata = [
@@ -75,7 +72,54 @@ def resolve_selected_role_metadata(
             )
 
         for metadata in matched_metadata:
-            add_metadata(metadata)
+            selected_metadata.setdefault(metadata.name, metadata)
+            narrowed = None
+            # A role-level tag always selects role scope, even when the same
+            # tag is also declared as a task tag with a narrowed closure.
+            if selected_tag in metadata.task_tags and selected_tag not in metadata.tags:
+                narrowed = metadata.task_depends_on.get(selected_tag)
+            if narrowed is None:
+                full_closure_roles.add(metadata.name)
+                continue
+            dependencies = narrowed_dependencies.setdefault(metadata.name, [])
+            for dependency_name in narrowed:
+                if dependency_name not in dependencies:
+                    dependencies.append(dependency_name)
+
+    # Every dependency of a full-closure role, and every dependency a narrowed
+    # task tag left in place, installs at role scope too. Walk that closure
+    # iteratively so each role is expanded at most once.
+    pending_dependency_names = list(full_closure_roles)
+    for dependencies in narrowed_dependencies.values():
+        pending_dependency_names.extend(dependencies)
+    while pending_dependency_names:
+        dependency_name = pending_dependency_names.pop()
+        if dependency_name in full_closure_roles:
+            continue
+        full_closure_roles.add(dependency_name)
+        dependency = metadata_by_name.get(dependency_name)
+        if dependency is not None:
+            pending_dependency_names.extend(dependency.depends_on)
+
+    def dependencies_for(metadata: RoleMetadata) -> list[str]:
+        if metadata.name in full_closure_roles:
+            return metadata.depends_on
+        return narrowed_dependencies.get(metadata.name, metadata.depends_on)
+
+    def add_metadata(metadata: RoleMetadata) -> None:
+        if metadata.name in resolved_metadata:
+            return
+        resolved_metadata[metadata.name] = metadata
+        for dependency_name in dependencies_for(metadata):
+            dependency = metadata_by_name.get(dependency_name)
+            if dependency is None:
+                raise CatalogError(
+                    f"role '{metadata.name}' depends on unknown role '{dependency_name}'"
+                )
+            add_metadata(dependency)
+
+    for metadata in selected_metadata.values():
+        add_metadata(metadata)
 
     return resolved_metadata
 

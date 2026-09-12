@@ -11,14 +11,14 @@ class AiToolSpec:
     `key` is the Python config field suffix (for example `manage_claude_code`),
     `tool_tag` is the install task tag, `label` is the user-facing name, and
     `extra_var` is the Ansible per-tool override variable. `trigger_tags` are the
-    role/task tags that enable the tool during tag-driven planning.
+    role/task tags that enable the tool during tag-driven planning; including the
+    `ai_tools` role tag also makes the tool a fresh-install default.
     """
 
     key: str
     tool_tag: str
     label: str
     extra_var: str
-    default_enabled: bool
     trigger_tags: tuple[str, ...]
 
 
@@ -30,7 +30,6 @@ AI_TOOLS: tuple[AiToolSpec, ...] = (
         tool_tag="claude_code",
         label="Claude Code",
         extra_var="ai_tools_manage_claude_code_override",
-        default_enabled=True,
         trigger_tags=("all", AI_TOOLS_ROLE_TAG, "claude_code"),
     ),
     AiToolSpec(
@@ -38,7 +37,6 @@ AI_TOOLS: tuple[AiToolSpec, ...] = (
         tool_tag="codex",
         label="Codex CLI",
         extra_var="ai_tools_manage_codex_override",
-        default_enabled=False,
         trigger_tags=("all", "codex"),
     ),
     AiToolSpec(
@@ -46,8 +44,14 @@ AI_TOOLS: tuple[AiToolSpec, ...] = (
         tool_tag="rtk",
         label="RTK",
         extra_var="ai_tools_manage_rtk_override",
-        default_enabled=True,
         trigger_tags=("all", AI_TOOLS_ROLE_TAG, "rtk"),
+    ),
+    AiToolSpec(
+        key="manage_herdr",
+        tool_tag="herdr",
+        label="Herdr",
+        extra_var="ai_tools_manage_herdr_override",
+        trigger_tags=("all", AI_TOOLS_ROLE_TAG, "herdr"),
     ),
 )
 

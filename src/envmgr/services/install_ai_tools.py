@@ -30,6 +30,7 @@ class AiToolsInstallOptions:
     manage_claude_code: bool
     manage_codex: bool
     manage_rtk: bool
+    manage_herdr: bool
 
 
 @dataclass(frozen=True)
@@ -38,6 +39,7 @@ class AiToolsInstallDefaults:
     manage_claude_code: bool
     manage_codex: bool
     manage_rtk: bool
+    manage_herdr: bool
 
 
 @dataclass(frozen=True)
@@ -60,6 +62,7 @@ def build_ai_tools_install_defaults(
             manage_claude_code=False,
             manage_codex=False,
             manage_rtk=False,
+            manage_herdr=False,
         )
 
     requested_tags = {tag.lower() for tag in selected_tags}
@@ -72,6 +75,7 @@ def build_ai_tools_install_defaults(
         manage_claude_code=enabled["manage_claude_code"],
         manage_codex=enabled["manage_codex"],
         manage_rtk=enabled["manage_rtk"],
+        manage_herdr=enabled["manage_herdr"],
     )
 
 
@@ -88,6 +92,7 @@ def _options_from_config(config: AiToolsConfig) -> AiToolsInstallOptions:
         manage_claude_code=config.manage_claude_code,
         manage_codex=config.manage_codex,
         manage_rtk=config.manage_rtk,
+        manage_herdr=config.manage_herdr,
     )
     _ensure_at_least_one_tool(options)
     return options
@@ -101,6 +106,7 @@ def _options_from_defaults(
         manage_claude_code=defaults.manage_claude_code,
         manage_codex=defaults.manage_codex,
         manage_rtk=defaults.manage_rtk,
+        manage_herdr=defaults.manage_herdr,
     )
     _ensure_at_least_one_tool(options)
     return options
@@ -108,9 +114,14 @@ def _options_from_defaults(
 
 def _ensure_at_least_one_tool(options: AiToolsInstallOptions) -> None:
     """Raise when every AI tool is disabled for a run that targets this role."""
-    if not (options.manage_claude_code or options.manage_codex or options.manage_rtk):
+    if not (
+        options.manage_claude_code
+        or options.manage_codex
+        or options.manage_rtk
+        or options.manage_herdr
+    ):
         raise CatalogError(
-            "AI tools selection disabled Claude Code, Codex CLI, and RTK; "
+            "AI tools selection disabled Claude Code, Codex CLI, RTK, and Herdr; "
             "choose at least one tool"
         )
 
@@ -168,6 +179,7 @@ def _run_ai_tools_setup_wizard(
         manage_claude_code=resolved["manage_claude_code"],
         manage_codex=resolved["manage_codex"],
         manage_rtk=resolved["manage_rtk"],
+        manage_herdr=resolved["manage_herdr"],
     )
 
     console.print()
@@ -216,7 +228,7 @@ def resolve_ai_tools_choices(
         options = _options_from_defaults(defaults)
         return AiToolsResolution(options=options)
 
-    # Targeted task-tag run (claude_code / codex / rtk): tool selection comes from
-    # the tags themselves.
+    # Targeted task-tag run (claude_code / codex / rtk / herdr): tool selection
+    # comes from the tags themselves.
     options = _options_from_defaults(defaults)
     return AiToolsResolution(options=options)

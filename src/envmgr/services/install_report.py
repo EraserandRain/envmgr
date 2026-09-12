@@ -86,6 +86,7 @@ def build_install_plan_json(
                 "manage_claude_code": ai_tools_options.manage_claude_code,
                 "manage_codex": ai_tools_options.manage_codex,
                 "manage_rtk": ai_tools_options.manage_rtk,
+                "manage_herdr": ai_tools_options.manage_herdr,
                 "extra_vars": build_ai_tools_extra_vars(ai_tools_options),
             }
         )
@@ -151,4 +152,5 @@ def build_ai_tools_config_from_options(
         manage_claude_code=options.manage_claude_code,
         manage_codex=options.manage_codex,
         manage_rtk=options.manage_rtk,
+        manage_herdr=options.manage_herdr,
     )

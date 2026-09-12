@@ -35,14 +35,31 @@
           )
         ) | bool
       }}
+    ai_tools_manage_herdr: >-
+      {{
+        (
+          ai_tools_manage_herdr_override
+          if ai_tools_manage_herdr_override is not none
+          else (
+            'all' in requested_tags
+            or 'ai_tools' in requested_tags
+            or 'herdr' in requested_tags
+          )
+        ) | bool
+      }}
 
 - name: Ensure at least one AI tool is selected
   assert:
     that:
-      - ai_tools_manage_claude_code or ai_tools_manage_codex or ai_tools_manage_rtk
-    fail_msg: "AI tools role was selected but Claude Code, Codex CLI, and RTK were all disabled."
+      - ai_tools_manage_claude_code or ai_tools_manage_codex or ai_tools_manage_rtk or ai_tools_manage_herdr
+    fail_msg: "AI tools role was selected but Claude Code, Codex CLI, RTK, and Herdr were all disabled."
+
+- name: Resolve whether the selected AI tools need Volta
+  set_fact:
+    ai_tools_needs_volta: "{{ ai_tools_manage_claude_code or ai_tools_manage_codex }}"
 
 - name: Pre-flight checks for AI tools installation
+  when: ai_tools_needs_volta
   environment:
     VOLTA_HOME: "{{ ansible_facts['env']['HOME'] }}/.volta"
     PATH: "{{ ai_tools_user_bin_path }}:{{ volta_root }}/bin:{{ ansible_facts['env']['PATH'] }}"
@@ -94,12 +111,12 @@
         PATH: "{{ ai_tools_user_bin_path }}:{{ volta_root }}/bin:{{ ansible_facts['env']['PATH'] }}"
   vars:
     current_tool: "ai_tools_basic"
-  when: ai_tools_manage_claude_code or ai_tools_manage_codex
+  when: ai_tools_needs_volta
 
 - name: Update global status after basic installation
   set_fact:
     global_ai_tools_status: "{{ global_ai_tools_status | combine({'tools_attempted': global_ai_tools_status.tools_attempted + ['ai_tools_basic'], 'tools_successful': global_ai_tools_status.tools_successful + (['ai_tools_basic'] if (ai_tools_summary.claude_code.installed or ai_tools_summary.codex.installed) else []), 'tools_failed': global_ai_tools_status.tools_failed + ([] if (ai_tools_summary.claude_code.installed or ai_tools_summary.codex.installed) else ['ai_tools_basic'])}) }}"
-  when: ai_tools_manage_claude_code or ai_tools_manage_codex
+  when: ai_tools_needs_volta
 
 - name: Install Claude Code (Advanced Configuration)
   include_tasks:
@@ -161,6 +178,26 @@
     global_ai_tools_status: "{{ global_ai_tools_status | combine({'tools_attempted': global_ai_tools_status.tools_attempted + ['rtk'], 'tools_successful': global_ai_tools_status.tools_successful + (['rtk'] if (rtk_installed | default(false)) else []), 'tools_failed': global_ai_tools_status.tools_failed + ([] if (rtk_installed | default(false)) else ['rtk'])}) }}"
   when: ai_tools_manage_rtk
 
+- name: Install Herdr
+  include_tasks:
+    file: herdr.yml
+    apply:
+      environment:
+        VOLTA_HOME: "{{ ansible_facts['env']['HOME'] }}/.volta"
+        PATH: "{{ ai_tools_user_bin_path }}:{{ volta_root }}/bin:{{ ansible_facts['env']['PATH'] }}"
+      tags:
+        - herdr
+  vars:
+    current_tool: "herdr"
+  tags:
+    - herdr
+  when: ai_tools_manage_herdr
+
+- name: Update global status after Herdr configuration
+  set_fact:
+    global_ai_tools_status: "{{ global_ai_tools_status | combine({'tools_attempted': global_ai_tools_status.tools_attempted + ['herdr'], 'tools_successful': global_ai_tools_status.tools_successful + (['herdr'] if (herdr_installed | default(false)) else []), 'tools_failed': global_ai_tools_status.tools_failed + ([] if (herdr_installed | default(false)) else ['herdr'])}) }}"
+  when: ai_tools_manage_herdr
+
 - name: Final verification and rollback check
   block:
     - name: Perform final verification of requested AI tools
@@ -214,6 +251,20 @@
         tools_total=$((tools_total + 1))
         {% endif %}
 
+        {% if ai_tools_manage_herdr | bool %}
+        if command -v herdr >/dev/null 2>&1; then
+          if herdr --version >/dev/null 2>&1; then
+            echo "✓ Herdr: Working"
+            tools_working=$((tools_working + 1))
+          else
+            echo "⚠ Herdr: Installed but not working"
+          fi
+        else
+          echo "⚠ Herdr: not installed"
+        fi
+        tools_total=$((tools_total + 1))
+        {% endif %}
+
         echo "=============================="
         echo "Working tools: $tools_working/$tools_total"
 
@@ -256,6 +307,16 @@
             path: "{{ ai_tools_config.rtk.install_dir }}/{{ ai_tools_config.rtk.binary }}"
             state: absent
           when: "'rtk' in global_ai_tools_status.tools_failed"
+
+        - name: Remove failed Herdr installation
+          file:
+            path: "{{ ai_tools_config.herdr.install_dir }}/{{ ai_tools_config.herdr.binary }}"
+            state: absent
+          when:
+            - "'herdr' in global_ai_tools_status.tools_failed"
+            # Only remove the binary when this run installed it; a pre-existing
+            # Herdr install must survive a failed update attempt.
+            - not (herdr_managed_binary_stat.stat.exists | default(false))
 
         - name: Display rollback information
           debug:
