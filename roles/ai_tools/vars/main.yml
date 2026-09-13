@@ -15,6 +15,11 @@ ai_tools_config:
     package: "@openai/codex"
     binary: "codex"
     description: "OpenAI's Codex CLI"
+  kimi:
+    enabled: true
+    package: "@moonshot-ai/kimi-code"
+    binary: "kimi"
+    description: "Moonshot AI's Kimi Code CLI"
   rtk:
     enabled: true
     binary: "rtk"

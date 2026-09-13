@@ -107,6 +107,7 @@ def check_ai_tools_install_option_resolution() -> None:
         configured=True,
         manage_claude_code=True,
         manage_codex=True,
+        manage_kimi=True,
         manage_rtk=True,
         manage_herdr=True,
     )
@@ -128,6 +129,8 @@ def check_ai_tools_install_option_resolution() -> None:
         raise AssertionError("expected saved config to keep Claude Code enabled")
     if not options.manage_codex:
         raise AssertionError("expected saved config to keep Codex CLI enabled")
+    if not options.manage_kimi:
+        raise AssertionError("expected saved config to keep Kimi Code CLI enabled")
     if not options.manage_rtk:
         raise AssertionError("expected saved config to keep RTK enabled")
     if not options.manage_herdr:
@@ -166,6 +169,22 @@ def check_ai_tools_install_option_resolution() -> None:
     if not herdr_only_options.manage_herdr:
         raise AssertionError("expected herdr task tag to enable Herdr")
 
+    # Targeted task-tag run for Kimi Code CLI selects only Kimi Code CLI.
+    kimi_resolution = resolve_ai_tools_choices(
+        ["kimi"],
+        execution_playbook_path="workstation",
+        ai_tools_config=unconfigured,
+        interactive=False,
+        console=console,
+    )
+    kimi_only_options = kimi_resolution.options
+    if kimi_only_options is None:
+        raise AssertionError("expected kimi task tag to resolve AI tools options")
+    if not kimi_only_options.manage_kimi:
+        raise AssertionError("expected kimi task tag to enable Kimi Code CLI")
+    if kimi_only_options.manage_claude_code:
+        raise AssertionError("expected kimi task tag to leave Claude Code disabled")
+
     # Non-interactive first-run default-scope run falls back to tag defaults.
     all_resolution = resolve_ai_tools_choices(
         ["all"],
@@ -179,6 +198,8 @@ def check_ai_tools_install_option_resolution() -> None:
         raise AssertionError("expected all tag to resolve AI tools options")
     if not all_options.manage_codex:
         raise AssertionError("expected all tag to enable Codex CLI by default")
+    if not all_options.manage_kimi:
+        raise AssertionError("expected all tag to enable Kimi Code CLI by default")
     if not all_options.manage_herdr:
         raise AssertionError("expected all tag to enable Herdr by default")
 
@@ -199,6 +220,7 @@ def check_ai_tools_config_rejects_all_disabled() -> None:
         configured=True,
         manage_claude_code=False,
         manage_codex=False,
+        manage_kimi=False,
         manage_rtk=False,
         manage_herdr=False,
     )
@@ -314,6 +336,7 @@ def check_ai_tools_extra_vars_match_role_contract() -> None:
     options = AiToolsInstallOptions(
         manage_claude_code=True,
         manage_codex=False,
+        manage_kimi=False,
         manage_rtk=True,
         manage_herdr=True,
     )
@@ -321,6 +344,7 @@ def check_ai_tools_extra_vars_match_role_contract() -> None:
     expected_extra_var_keys = {
         "ai_tools_manage_claude_code_override",
         "ai_tools_manage_codex_override",
+        "ai_tools_manage_kimi_override",
         "ai_tools_manage_rtk_override",
         "ai_tools_manage_herdr_override",
     }
@@ -387,7 +411,7 @@ def check_ai_tools_setup_wizard_uses_shared_prompt_path() -> None:
         patch("envmgr.commands.shared.console.print"),
         patch(
             "envmgr.commands.shared.confirm_backend",
-            side_effect=[True, True, True, True, True],
+            side_effect=[True, True, True, True, True, True],
         ) as mock_confirm,
         patch(
             "builtins.input",
@@ -409,10 +433,12 @@ def check_ai_tools_setup_wizard_uses_shared_prompt_path() -> None:
         raise AssertionError("expected AI tools wizard to return install options")
     if not resolution.persist:
         raise AssertionError("expected first-run wizard to request config persistence")
-    if mock_confirm.call_count != 5:
+    if mock_confirm.call_count != 6:
         raise AssertionError("expected shared confirm prompts for each yes/no question")
     if not options.manage_codex:
         raise AssertionError("expected wizard to allow enabling Codex CLI")
+    if not options.manage_kimi:
+        raise AssertionError("expected wizard to allow enabling Kimi Code CLI")
 
 
 def check_ai_tools_setup_wizard_prompt_interrupt_exits_130() -> None:
@@ -730,6 +756,7 @@ def check_install_summary_uses_rich_console_and_keeps_raw_subprocess_output() ->
                 applicable=False,
                 manage_claude_code=False,
                 manage_codex=False,
+                manage_kimi=False,
                 manage_rtk=False,
                 manage_herdr=False,
             ),
@@ -828,6 +855,7 @@ def check_install_dry_run_reports_plan_without_subprocess_and_cleans_temp() -> N
                 applicable=False,
                 manage_claude_code=False,
                 manage_codex=False,
+                manage_kimi=False,
                 manage_rtk=False,
                 manage_herdr=False,
             ),
@@ -899,6 +927,7 @@ def check_install_dry_run_json_outputs_machine_readable_plan() -> None:
                 applicable=True,
                 manage_claude_code=True,
                 manage_codex=False,
+                manage_kimi=False,
                 manage_rtk=True,
                 manage_herdr=True,
             ),
@@ -906,6 +935,7 @@ def check_install_dry_run_json_outputs_machine_readable_plan() -> None:
         ai_tools_options = AiToolsInstallOptions(
             manage_claude_code=True,
             manage_codex=True,
+            manage_kimi=True,
             manage_rtk=False,
             manage_herdr=False,
         )
@@ -972,6 +1002,14 @@ def check_install_dry_run_json_outputs_machine_readable_plan() -> None:
             raise AssertionError("expected JSON dry-run to include command argv")
         if plan["ai_tools"]["extra_vars"]["ai_tools_manage_codex_override"] is not True:
             raise AssertionError("expected JSON dry-run to include AI tools extra-vars")
+        if plan["ai_tools"]["extra_vars"]["ai_tools_manage_kimi_override"] is not True:
+            raise AssertionError(
+                "expected JSON dry-run to include Kimi Code extra-vars"
+            )
+        if plan["ai_tools"]["manage_kimi"] is not True:
+            raise AssertionError(
+                "expected JSON dry-run to include Kimi Code CLI selection"
+            )
         if plan["ai_tools"]["manage_herdr"] is not False:
             raise AssertionError("expected JSON dry-run to include Herdr selection")
 
@@ -996,6 +1034,7 @@ def check_install_dry_run_json_reports_inapplicable_ai_tools() -> None:
                 applicable=False,
                 manage_claude_code=False,
                 manage_codex=False,
+                manage_kimi=False,
                 manage_rtk=False,
                 manage_herdr=False,
             ),
@@ -1061,6 +1100,7 @@ def check_install_wizard_cancellation_reports_via_rich_console() -> None:
                 applicable=True,
                 manage_claude_code=True,
                 manage_codex=False,
+                manage_kimi=False,
                 manage_rtk=True,
                 manage_herdr=True,
             ),
@@ -1156,6 +1196,7 @@ def check_install_interrupt_exits_cleanly() -> None:
                 applicable=False,
                 manage_claude_code=False,
                 manage_codex=False,
+                manage_kimi=False,
                 manage_rtk=False,
                 manage_herdr=False,
             ),

@@ -119,15 +119,16 @@ envmgr install --playbook ./custom-playbook.yml zsh
 
 Role-level tags include `ai_tools`, `cloud`, `docker`, `dotnet`, `golang`,
 `init`, `java`, `kubeadm`, `kubernetes_tools`, `minikube`, `monitoring`, `node`,
-`ruby`, and `zsh`. Task-level tags include `claude_code`, `codex`, `rtk`, `herdr`,
-`github_cli`, `hashicorp`, `terraform`, and `tf`.
+`ruby`, and `zsh`. Task-level tags include `claude_code`, `codex`, `kimi`,
+`rtk`, `herdr`, `github_cli`, `hashicorp`, `terraform`, and `tf`.
 
 ## AI Tools
 
 The `ai_tools` role depends on `node`. It installs Claude Code, RTK, and Herdr by
-default; Codex CLI is opt-in through the `codex` task tag or `all`. AI tools are
-selected by task tags, and the durable choices (which tools to manage) live in
-`~/.envmgr/config.toml` under `[ai_tools]`.
+default; Codex CLI and Kimi Code CLI are opt-in through their task tags (`codex`,
+`kimi`) or `all`. AI tools are selected by task tags, and the durable
+choices (which tools to manage) live in `~/.envmgr/config.toml` under
+`[ai_tools]`.
 
 The first interactive `envmgr install ai_tools` (or `envmgr install all`) run
 launches an AI Tools Setup wizard once and writes your choices into `[ai_tools]`.
@@ -137,9 +138,11 @@ the `envmgr config` command to review or change the saved configuration:
 ```bash
 envmgr install ai_tools            # first run: wizard + persist; later runs reuse config
 envmgr install codex               # install only Codex CLI via the codex task tag
+envmgr install kimi                # install only Kimi Code CLI via the kimi task tag
 envmgr install herdr               # install only Herdr via the herdr task tag
 envmgr config show                 # print the saved AI tools config
 envmgr config set ai_tools.manage_codex true
+envmgr config set ai_tools.manage_kimi true
 ```
 
 ## Reference

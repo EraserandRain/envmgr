@@ -794,6 +794,7 @@ def check_ai_tools_config_round_trip_preserves_other_tables() -> None:
                     "configured = true",
                     "manage_claude_code = true",
                     "manage_codex = false",
+                    "manage_kimi = false",
                     "manage_rtk = true",
                     "manage_herdr = false",
                 ]
@@ -808,6 +809,7 @@ def check_ai_tools_config_round_trip_preserves_other_tables() -> None:
                 configured=True,
                 manage_claude_code=True,
                 manage_codex=True,
+                manage_kimi=True,
                 manage_rtk=False,
                 manage_herdr=True,
             ),
@@ -836,6 +838,8 @@ def check_ai_tools_config_round_trip_preserves_other_tables() -> None:
             raise AssertionError("expected rewritten config to stay configured")
         if not config.manage_codex:
             raise AssertionError("expected rewritten config to update manage_codex")
+        if not config.manage_kimi:
+            raise AssertionError("expected rewritten config to update manage_kimi")
         if config.manage_rtk:
             raise AssertionError("expected rewritten config to update manage_rtk")
         if not config.manage_herdr:
@@ -874,6 +878,11 @@ manage_rtk = true
             raise AssertionError(
                 "expected a legacy [ai_tools] table without manage_herdr to "
                 "leave Herdr disabled"
+            )
+        if config.manage_kimi:
+            raise AssertionError(
+                "expected a legacy [ai_tools] table without manage_kimi to "
+                "leave Kimi Code CLI disabled"
             )
         if not config.manage_rtk:
             raise AssertionError("expected legacy RTK preference to be preserved")

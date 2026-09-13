@@ -172,6 +172,7 @@ class AiToolsConfig:
     configured: bool
     manage_claude_code: bool
     manage_codex: bool
+    manage_kimi: bool
     manage_rtk: bool
     manage_herdr: bool
 
@@ -187,6 +188,7 @@ class AiToolsConfig:
             configured=False,
             manage_claude_code=True,
             manage_codex=False,
+            manage_kimi=False,
             manage_rtk=True,
             manage_herdr=True,
         )
@@ -420,8 +422,9 @@ def _read_ai_tools_config(data: dict[str, Any], config_path: Path) -> AiToolsCon
         return AiToolsConfig.unconfigured_defaults()
 
     # Keys missing from a saved table default to the values the table was
-    # introduced with, except for tools added later: Herdr defaults to `false`
-    # so upgrading never installs a tool the user did not choose.
+    # introduced with, except for tools added later: Herdr and Kimi Code CLI
+    # default to `false` so upgrading never installs a tool the user did not
+    # choose.
     configure = _read_bool(
         table.get("configured"),
         "ai_tools.configured",
@@ -439,6 +442,12 @@ def _read_ai_tools_config(data: dict[str, Any], config_path: Path) -> AiToolsCon
         manage_codex=_read_bool(
             table.get("manage_codex"),
             "ai_tools.manage_codex",
+            config_path,
+            default=False,
+        ),
+        manage_kimi=_read_bool(
+            table.get("manage_kimi"),
+            "ai_tools.manage_kimi",
             config_path,
             default=False,
         ),
@@ -637,6 +646,7 @@ def _format_ai_tools_table(config: AiToolsConfig) -> list[str]:
         f"configured = {str(config.configured).lower()}",
         f"manage_claude_code = {str(config.manage_claude_code).lower()}",
         f"manage_codex = {str(config.manage_codex).lower()}",
+        f"manage_kimi = {str(config.manage_kimi).lower()}",
         f"manage_rtk = {str(config.manage_rtk).lower()}",
         f"manage_herdr = {str(config.manage_herdr).lower()}",
     ]

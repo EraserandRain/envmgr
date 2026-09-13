@@ -29,6 +29,7 @@ class WizardCancelled(RuntimeError):
 class AiToolsInstallOptions:
     manage_claude_code: bool
     manage_codex: bool
+    manage_kimi: bool
     manage_rtk: bool
     manage_herdr: bool
 
@@ -38,6 +39,7 @@ class AiToolsInstallDefaults:
     applicable: bool
     manage_claude_code: bool
     manage_codex: bool
+    manage_kimi: bool
     manage_rtk: bool
     manage_herdr: bool
 
@@ -61,6 +63,7 @@ def build_ai_tools_install_defaults(
             applicable=False,
             manage_claude_code=False,
             manage_codex=False,
+            manage_kimi=False,
             manage_rtk=False,
             manage_herdr=False,
         )
@@ -74,6 +77,7 @@ def build_ai_tools_install_defaults(
         applicable=True,
         manage_claude_code=enabled["manage_claude_code"],
         manage_codex=enabled["manage_codex"],
+        manage_kimi=enabled["manage_kimi"],
         manage_rtk=enabled["manage_rtk"],
         manage_herdr=enabled["manage_herdr"],
     )
@@ -91,6 +95,7 @@ def _options_from_config(config: AiToolsConfig) -> AiToolsInstallOptions:
     options = AiToolsInstallOptions(
         manage_claude_code=config.manage_claude_code,
         manage_codex=config.manage_codex,
+        manage_kimi=config.manage_kimi,
         manage_rtk=config.manage_rtk,
         manage_herdr=config.manage_herdr,
     )
@@ -105,6 +110,7 @@ def _options_from_defaults(
     options = AiToolsInstallOptions(
         manage_claude_code=defaults.manage_claude_code,
         manage_codex=defaults.manage_codex,
+        manage_kimi=defaults.manage_kimi,
         manage_rtk=defaults.manage_rtk,
         manage_herdr=defaults.manage_herdr,
     )
@@ -117,12 +123,13 @@ def _ensure_at_least_one_tool(options: AiToolsInstallOptions) -> None:
     if not (
         options.manage_claude_code
         or options.manage_codex
+        or options.manage_kimi
         or options.manage_rtk
         or options.manage_herdr
     ):
         raise CatalogError(
-            "AI tools selection disabled Claude Code, Codex CLI, RTK, and Herdr; "
-            "choose at least one tool"
+            "AI tools selection disabled Claude Code, Codex CLI, Kimi Code CLI, "
+            "RTK, and Herdr; choose at least one tool"
         )
 
 
@@ -178,6 +185,7 @@ def _run_ai_tools_setup_wizard(
     options = AiToolsInstallOptions(
         manage_claude_code=resolved["manage_claude_code"],
         manage_codex=resolved["manage_codex"],
+        manage_kimi=resolved["manage_kimi"],
         manage_rtk=resolved["manage_rtk"],
         manage_herdr=resolved["manage_herdr"],
     )

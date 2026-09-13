@@ -13,6 +13,7 @@ task_depends_on:
 task_tags:
   - claude_code
   - codex
+  - kimi
   - rtk
   - herdr
 vars_files: []
