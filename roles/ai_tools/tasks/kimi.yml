@@ -1,0 +1,58 @@
+---
+- name: Verify volta is available
+  when: ai_tools_volta_version is not defined
+  block:
+    - name: Check volta version for Kimi Code tasks
+      command: volta --version
+      register: volta_version
+      changed_when: false
+      failed_when: volta_version.rc != 0
+
+    - name: Cache volta version fact for Kimi Code tasks
+      set_fact:
+        ai_tools_volta_version: "{{ volta_version.stdout }}"
+
+- name: Check Kimi Code CLI version
+  include_tasks: check_tool_version.yml
+  vars:
+    tool_name: "Kimi Code CLI"
+    binary_name: "kimi"
+    package_name: "@moonshot-ai/kimi-code"
+  when: not (kimi_needs_update is defined and kimi_current_version is defined and kimi_latest_version is defined)
+
+- name: Ensure Kimi Code CLI binary is installed
+  include_tasks:
+    file: install_ai_tool.yml
+  vars:
+    ai_tool_name: "Kimi Code CLI"
+    ai_tool_install_command: "volta install @moonshot-ai/kimi-code@latest"
+    ai_tool_needs_update_var: "kimi_needs_update"
+    ai_tool_binary_path: "{{ volta_root }}/bin/{{ ai_tools_config.kimi.binary }}"
+
+- name: Verify Kimi Code CLI installation and get version
+  command: kimi --version
+  register: kimi_version_check
+  changed_when: false
+  failed_when: false
+
+- name: Set Kimi Code CLI installation status
+  set_fact:
+    kimi_installed: "{{ kimi_version_check.rc == 0 }}"
+    kimi_version: "{{ kimi_version_check.stdout if kimi_version_check.rc == 0 else 'version check failed' }}"
+
+- name: Display Kimi Code CLI summary and usage guidance
+  include_tasks:
+    file: show_tool_summary.yml
+  vars:
+    ai_tool_display_name: "Kimi Code CLI"
+    ai_tool_installed: "{{ kimi_installed | default(false) }}"
+    ai_tool_version: "{{ kimi_version }}"
+    ai_tool_summary_footer: "======================================"
+    usage_lines:
+      - "Kimi Code CLI Installation Complete!"
+      - ""
+      - "Next steps:"
+      - "1. Run 'kimi' to start the CLI"
+      - "2. Run '/login' inside the CLI to configure Kimi Code OAuth or an API key"
+      - ""
+      - "Kimi Code CLI is now available in your PATH via volta."

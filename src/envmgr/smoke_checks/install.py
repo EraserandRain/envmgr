@@ -12,7 +12,7 @@ def check_ai_tools_setup_wizard_flow() -> None:
         patch("envmgr.commands.shared.console.print"),
         patch(
             "envmgr.commands.shared.confirm_backend",
-            side_effect=[True, True, True, True, True],
+            side_effect=[True, True, True, True, True, True],
         ),
         patch(
             "builtins.input",
@@ -38,6 +38,8 @@ def check_ai_tools_setup_wizard_flow() -> None:
         raise AssertionError("expected wizard to keep Claude Code enabled")
     if not options.manage_codex:
         raise AssertionError("expected wizard to allow enabling Codex CLI")
+    if not options.manage_kimi:
+        raise AssertionError("expected wizard to allow enabling Kimi Code CLI")
     if not options.manage_rtk:
         raise AssertionError("expected wizard to keep RTK enabled by default")
     if not options.manage_herdr:

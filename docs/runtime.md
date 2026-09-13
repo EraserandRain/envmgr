@@ -84,19 +84,23 @@ without prompting:
 configured = true
 manage_claude_code = true
 manage_codex = true
+manage_kimi = true
 manage_rtk = true
 manage_herdr = true
 ```
 
 Use `envmgr config show` to inspect the saved values and
 `envmgr config set <key> <value>` to change them without re-running an install.
-Configs saved before `manage_herdr` existed read the missing key as `false`, so
-upgrading never installs Herdr without an explicit choice. Run
-`envmgr config set ai_tools.manage_herdr true` to opt in; while `[ai_tools]` is
-still unconfigured, the first-run wizard offers Herdr enabled.
-Specific tool runs such as `envmgr install codex`, `envmgr install claude_code`,
-`envmgr install rtk`, and `envmgr install herdr` select tools directly from the
-task tag and do not open the wizard.
+Configs saved before `manage_herdr` or `manage_kimi` existed read the
+missing key as `false`, so upgrading never installs Herdr or Kimi Code CLI
+without an explicit choice. Run
+`envmgr config set ai_tools.manage_herdr true` or
+`envmgr config set ai_tools.manage_kimi true` to opt in; while `[ai_tools]`
+is still unconfigured, the first-run wizard offers Herdr enabled and Kimi Code
+CLI disabled.
+Specific tool runs such as `envmgr install codex`, `envmgr install kimi`,
+`envmgr install claude_code`, `envmgr install rtk`, and `envmgr install herdr`
+select tools directly from the task tag and do not open the wizard.
 
 Commands that accept `-i` or `--inventory` use aliases from this config. Alias
 targets must stay under the runtime inventory directory; envmgr does not fall
@@ -206,7 +210,7 @@ a public interface.
 
 Role-level tags install complete modules:
 
-- `ai_tools` - Claude Code, optional Codex CLI, RTK, and Herdr.
+- `ai_tools` - Claude Code, optional Codex CLI and Kimi Code CLI, RTK, and Herdr.
 - `cloud` - HashiCorp repository tooling and Terraform tasks.
 - `docker`
 - `dotnet` - default .NET version `8.0`.
@@ -221,8 +225,8 @@ Role-level tags install complete modules:
 - `ruby` - default Ruby version `3.0.5`.
 - `zsh`
 
-Task-level tags include `claude_code`, `codex`, `rtk`, `herdr`, `github_cli`,
-`hashicorp`, `terraform`, and `tf`.
+Task-level tags include `claude_code`, `codex`, `kimi`, `rtk`, `herdr`,
+`github_cli`, `hashicorp`, `terraform`, and `tf`.
 
 Use `envmgr install -l` or `envmgr install --list-tags` for the generated,
 current list of scenarios, role tags, and task tags.

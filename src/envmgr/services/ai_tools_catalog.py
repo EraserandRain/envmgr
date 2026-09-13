@@ -40,6 +40,13 @@ AI_TOOLS: tuple[AiToolSpec, ...] = (
         trigger_tags=("all", "codex"),
     ),
     AiToolSpec(
+        key="manage_kimi",
+        tool_tag="kimi",
+        label="Kimi Code CLI",
+        extra_var="ai_tools_manage_kimi_override",
+        trigger_tags=("all", "kimi"),
+    ),
+    AiToolSpec(
         key="manage_rtk",
         tool_tag="rtk",
         label="RTK",

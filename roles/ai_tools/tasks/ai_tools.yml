@@ -22,6 +22,9 @@
       codex:
         installed: false
         version: "not installed"
+      kimi:
+        installed: false
+        version: "not installed"
       rtk:
         installed: false
         version: "not installed"
@@ -38,6 +41,10 @@
         +
         ([] if not (ai_tools_manage_codex | default(false)) else [
           {'name': 'Codex CLI', 'binary': 'codex', 'package': '@openai/codex'}
+        ])
+        +
+        ([] if not (ai_tools_manage_kimi | default(false)) else [
+          {'name': 'Kimi Code CLI', 'binary': 'kimi', 'package': '@moonshot-ai/kimi-code'}
         ])
       }}
 
@@ -70,6 +77,11 @@
               if (ai_tools_manage_codex | default(false))
               else []
             )
+            + (
+              ['Kimi Code CLI - Current: ' ~ kimi_current_version ~ ', Latest: ' ~ kimi_latest_version]
+              if (ai_tools_manage_kimi | default(false))
+              else []
+            )
             + ['================================']
           }}
 
@@ -93,6 +105,10 @@
       +
       ([] if not (ai_tools_manage_codex | default(false)) else [
         {'display_name': 'Codex CLI', 'binary': ai_tools_config.codex.binary, 'summary_key': 'codex'}
+      ])
+      +
+      ([] if not (ai_tools_manage_kimi | default(false)) else [
+        {'display_name': 'Kimi Code CLI', 'binary': ai_tools_config.kimi.binary, 'summary_key': 'kimi'}
       ])
     }}
   loop_control:
@@ -123,6 +139,15 @@
           if (ai_tools_manage_codex | default(false))
           else []
         )
+        + (
+          [
+            (
+              '✓ Kimi Code CLI: ' ~ ai_tools_summary.kimi.version
+            ) if ai_tools_summary.kimi.installed else '✗ Kimi Code CLI: not installed'
+          ]
+          if (ai_tools_manage_kimi | default(false))
+          else []
+        )
         + ['===========================']
       }}
 
@@ -135,7 +160,7 @@
       - "  • Check your internet connection"
       - "  • Verify volta is properly configured"
       - "  • Run the installation again"
-  when: not ((ai_tools_manage_claude_code | default(false) and ai_tools_summary.claude_code.installed) or (ai_tools_manage_codex | default(false) and ai_tools_summary.codex.installed))
+  when: not ((ai_tools_manage_claude_code | default(false) and ai_tools_summary.claude_code.installed) or (ai_tools_manage_codex | default(false) and ai_tools_summary.codex.installed) or (ai_tools_manage_kimi | default(false) and ai_tools_summary.kimi.installed))
 
 - name: Provide usage instructions
   debug:
@@ -154,6 +179,11 @@
           if (ai_tools_manage_codex | default(false) and ai_tools_summary.codex.installed)
           else []
         )
+        + (
+          ['  • Kimi Code CLI (' ~ ai_tools_summary.kimi.version ~ ')']
+          if (ai_tools_manage_kimi | default(false) and ai_tools_summary.kimi.installed)
+          else []
+        )
         + [
           '',
           'Next steps:',
@@ -168,10 +198,15 @@
           if (ai_tools_manage_codex | default(false) and ai_tools_summary.codex.installed)
           else []
         )
+        + (
+          ["  • Run 'kimi' to start Kimi Code CLI"]
+          if (ai_tools_manage_kimi | default(false) and ai_tools_summary.kimi.installed)
+          else []
+        )
         + [
           '  • Authentication and configuration may be required',
           '',
           'Requested tools are now available in your PATH via volta.',
         ]
       }}
-  when: (ai_tools_manage_claude_code | default(false) and ai_tools_summary.claude_code.installed) or (ai_tools_manage_codex | default(false) and ai_tools_summary.codex.installed)
+  when: (ai_tools_manage_claude_code | default(false) and ai_tools_summary.claude_code.installed) or (ai_tools_manage_codex | default(false) and ai_tools_summary.codex.installed) or (ai_tools_manage_kimi | default(false) and ai_tools_summary.kimi.installed)

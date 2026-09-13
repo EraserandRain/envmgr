@@ -23,6 +23,14 @@
           else ('all' in requested_tags or 'codex' in requested_tags)
         ) | bool
       }}
+    ai_tools_manage_kimi: >-
+      {{
+        (
+          ai_tools_manage_kimi_override
+          if ai_tools_manage_kimi_override is not none
+          else ('all' in requested_tags or 'kimi' in requested_tags)
+        ) | bool
+      }}
     ai_tools_manage_rtk: >-
       {{
         (
@@ -51,12 +59,12 @@
 - name: Ensure at least one AI tool is selected
   assert:
     that:
-      - ai_tools_manage_claude_code or ai_tools_manage_codex or ai_tools_manage_rtk or ai_tools_manage_herdr
-    fail_msg: "AI tools role was selected but Claude Code, Codex CLI, RTK, and Herdr were all disabled."
+      - ai_tools_manage_claude_code or ai_tools_manage_codex or ai_tools_manage_kimi or ai_tools_manage_rtk or ai_tools_manage_herdr
+    fail_msg: "AI tools role was selected but Claude Code, Codex CLI, Kimi Code CLI, RTK, and Herdr were all disabled."
 
 - name: Resolve whether the selected AI tools need Volta
   set_fact:
-    ai_tools_needs_volta: "{{ ai_tools_manage_claude_code or ai_tools_manage_codex }}"
+    ai_tools_needs_volta: "{{ ai_tools_manage_claude_code or ai_tools_manage_codex or ai_tools_manage_kimi }}"
 
 - name: Pre-flight checks for AI tools installation
   when: ai_tools_needs_volta
@@ -115,7 +123,7 @@
 
 - name: Update global status after basic installation
   set_fact:
-    global_ai_tools_status: "{{ global_ai_tools_status | combine({'tools_attempted': global_ai_tools_status.tools_attempted + ['ai_tools_basic'], 'tools_successful': global_ai_tools_status.tools_successful + (['ai_tools_basic'] if (ai_tools_summary.claude_code.installed or ai_tools_summary.codex.installed) else []), 'tools_failed': global_ai_tools_status.tools_failed + ([] if (ai_tools_summary.claude_code.installed or ai_tools_summary.codex.installed) else ['ai_tools_basic'])}) }}"
+    global_ai_tools_status: "{{ global_ai_tools_status | combine({'tools_attempted': global_ai_tools_status.tools_attempted + ['ai_tools_basic'], 'tools_successful': global_ai_tools_status.tools_successful + (['ai_tools_basic'] if (ai_tools_summary.claude_code.installed or ai_tools_summary.codex.installed or ai_tools_summary.kimi.installed) else []), 'tools_failed': global_ai_tools_status.tools_failed + ([] if (ai_tools_summary.claude_code.installed or ai_tools_summary.codex.installed or ai_tools_summary.kimi.installed) else ['ai_tools_basic'])}) }}"
   when: ai_tools_needs_volta
 
 - name: Install Claude Code (Advanced Configuration)
@@ -157,6 +165,26 @@
   set_fact:
     global_ai_tools_status: "{{ global_ai_tools_status | combine({'tools_attempted': global_ai_tools_status.tools_attempted + ['codex'], 'tools_successful': global_ai_tools_status.tools_successful + (['codex'] if (codex_installed | default(false)) else []), 'tools_failed': global_ai_tools_status.tools_failed + ([] if (codex_installed | default(false)) else ['codex'])}) }}"
   when: ai_tools_manage_codex
+
+- name: Install Kimi Code CLI (Advanced Configuration)
+  include_tasks:
+    file: kimi.yml
+    apply:
+      environment:
+        VOLTA_HOME: "{{ ansible_facts['env']['HOME'] }}/.volta"
+        PATH: "{{ ai_tools_user_bin_path }}:{{ volta_root }}/bin:{{ ansible_facts['env']['PATH'] }}"
+      tags:
+        - kimi
+  vars:
+    current_tool: "kimi"
+  tags:
+    - kimi
+  when: ai_tools_manage_kimi
+
+- name: Update global status after Kimi Code configuration
+  set_fact:
+    global_ai_tools_status: "{{ global_ai_tools_status | combine({'tools_attempted': global_ai_tools_status.tools_attempted + ['kimi'], 'tools_successful': global_ai_tools_status.tools_successful + (['kimi'] if (kimi_installed | default(false)) else []), 'tools_failed': global_ai_tools_status.tools_failed + ([] if (kimi_installed | default(false)) else ['kimi'])}) }}"
+  when: ai_tools_manage_kimi
 
 - name: Install RTK
   include_tasks:
@@ -237,6 +265,20 @@
         tools_total=$((tools_total + 1))
         {% endif %}
 
+        {% if ai_tools_manage_kimi | bool %}
+        if command -v kimi >/dev/null 2>&1; then
+          if kimi --version >/dev/null 2>&1; then
+            echo "✓ Kimi Code CLI: Working"
+            tools_working=$((tools_working + 1))
+          else
+            echo "⚠ Kimi Code CLI: Installed but not working"
+          fi
+        else
+          echo "⚠ Kimi Code CLI: not installed"
+        fi
+        tools_total=$((tools_total + 1))
+        {% endif %}
+
         {% if ai_tools_manage_rtk | bool %}
         if command -v rtk >/dev/null 2>&1; then
           if rtk --version >/dev/null 2>&1; then
@@ -301,6 +343,12 @@
             path: "{{ volta_root }}/bin/codex"
             state: absent
           when: "'codex' in global_ai_tools_status.tools_failed"
+
+        - name: Remove failed Kimi Code installation
+          file:
+            path: "{{ volta_root }}/bin/kimi"
+            state: absent
+          when: "'kimi' in global_ai_tools_status.tools_failed"
 
         - name: Remove failed RTK installation
           file:
